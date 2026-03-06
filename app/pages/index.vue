@@ -97,18 +97,27 @@ function barH(v: number) { return (v / pickupMax) * innerH }
       <div
         v-for="stat in stats"
         :key="stat.label"
-        style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)"
+        style="background:white;border:1px solid #ececec;border-radius:16px;padding:1px;box-shadow:0 1px 3px rgba(0,0,0,0.1),0 1px 2px rgba(0,0,0,0.1);overflow:hidden"
       >
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-          <div style="width:48px;height:48px;background:#fff9e6;border-radius:16px;display:flex;align-items:center;justify-content:center">
-            <UIcon :name="stat.icon" style="width:24px;height:24px;color:#ffb400" />
+        <div style="position:relative;height:144px">
+          <!-- Icon + badge -->
+          <div style="position:absolute;top:7px;left:24px;right:24px;height:48px;display:flex;align-items:center;justify-content:space-between">
+            <div style="width:48px;height:48px;background:#fff9e6;border-radius:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <UIcon :name="stat.icon" style="width:24px;height:24px;color:#ffb400" />
+            </div>
+            <span :style="`font-size:14px;font-weight:500;font-family:'Manrope',sans-serif;line-height:20px;color:${stat.positive === true ? '#22c55e' : stat.positive === false ? '#ef4444' : '#6b7280'}`">
+              {{ stat.change }}
+            </span>
           </div>
-          <span
-            :style="`font-size:14px;font-weight:500;font-family:'Manrope',sans-serif;color:${stat.positive === true ? '#22c55e' : stat.positive === false ? '#ef4444' : '#6b7280'}`"
-          >{{ stat.change }}</span>
+          <!-- Label -->
+          <p style="position:absolute;top:64px;left:24px;font-size:14px;font-weight:400;color:#6b7280;font-family:'Manrope',sans-serif;line-height:20px;white-space:nowrap">
+            {{ stat.label }}
+          </p>
+          <!-- Value -->
+          <p style="position:absolute;top:88px;left:24px;font-size:24px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif;line-height:32px;white-space:nowrap">
+            {{ stat.value }}
+          </p>
         </div>
-        <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">{{ stat.label }}</p>
-        <p style="font-size:24px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ stat.value }}</p>
       </div>
     </div>
 
@@ -228,26 +237,26 @@ function barH(v: number) { return (v / pickupMax) * innerH }
     </div>
 
     <!-- Active trucks -->
-    <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+    <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:25px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
       <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin-bottom:16px">Active Trucks</p>
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <div v-for="truck in trucks" :key="truck.id" style="background:#f8f9fa;border-radius:16px;padding:12px 16px;display:flex;align-items:center;gap:12px">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div v-for="truck in trucks" :key="truck.id" style="height:64px;background:#f8f9fa;border-radius:16px;padding:0 12px;display:flex;align-items:center;gap:12px">
           <div style="width:40px;height:40px;background:#22c55e;border-radius:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
             <UIcon name="i-lucide-truck" style="width:20px;height:20px;color:white" />
           </div>
-          <div style="flex:1;min-width:0">
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
             <div style="display:flex;align-items:center;gap:8px">
               <span style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ truck.id }}</span>
-              <span style="font-size:12px;font-weight:500;color:#22c55e;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);border-radius:14px;padding:3px 11px">on-route</span>
+              <span style="font-size:12px;font-weight:500;color:#22c55e;background:rgba(34,197,94,0.1);border-radius:14px;padding:3px 11px">on-route</span>
             </div>
-            <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:2px">{{ truck.driver }}</p>
+            <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ truck.driver }}</p>
           </div>
-          <div style="text-align:right">
-            <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
+          <div style="display:flex;flex-direction:column;gap:2px;align-items:flex-end">
+            <div style="display:flex;align-items:center;gap:4px">
               <UIcon name="i-lucide-map-pin" style="width:12px;height:12px;color:#6b7280" />
               <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ truck.zone }}</span>
             </div>
-            <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:2px">ETA: {{ truck.eta }}</p>
+            <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">ETA: {{ truck.eta }}</p>
           </div>
         </div>
       </div>
