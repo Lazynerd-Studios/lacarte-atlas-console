@@ -1,6 +1,8 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'dashboard' })
 
+const showModal = ref(false)
+
 const search = ref('')
 const statusFilter = ref('all')
 const planFilter = ref('all')
@@ -29,6 +31,12 @@ const paginated = computed(() => filtered.value.slice((page.value - 1) * perPage
 
 watch([search, statusFilter, planFilter], () => { page.value = 1 })
 
+function handleAddCustomer(data: Record<string, string>) {
+  // TODO: call API to create customer
+  console.log('New customer:', data)
+  showModal.value = false
+}
+
 function planBadge(plan: string) {
   if (plan === 'subscription') return { bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)', color: '#3b82f6', label: 'Subscription' }
   return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: 'Pay-as-you-go' }
@@ -49,7 +57,7 @@ function statusBadge(status: string) {
         <h1 style="font-size:32px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;line-height:1.3">Customers</h1>
         <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:4px">Manage all customer accounts and subscriptions</p>
       </div>
-      <button style="height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:1000px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)">
+      <button style="height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:1000px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)" @click="showModal = true">
         Add Customer
       </button>
     </div>
@@ -152,14 +160,16 @@ function statusBadge(status: string) {
             </td>
             <td style="padding:16px">
               <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px">
-                <button
-                  style="width:32px;height:32px;border-radius:20px;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center"
-                  title="View"
-                  @mouseover="($event.currentTarget as HTMLElement).style.background='#f3f4f6'"
-                  @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
-                >
-                  <UIcon name="i-lucide-eye" style="width:16px;height:16px;color:#6b7280" />
-                </button>
+                <NuxtLink :to="`/customers/${i + 1}`" style="text-decoration:none">
+                  <button
+                    style="width:32px;height:32px;border-radius:20px;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center"
+                    title="View"
+                    @mouseover="($event.currentTarget as HTMLElement).style.background='#f3f4f6'"
+                    @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
+                  >
+                    <UIcon name="i-lucide-eye" style="width:16px;height:16px;color:#6b7280" />
+                  </button>
+                </NuxtLink>
                 <button
                   style="width:32px;height:32px;border-radius:20px;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center"
                   title="Deactivate"
@@ -181,4 +191,7 @@ function statusBadge(status: string) {
     <!-- Pagination -->
     <AppPagination :page="page" :total="filtered.length" :per-page="perPage" @update:page="page = $event" />
   </div>
+
+  <!-- Add Customer Modal -->
+  <CustomerModal v-if="showModal" @close="showModal = false" @submit="handleAddCustomer" />
 </template>
