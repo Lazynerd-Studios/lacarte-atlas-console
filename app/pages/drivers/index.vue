@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 definePageMeta({ layout: 'dashboard' })
 
 const drivers = [
@@ -22,18 +22,31 @@ function statusStyle(s: string) {
       <div>
         <h1 style="font-size:32px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;line-height:1.3">Drivers &amp; Trucks</h1>
         <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:4px">Manage drivers, trucks, and assignments</p>
-        <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:2px">Current Pay Period: Feb 17 - Mar 2</p>
+        <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:2px">Current Pay Period: Feb 17 – Mar 2</p>
       </div>
       <div style="display:flex;gap:12px;flex-shrink:0">
-        <button style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px">
+        <button
+          style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px"
+          @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
+          @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
+        >
           <UIcon name="i-lucide-plus" style="width:16px;height:16px;color:#111" />
           Add Driver
         </button>
-        <button style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer">Manage Trucks</button>
+        <button
+          style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
+          @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
+          @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
+        >Manage Trucks</button>
       </div>
     </div>
+
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px">
-      <div v-for="d in drivers" :key="d.name" style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1);display:flex;flex-direction:column;gap:16px">
+      <div
+        v-for="d in drivers"
+        :key="d.name"
+        style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1);display:flex;flex-direction:column;gap:16px"
+      >
         <div style="display:flex;align-items:flex-start;gap:12px">
           <div style="width:48px;height:48px;border-radius:9999px;background:#ffb400;display:flex;align-items:center;justify-content:center;flex-shrink:0">
             <span style="font-size:18px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ d.initials }}</span>
@@ -43,6 +56,7 @@ function statusStyle(s: string) {
             <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:2px 10px;width:fit-content;color:${statusStyle(d.status).color};background:${statusStyle(d.status).bg};border:1px solid ${statusStyle(d.status).border}`">{{ d.status }}</span>
           </div>
         </div>
+
         <div style="display:flex;flex-direction:column;gap:12px">
           <div style="display:flex;align-items:center;gap:8px">
             <UIcon name="i-lucide-phone" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
@@ -61,24 +75,36 @@ function statusStyle(s: string) {
             <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ d.bins }} Assigned Bins</span>
           </div>
         </div>
+
         <div style="background:#f8f9fa;border-radius:16px;padding:12px">
           <div style="display:flex;align-items:center;justify-content:space-between">
             <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Today's Pickups</span>
             <span style="font-size:18px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ d.todayPickups }}</span>
           </div>
         </div>
+
         <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:4px">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
             <UIcon name="i-lucide-dollar-sign" style="width:16px;height:16px;color:#15803d;flex-shrink:0" />
             <span style="font-size:14px;font-weight:500;color:#15803d;font-family:'Manrope',sans-serif">Period Earnings</span>
           </div>
           <p style="font-size:20px;font-weight:700;color:#15803d;font-family:'Manrope',sans-serif;margin:0">{{ d.earnings }}</p>
-          <p style="font-size:12px;color:#dc2626;font-family:'Manrope',sans-serif;margin:0">-{{ d.incomplete }} incomplete ({{ d.incomplete }} x $15 = -{{ d.deduction }})</p>
+          <p style="font-size:12px;color:#dc2626;font-family:'Manrope',sans-serif;margin:0">-{{ d.incomplete }} incomplete ({{ d.incomplete }} × $15 = -{{ d.deduction }})</p>
           <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">{{ d.completed }}/{{ d.total }} tasks completed</p>
         </div>
+
         <div style="display:flex;gap:8px">
-          <button style="flex:1;height:40px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer">View Details</button>
-          <button style="height:40px;padding:0 16px;background:none;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer">Assign Bins</button>
+          <NuxtLink
+            :to="`/drivers/${d.name.toLowerCase().replace(/\s+/g, '-')}`"
+            style="flex:1;height:40px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;text-decoration:none"
+            @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
+            @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
+          >View Details</NuxtLink>
+          <button
+            style="height:40px;padding:0 16px;background:none;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
+            @mouseover="($event.currentTarget as HTMLElement).style.background='#f3f4f6'"
+            @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
+          >Assign Bins</button>
         </div>
       </div>
     </div>
