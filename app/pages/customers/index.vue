@@ -105,10 +105,10 @@ function statusBadge(status: string) {
           <UIcon name="i-lucide-chevron-down" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#6b7280;pointer-events:none" />
         </div>
 
-        <!-- More Filters -->
+        <!-- Filter -->
         <button style="height:42px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap">
           <UIcon name="i-lucide-sliders-horizontal" style="width:16px;height:16px;color:#111" />
-          More Filters
+          Filter
         </button>
 
         <!-- Export -->
@@ -176,7 +176,7 @@ function statusBadge(status: string) {
                   @mouseover="($event.currentTarget as HTMLElement).style.background='#fef2f2'"
                   @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
                 >
-                  <UIcon name="i-lucide-user-x" style="width:16px;height:16px;color:#6b7280" />
+                  <UIcon name="i-lucide-user-x" style="width:16px;height:16px;color:#ef4444" />
                 </button>
               </div>
             </td>

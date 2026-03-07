@@ -33,11 +33,23 @@ const statusBadge = computed(() => {
 })
 
 const showSuspendModal = ref(false)
+const showEditModal = ref(false)
 
 function handleSuspend(reason: string) {
   // TODO: call API to suspend customer
   console.log('Suspend reason:', reason)
   showSuspendModal.value = false
+}
+
+function handleEditCustomer(data: Record<string, unknown>) {
+  // TODO: call API to update customer
+  console.log('Updated customer:', data)
+  showEditModal.value = false
+}
+
+function downloadQR() {
+  // TODO: generate and download QR code for customer
+  console.log('Download QR for', customer.id)
 }
 
 const activeTab = ref('Overview')
@@ -126,7 +138,17 @@ function addNote() {
         </div>
         <!-- Right: actions -->
         <div style="display:flex;gap:8px;flex-shrink:0">
-          <button style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer">
+          <button
+            style="height:40px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px"
+            @click="downloadQR"
+          >
+            <UIcon name="i-lucide-qr-code" style="width:16px;height:16px;color:#0a0d12" />
+            Download QR
+          </button>
+          <button
+            style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
+            @click="showEditModal = true"
+          >
             Edit Customer
           </button>
           <button style="height:40px;padding:0 16px;background:#ef4444;border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:pointer" @click="showSuspendModal = true">
@@ -406,28 +428,39 @@ function addNote() {
 
         <!-- Notes -->
         <div v-else-if="activeTab === 'Notes'" style="display:flex;flex-direction:column;gap:16px">
-          <div style="display:flex;gap:8px">
-            <input
+          <!-- Add note box -->
+          <div style="background:#f8f9fa;border:1px solid #e5e7eb;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Add a Note</label>
+            <textarea
               v-model="newNote"
-              type="text"
-              placeholder="Add a note..."
-              style="flex:1;height:39px;padding:0 12px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none"
+              placeholder="Write a note about this customer..."
+              rows="3"
+              style="width:100%;padding:10px 12px;background:white;border:1px solid #e5e7eb;border-radius:12px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;resize:none;box-sizing:border-box;line-height:1.5"
               @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
               @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
-              @keyup.enter="addNote"
             />
-            <button
-              style="height:39px;padding:0 16px;background:#ffb400;border:none;border-radius:16px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer"
-              @click="addNote"
-            >Add</button>
+            <div style="display:flex;justify-content:flex-end">
+              <button
+                style="height:36px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer"
+                @click="addNote"
+              >Add Note</button>
+            </div>
           </div>
+
+          <!-- Notes list -->
           <div style="display:flex;flex-direction:column;gap:12px">
-            <div v-for="(note, i) in notes" :key="i" style="background:#f8f9fa;border-radius:16px;padding:16px">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-                <span style="font-size:12px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ note.author }}</span>
+            <p v-if="notes.length === 0" style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;text-align:center;padding:32px 0">No notes yet</p>
+            <div v-for="(note, i) in notes" :key="i" style="background:#f8f9fa;border:1px solid #e5e7eb;border-radius:16px;padding:16px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div style="width:28px;height:28px;border-radius:9999px;background:#ffb400;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                    <span style="font-size:11px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">A</span>
+                  </div>
+                  <span style="font-size:13px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ note.author }}</span>
+                </div>
                 <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ note.date }}</span>
               </div>
-              <p style="font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;line-height:1.5">{{ note.text }}</p>
+              <p style="font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;line-height:1.6;margin-left:36px">{{ note.text }}</p>
             </div>
           </div>
         </div>
@@ -442,5 +475,13 @@ function addNote() {
     :customer-name="`${customer.firstName} ${customer.lastName}`"
     @close="showSuspendModal = false"
     @confirm="handleSuspend"
+  />
+
+  <!-- Edit Customer Modal -->
+  <EditCustomerModal
+    v-if="showEditModal"
+    :customer="customer"
+    @close="showEditModal = false"
+    @submit="handleEditCustomer"
   />
 </template>
