@@ -33,11 +33,12 @@ function statusStyle(s: string) {
           <UIcon name="i-lucide-plus" style="width:16px;height:16px;color:#111" />
           Add Driver
         </button>
-        <button
-          style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
+        <NuxtLink
+          to="/trucks"
+          style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;text-decoration:none"
           @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
           @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
-        >Manage Trucks</button>
+        >Manage Trucks</NuxtLink>
       </div>
     </div>
 

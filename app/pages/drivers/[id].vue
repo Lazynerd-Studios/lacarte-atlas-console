@@ -45,31 +45,117 @@ const currentRoute = [
 ]
 
 const routeHistory = [
-  { date: '2026-03-06', stops: 28, completed: 28, missed: 0, duration: '6h 12m', earnings: 'GHS 420' },
-  { date: '2026-03-05', stops: 25, completed: 24, missed: 1, duration: '5h 48m', earnings: 'GHS 360' },
-  { date: '2026-03-04', stops: 30, completed: 29, missed: 1, duration: '6h 55m', earnings: 'GHS 435' },
-  { date: '2026-03-03', stops: 22, completed: 22, missed: 0, duration: '5h 10m', earnings: 'GHS 330' },
-  { date: '2026-03-01', stops: 27, completed: 27, missed: 0, duration: '6h 05m', earnings: 'GHS 405' },
+  { date: '2026-03-01', stops: 28, completed: 28, duration: '6h 20m', zone: 'Downtown' },
+  { date: '2026-02-28', stops: 32, completed: 31, duration: '7h 10m', zone: 'Downtown' },
+  { date: '2026-02-27', stops: 27, completed: 27, duration: '6h 05m', zone: 'Downtown' },
+  { date: '2026-02-26', stops: 30, completed: 30, duration: '6h 45m', zone: 'Downtown' },
+  { date: '2026-02-25', stops: 25, completed: 24, duration: '5h 50m', zone: 'Downtown' },
 ]
 
-const performanceStats = [
-  { label: 'Total Pickups (All Time)', value: '1,245' },
-  { label: 'Avg Pickups / Day',        value: '24.3' },
-  { label: 'On-Time Rate',             value: '96.2%' },
-  { label: 'Customer Rating',          value: '4.8 / 5' },
+const monthlyPickups = [
+  { month: 'Sep', value: 480 },
+  { month: 'Oct', value: 520 },
+  { month: 'Nov', value: 560 },
+  { month: 'Dec', value: 500 },
+  { month: 'Jan', value: 610 },
+  { month: 'Feb', value: 680 },
 ]
+
+const completionRates = [
+  { month: 'Sep', value: 91 },
+  { month: 'Oct', value: 93 },
+  { month: 'Nov', value: 95 },
+  { month: 'Dec', value: 92 },
+  { month: 'Jan', value: 97 },
+  { month: 'Feb', value: 98.5 },
+]
+
+const perfStats = [
+  { label: 'Average Time/Stop', value: '4.2 min', color: '#1a1a1a' },
+  { label: 'On-Time Rate',      value: '98.5%',   color: '#22c55e' },
+  { label: 'Customer Rating',   value: '4.9/5.0', color: '#1a1a1a' },
+]
+
+// Bar chart helpers
+const barChartH = 220
+const barChartPadL = 40
+const barChartPadB = 28
+const barMax = 800
+function barY(v: number) { return barChartH - barChartPadB - (v / barMax) * (barChartH - barChartPadB - 8) }
+function barH(v: number) { return (v / barMax) * (barChartH - barChartPadB - 8) }
+
+// Line chart helpers
+const lineChartH = 220
+const lineChartPadL = 40
+const lineChartPadB = 28
+const lineMin = 88
+const lineMax = 100
+function lineY(v: number) { return lineChartH - lineChartPadB - ((v - lineMin) / (lineMax - lineMin)) * (lineChartH - lineChartPadB - 8) }
+
+function barPoints(data: { month: string; value: number }[], totalW: number) {
+  const n = data.length
+  const usableW = totalW - barChartPadL
+  const slotW = usableW / n
+  const bw = slotW * 0.45
+  return data.map((d, i) => ({
+    x: barChartPadL + i * slotW + slotW / 2 - bw / 2,
+    y: barY(d.value),
+    h: barH(d.value),
+    w: bw,
+    month: d.month,
+  }))
+}
+
+function linePolyline(data: { month: string; value: number }[], totalW: number) {
+  const n = data.length
+  const usableW = totalW - lineChartPadL
+  const slotW = usableW / n
+  return data.map((d, i) => `${lineChartPadL + i * slotW + slotW / 2},${lineY(d.value)}`).join(' ')
+}
+
+function linePoints(data: { month: string; value: number }[], totalW: number) {
+  const n = data.length
+  const usableW = totalW - lineChartPadL
+  const slotW = usableW / n
+  return data.map((d, i) => ({
+    x: lineChartPadL + i * slotW + slotW / 2,
+    y: lineY(d.value),
+    month: d.month,
+    value: d.value,
+  }))
+}
+
+const currentPeriod = {
+  label: 'Current Pay Period (Feb 17 – Mar 2, 2026)',
+  total: 'GHS 1,955.00',
+  status: 'In Progress',
+  basePay: 'GHS 2,000.00',
+  tasks: '142/145',
+  deductions: '-GHS 45.00',
+  deductionNote: '3 incomplete × GHS 15',
+  bonus: '+GHS 0.00',
+  paymentSchedule: 'Bi-weekly (every 2 weeks)',
+  deductionPolicy: 'GHS 15 deducted per incomplete assigned task. Complete 100% of tasks to avoid deductions and earn a GHS 50 bonus.',
+}
 
 const earningsHistory = [
-  { period: 'Feb 17 – Mar 2', gross: 'GHS 2,100', deductions: 'GHS 45', net: 'GHS 2,055' },
-  { period: 'Feb 3 – Feb 16', gross: 'GHS 1,980', deductions: 'GHS 30', net: 'GHS 1,950' },
-  { period: 'Jan 20 – Feb 2', gross: 'GHS 2,040', deductions: 'GHS 60', net: 'GHS 1,980' },
-  { period: 'Jan 6 – Jan 19', gross: 'GHS 1,890', deductions: 'GHS 15', net: 'GHS 1,875' },
+  { period: 'Feb 3 – Feb 16, 2026',  basePay: 'GHS 2,000.00', tasks: '145/145', tasksColor: '#22c55e', deductions: '-GHS 0.00',  deductionsColor: '#6b7280', bonus: '+GHS 50.00',  bonusColor: '#22c55e', total: 'GHS 2,050.00', status: 'paid' },
+  { period: 'Jan 20 – Feb 2, 2026',  basePay: 'GHS 2,000.00', tasks: '148/150', tasksColor: '#ffb400', deductions: '-GHS 30.00', deductionsColor: '#dc2626', bonus: '+GHS 0.00',   bonusColor: '#6b7280', total: 'GHS 1,970.00', status: 'paid' },
+  { period: 'Jan 6 – Jan 19, 2026',  basePay: 'GHS 2,000.00', tasks: '147/148', tasksColor: '#ffb400', deductions: '-GHS 15.00', deductionsColor: '#dc2626', bonus: '+GHS 50.00',  bonusColor: '#22c55e', total: 'GHS 2,035.00', status: 'paid' },
+  { period: 'Dec 23 – Jan 5, 2026',  basePay: 'GHS 2,000.00', tasks: '140/140', tasksColor: '#22c55e', deductions: '-GHS 0.00',  deductionsColor: '#6b7280', bonus: '+GHS 100.00', bonusColor: '#22c55e', total: 'GHS 2,100.00', status: 'paid' },
 ]
 
-const assignedBins = [
-  { type: 'Standard Bin',  size: '120L', customers: 18, status: 'active' },
-  { type: 'Recycling Bin', size: '80L',  customers: 12, status: 'active' },
-]
+const assignedBins = ref([
+  { type: 'Standard Waste Bin', quantity: 2, zone: 'Downtown', assigned: '2026-03-01' },
+  { type: 'Recycling Bin',      quantity: 1, zone: 'Downtown', assigned: '2026-03-01' },
+])
+
+const showAssignBinModal = ref(false)
+
+function handleAssignBin(data: { binType: string; quantity: number; zone: string; date: string; notes: string }) {
+  assignedBins.value.push({ type: data.binType, quantity: data.quantity, zone: data.zone, assigned: data.date })
+  showAssignBinModal.value = false
+}
 
 function stopBadge(status: string) {
   if (status === 'completed')   return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e' }
@@ -233,9 +319,8 @@ function stopBadge(status: string) {
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Date</th>
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Total Stops</th>
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Completed</th>
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Missed</th>
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Duration</th>
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Earnings</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Zone</th>
                 </tr>
               </thead>
               <tbody>
@@ -246,12 +331,11 @@ function stopBadge(status: string) {
                   @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
                   @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
                 >
-                  <td style="padding:18px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.date }}</td>
-                  <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.stops }}</td>
-                  <td style="padding:18px 16px;font-size:14px;color:#22c55e;font-weight:600;font-family:'Manrope',sans-serif">{{ row.completed }}</td>
-                  <td style="padding:18px 16px;font-size:14px;font-family:'Manrope',sans-serif" :style="row.missed > 0 ? 'color:#ef4444;font-weight:600' : 'color:#6b7280'">{{ row.missed }}</td>
-                  <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.duration }}</td>
-                  <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.earnings }}</td>
+                  <td style="padding:17px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.date }}</td>
+                  <td style="padding:17px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.stops }}</td>
+                  <td style="padding:17px 16px;font-size:14px;font-family:'Manrope',sans-serif" :style="`color:${row.completed === row.stops ? '#22c55e' : '#ffb400'}`">{{ row.completed }}</td>
+                  <td style="padding:17px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.duration }}</td>
+                  <td style="padding:17px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.zone }}</td>
                 </tr>
               </tbody>
             </table>
@@ -259,32 +343,134 @@ function stopBadge(status: string) {
         </div>
 
         <!-- Performance -->
-        <div v-else-if="activeTab === 'Performance'" style="display:grid;grid-template-columns:repeat(2,1fr);gap:24px">
-          <div v-for="stat in performanceStats" :key="stat.label" style="background:#f8f9fa;border-radius:16px;padding:20px 24px">
-            <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">{{ stat.label }}</p>
-            <p style="font-size:24px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ stat.value }}</p>
+        <div v-else-if="activeTab === 'Performance'" style="display:flex;flex-direction:column;gap:24px">
+
+          <!-- Monthly Pickups bar chart -->
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Monthly Pickups</p>
+            <div style="width:100%;overflow:hidden">
+              <svg width="100%" :viewBox="`0 0 1030 ${barChartH}`" preserveAspectRatio="none" style="display:block">
+                <!-- Y grid lines + labels -->
+                <template v-for="tick in [0,200,400,600,800]" :key="tick">
+                  <line :x1="barChartPadL" :y1="barY(tick)" :x2="1030" :y2="barY(tick)" stroke="#e5e7eb" stroke-width="1" />
+                  <text :x="barChartPadL - 6" :y="barY(tick) + 4" text-anchor="end" font-size="11" fill="#6b7280" font-family="Inter,sans-serif">{{ tick }}</text>
+                </template>
+                <!-- Bars -->
+                <template v-for="b in barPoints(monthlyPickups, 1030)" :key="b.month">
+                  <rect :x="b.x" :y="b.y" :width="b.w" :height="b.h" rx="4" fill="#ffb400" />
+                  <text :x="b.x + b.w / 2" :y="barChartH - 6" text-anchor="middle" font-size="11" fill="#6b7280" font-family="Inter,sans-serif">{{ b.month }}</text>
+                </template>
+                <!-- X axis -->
+                <line :x1="barChartPadL" :y1="barChartH - barChartPadB" x2="1030" :y2="barChartH - barChartPadB" stroke="#e5e7eb" stroke-width="1" />
+              </svg>
+            </div>
           </div>
-          <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:16px;padding:20px 24px">
-            <p style="font-size:14px;color:#15803d;font-family:'Manrope',sans-serif;margin-bottom:8px">Incomplete Deductions</p>
-            <p style="font-size:24px;font-weight:700;color:#dc2626;font-family:'Manrope',sans-serif">-{{ driver.deduction }}</p>
-            <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:4px">{{ driver.incompleteCount }} incomplete × GHS 15</p>
+
+          <!-- Completion Rate line chart -->
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Completion Rate (%)</p>
+            <div style="width:100%;overflow:hidden">
+              <svg width="100%" :viewBox="`0 0 1030 ${lineChartH}`" preserveAspectRatio="none" style="display:block">
+                <!-- Y grid lines + labels -->
+                <template v-for="tick in [90,93,96,100]" :key="tick">
+                  <line :x1="lineChartPadL" :y1="lineY(tick)" :x2="1030" :y2="lineY(tick)" stroke="#e5e7eb" stroke-width="1" />
+                  <text :x="lineChartPadL - 6" :y="lineY(tick) + 4" text-anchor="end" font-size="11" fill="#6b7280" font-family="Inter,sans-serif">{{ tick }}</text>
+                </template>
+                <!-- Area fill -->
+                <defs>
+                  <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#ffb400" stop-opacity="0.15" />
+                    <stop offset="100%" stop-color="#ffb400" stop-opacity="0" />
+                  </linearGradient>
+                </defs>
+                <polygon
+                  :points="`${lineChartPadL + (1030 - lineChartPadL) / completionRates.length / 2},${lineChartH - lineChartPadB} ${linePolyline(completionRates, 1030)} ${lineChartPadL + (completionRates.length - 0.5) * ((1030 - lineChartPadL) / completionRates.length)},${lineChartH - lineChartPadB}`"
+                  fill="url(#lineGrad)"
+                />
+                <!-- Line -->
+                <polyline :points="linePolyline(completionRates, 1030)" fill="none" stroke="#ffb400" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
+                <!-- Dots + X labels -->
+                <template v-for="p in linePoints(completionRates, 1030)" :key="p.month">
+                  <circle :cx="p.x" :cy="p.y" r="4" fill="white" stroke="#ffb400" stroke-width="2" />
+                  <text :x="p.x" :y="lineChartH - 6" text-anchor="middle" font-size="11" fill="#6b7280" font-family="Inter,sans-serif">{{ p.month }}</text>
+                </template>
+                <!-- X axis -->
+                <line :x1="lineChartPadL" :y1="lineChartH - lineChartPadB" x2="1030" :y2="lineChartH - lineChartPadB" stroke="#e5e7eb" stroke-width="1" />
+              </svg>
+            </div>
           </div>
-          <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:16px;padding:20px 24px">
-            <p style="font-size:14px;color:#15803d;font-family:'Manrope',sans-serif;margin-bottom:8px">Tasks Completed</p>
-            <p style="font-size:24px;font-weight:700;color:#15803d;font-family:'Manrope',sans-serif">{{ driver.completed }} / {{ driver.total }}</p>
+
+          <!-- Stat cards -->
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px">
+            <div v-for="s in perfStats" :key="s.label" style="background:white;border:1px solid #ececec;border-radius:16px;padding:10px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+              <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">{{ s.label }}</p>
+              <p :style="`font-size:24px;font-weight:700;font-family:'Manrope',sans-serif;color:${s.color}`">{{ s.value }}</p>
+            </div>
           </div>
+
         </div>
 
         <!-- Earnings -->
-        <div v-else-if="activeTab === 'Earnings'">
+        <div v-else-if="activeTab === 'Earnings'" style="display:flex;flex-direction:column;gap:24px">
+
+          <!-- Current period summary card -->
+          <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:16px;padding:25px;display:flex;flex-direction:column;gap:16px">
+            <!-- Header row -->
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ currentPeriod.label }}</p>
+                <p style="font-size:30px;font-weight:700;color:#15803d;font-family:'Manrope',sans-serif">{{ currentPeriod.total }}</p>
+              </div>
+              <span style="font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;color:#d49a00;background:rgba(255,180,0,0.1);border:1px solid rgba(255,180,0,0.2);border-radius:14px;padding:3px 11px">
+                {{ currentPeriod.status }}
+              </span>
+            </div>
+
+            <!-- Breakdown row -->
+            <div style="border-top:1px solid #86efac;padding-top:17px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Base Pay</p>
+                <p style="font-size:14px;font-weight:700;color:#15803d;font-family:'Manrope',sans-serif">{{ currentPeriod.basePay }}</p>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Tasks Completed</p>
+                <p style="font-size:14px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ currentPeriod.tasks }}</p>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Deductions</p>
+                <p style="font-size:14px;font-weight:700;color:#dc2626;font-family:'Manrope',sans-serif">{{ currentPeriod.deductions }}</p>
+                <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ currentPeriod.deductionNote }}</p>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Bonus</p>
+                <p style="font-size:14px;font-weight:700;color:#15803d;font-family:'Manrope',sans-serif">{{ currentPeriod.bonus }}</p>
+              </div>
+            </div>
+
+            <!-- Policy note -->
+            <div style="background:white;border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:8px">
+              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Payment Schedule: {{ currentPeriod.paymentSchedule }}</p>
+              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">
+                <span style="font-weight:700">Deduction Policy:</span> {{ currentPeriod.deductionPolicy }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Earnings History heading -->
+          <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Earnings History</p>
+
+          <!-- History table -->
           <div style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
             <table style="width:100%;border-collapse:collapse">
               <thead>
                 <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Pay Period</th>
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Gross</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Period</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Base Pay</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Tasks</th>
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Deductions</th>
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Net</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Bonus</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Total Earnings</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -295,10 +481,17 @@ function stopBadge(status: string) {
                   @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
                   @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
                 >
-                  <td style="padding:18px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.period }}</td>
-                  <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.gross }}</td>
-                  <td style="padding:18px 16px;font-size:14px;color:#ef4444;font-family:'Manrope',sans-serif">-{{ row.deductions }}</td>
-                  <td style="padding:18px 16px;font-size:14px;font-weight:600;color:#22c55e;font-family:'Manrope',sans-serif">{{ row.net }}</td>
+                  <td style="padding:18px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ row.period }}</td>
+                  <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ row.basePay }}</td>
+                  <td style="padding:18px 16px;font-size:14px;font-family:'Manrope',sans-serif;white-space:nowrap" :style="`color:${row.tasksColor}`">{{ row.tasks }}</td>
+                  <td style="padding:18px 16px;font-size:14px;font-family:'Manrope',sans-serif;white-space:nowrap" :style="`color:${row.deductionsColor}`">{{ row.deductions }}</td>
+                  <td style="padding:18px 16px;font-size:14px;font-family:'Manrope',sans-serif;white-space:nowrap" :style="`color:${row.bonusColor}`">{{ row.bonus }}</td>
+                  <td style="padding:18px 16px;font-size:14px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ row.total }}</td>
+                  <td style="padding:18px 16px">
+                    <span style="font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;color:#22c55e;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2)">
+                      {{ row.status }}
+                    </span>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -306,15 +499,31 @@ function stopBadge(status: string) {
         </div>
 
         <!-- Assigned Bins -->
-        <div v-else-if="activeTab === 'Assigned Bins'">
+        <div v-else-if="activeTab === 'Assigned Bins'" style="display:flex;flex-direction:column;gap:16px">
+          <!-- Header -->
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Assigned Waste Bins</p>
+              <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Bins currently assigned to this driver</p>
+            </div>
+            <button
+              style="height:40px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
+              @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
+              @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
+              @click="showAssignBinModal = true"
+            >Assign More Bins</button>
+          </div>
+
+          <!-- Table -->
           <div style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
             <table style="width:100%;border-collapse:collapse">
               <thead>
                 <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Bin Type</th>
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Size</th>
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Customers</th>
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Status</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Quantity</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Zone</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Assigned Date</th>
+                  <th style="padding:14px 16px;text-align:right;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -325,14 +534,21 @@ function stopBadge(status: string) {
                   @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
                   @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
                 >
-                  <td style="padding:18px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ bin.type }}</td>
-                  <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ bin.size }}</td>
-                  <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ bin.customers }}</td>
-                  <td style="padding:18px 16px">
-                    <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;color:${bin.status === 'active' ? '#22c55e' : '#6b7280'};background:${bin.status === 'active' ? 'rgba(34,197,94,0.1)' : '#e5e7eb'};border:1px solid ${bin.status === 'active' ? 'rgba(34,197,94,0.2)' : '#e5e7eb'}`">
-                      {{ bin.status }}
-                    </span>
+                  <td style="padding:23px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ bin.type }}</td>
+                  <td style="padding:23px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ bin.quantity }}</td>
+                  <td style="padding:23px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ bin.zone }}</td>
+                  <td style="padding:23px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ bin.assigned }}</td>
+                  <td style="padding:23px 16px;text-align:right">
+                    <button
+                      style="height:32px;padding:0 16px;background:none;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
+                      @mouseover="($event.currentTarget as HTMLElement).style.background='#f3f4f6'"
+                      @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
+                      @click="assignedBins.splice(i, 1)"
+                    >Remove</button>
                   </td>
+                </tr>
+                <tr v-if="assignedBins.length === 0">
+                  <td colspan="5" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No bins assigned</td>
                 </tr>
               </tbody>
             </table>
@@ -343,4 +559,11 @@ function stopBadge(status: string) {
     </div>
 
   </div>
+
+  <AssignBinModal
+    v-if="showAssignBinModal"
+    :driverName="`${driver.firstName} ${driver.lastName}`"
+    @close="showAssignBinModal = false"
+    @submit="handleAssignBin"
+  />
 </template>
