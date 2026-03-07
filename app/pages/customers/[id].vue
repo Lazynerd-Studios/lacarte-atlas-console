@@ -1,9 +1,7 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'dashboard' })
 
-const route = useRoute()
-
-// Mock customer data — replace with API call using route.params.id
+// Mock customer data — replace with API call using useRoute().params.id
 const customer = {
   id: 'CUST-2025-1',
   firstName: 'Sarah',
@@ -34,25 +32,40 @@ const statusBadge = computed(() => {
   return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: 'Inactive' }
 })
 
-const tabs = ['Overview', 'Pickup History', 'Billing', 'Assigned Bins', 'Notes']
+const showSuspendModal = ref(false)
+
+function handleSuspend(reason: string) {
+  // TODO: call API to suspend customer
+  console.log('Suspend reason:', reason)
+  showSuspendModal.value = false
+}
+
 const activeTab = ref('Overview')
+const tabs = ['Overview', 'Pickup History', 'Billing', 'Assigned Bins', 'Notes']
 
 const pickupHistory = [
-  { date: '2026-03-01', driver: 'John Smith',   zone: 'Downtown', status: 'completed' },
-  { date: '2026-02-22', driver: 'Maria Garcia',  zone: 'Downtown', status: 'completed' },
-  { date: '2026-02-15', driver: 'John Smith',   zone: 'Downtown', status: 'completed' },
-  { date: '2026-02-08', driver: 'James Wilson',  zone: 'Downtown', status: 'completed' },
+  { date: '2026-03-01', time: '08:45 AM', driver: 'John Smith',   zone: 'Downtown', truck: 'T-001', weight: '42 kg', status: 'completed' },
+  { date: '2026-02-22', time: '09:10 AM', driver: 'Maria Garcia',  zone: 'Downtown', truck: 'T-003', weight: '38 kg', status: 'completed' },
+  { date: '2026-02-15', time: '08:30 AM', driver: 'John Smith',   zone: 'Downtown', truck: 'T-001', weight: '45 kg', status: 'completed' },
+  { date: '2026-02-08', time: '10:00 AM', driver: 'James Wilson',  zone: 'Downtown', truck: 'T-007', weight: '0 kg',  status: 'missed' },
+  { date: '2026-02-01', time: '08:55 AM', driver: 'John Smith',   zone: 'Downtown', truck: 'T-001', weight: '40 kg', status: 'completed' },
+  { date: '2026-01-25', time: '09:20 AM', driver: 'Maria Garcia',  zone: 'Downtown', truck: 'T-003', weight: '36 kg', status: 'completed' },
+  { date: '2026-01-18', time: '08:40 AM', driver: 'John Smith',   zone: 'Downtown', truck: 'T-001', weight: '41 kg', status: 'completed' },
+  { date: '2026-01-11', time: '09:05 AM', driver: 'Lisa Anderson', zone: 'Downtown', truck: 'T-012', weight: '39 kg', status: 'rescheduled' },
 ]
 
 const billingHistory = [
-  { date: '2026-03-01', description: 'Monthly Subscription', amount: '$45.00', status: 'paid' },
-  { date: '2026-02-01', description: 'Monthly Subscription', amount: '$45.00', status: 'paid' },
-  { date: '2026-01-01', description: 'Monthly Subscription', amount: '$45.00', status: 'paid' },
+  { date: '2026-03-01', invoice: 'INV-2026-001', description: 'Monthly Subscription', amountRaw: 45, status: 'paid' },
+  { date: '2026-02-01', invoice: 'INV-2026-002', description: 'Monthly Subscription', amountRaw: 45, status: 'paid' },
+  { date: '2026-01-01', invoice: 'INV-2026-003', description: 'Monthly Subscription', amountRaw: 45, status: 'paid' },
+  { date: '2025-12-01', invoice: 'INV-2025-012', description: 'Monthly Subscription', amountRaw: 45, status: 'paid' },
+  { date: '2025-11-01', invoice: 'INV-2025-011', description: 'Monthly Subscription + Extra Pickup', amountRaw: 65, status: 'paid' },
+  { date: '2025-10-01', invoice: 'INV-2025-010', description: 'Monthly Subscription', amountRaw: 45, status: 'paid' },
 ]
 
 const bins = [
-  { id: 'BIN-001', type: 'General Waste', size: '240L', assigned: '2025-01-15' },
-  { id: 'BIN-002', type: 'Recycling',     size: '120L', assigned: '2025-01-15' },
+  { type: 'Standard Bin',  size: '120L', assigned: '2025-06-15', status: 'active' },
+  { type: 'Recycling Bin', size: '80L',  assigned: '2025-06-15', status: 'active' },
 ]
 
 const notes = ref([
@@ -116,7 +129,7 @@ function addNote() {
           <button style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer">
             Edit Customer
           </button>
-          <button style="height:40px;padding:0 16px;background:#ef4444;border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:pointer">
+          <button style="height:40px;padding:0 16px;background:#ef4444;border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:pointer" @click="showSuspendModal = true">
             Suspend Account
           </button>
         </div>
@@ -201,65 +214,193 @@ function addNote() {
         </div>
 
         <!-- Pickup History -->
-        <div v-else-if="activeTab === 'Pickup History'">
-          <table style="width:100%;border-collapse:collapse">
-            <thead>
-              <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
-                <th style="padding:12px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Date</th>
-                <th style="padding:12px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Driver</th>
-                <th style="padding:12px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Zone</th>
-                <th style="padding:12px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(p, i) in pickupHistory" :key="i" style="border-bottom:1px solid #e5e7eb">
-                <td style="padding:14px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ p.date }}</td>
-                <td style="padding:14px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ p.driver }}</td>
-                <td style="padding:14px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ p.zone }}</td>
-                <td style="padding:14px 16px">
-                  <span style="font-size:12px;font-weight:500;color:#22c55e;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);border-radius:14px;padding:3px 10px;font-family:'Manrope',sans-serif">{{ p.status }}</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div v-else-if="activeTab === 'Pickup History'" style="display:flex;flex-direction:column;gap:16px">
+          <!-- Summary row -->
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+            <div style="background:#f8f9fa;border-radius:16px;padding:16px 20px">
+              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Total Pickups</p>
+              <p style="font-size:20px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ pickupHistory.length }}</p>
+            </div>
+            <div style="background:#f8f9fa;border-radius:16px;padding:16px 20px">
+              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Completed</p>
+              <p style="font-size:20px;font-weight:700;color:#22c55e;font-family:'Manrope',sans-serif">{{ pickupHistory.filter(p => p.status === 'completed').length }}</p>
+            </div>
+            <div style="background:#f8f9fa;border-radius:16px;padding:16px 20px">
+              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Missed / Cancelled</p>
+              <p style="font-size:20px;font-weight:700;color:#ef4444;font-family:'Manrope',sans-serif">{{ pickupHistory.filter(p => p.status !== 'completed').length }}</p>
+            </div>
+          </div>
+
+          <!-- Table -->
+          <div style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
+            <table style="width:100%;border-collapse:collapse">
+              <thead>
+                <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Date</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Driver</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Zone</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Truck</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Weight</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Status</th>
+                  <th style="padding:14px 16px;text-align:right;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="(p, i) in pickupHistory"
+                  :key="i"
+                  style="border-bottom:1px solid #e5e7eb"
+                  @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
+                  @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
+                >
+                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">
+                    <div style="display:flex;flex-direction:column;gap:2px">
+                      <span style="font-weight:500">{{ p.date }}</span>
+                      <span style="font-size:12px;color:#6b7280">{{ p.time }}</span>
+                    </div>
+                  </td>
+                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ p.driver }}</td>
+                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ p.zone }}</td>
+                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ p.truck }}</td>
+                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ p.weight }}</td>
+                  <td style="padding:16px">
+                    <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;
+                      color:${p.status === 'completed' ? '#22c55e' : p.status === 'missed' ? '#ef4444' : '#d49a00'};
+                      background:${p.status === 'completed' ? 'rgba(34,197,94,0.1)' : p.status === 'missed' ? 'rgba(239,68,68,0.1)' : 'rgba(255,180,0,0.1)'};
+                      border:1px solid ${p.status === 'completed' ? 'rgba(34,197,94,0.2)' : p.status === 'missed' ? 'rgba(239,68,68,0.2)' : 'rgba(255,180,0,0.2)'}`">
+                      {{ p.status }}
+                    </span>
+                  </td>
+                  <td style="padding:16px;text-align:right">
+                    <button
+                      style="width:32px;height:32px;border-radius:20px;background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center"
+                      title="View details"
+                      @mouseover="($event.currentTarget as HTMLElement).style.background='#f3f4f6'"
+                      @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
+                    >
+                      <UIcon name="i-lucide-eye" style="width:16px;height:16px;color:#6b7280" />
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="pickupHistory.length === 0">
+                  <td colspan="7" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No pickup history found</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- Billing -->
-        <div v-else-if="activeTab === 'Billing'">
-          <table style="width:100%;border-collapse:collapse">
-            <thead>
-              <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
-                <th style="padding:12px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Date</th>
-                <th style="padding:12px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Description</th>
-                <th style="padding:12px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Amount</th>
-                <th style="padding:12px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(b, i) in billingHistory" :key="i" style="border-bottom:1px solid #e5e7eb">
-                <td style="padding:14px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ b.date }}</td>
-                <td style="padding:14px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ b.description }}</td>
-                <td style="padding:14px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ b.amount }}</td>
-                <td style="padding:14px 16px">
-                  <span style="font-size:12px;font-weight:500;color:#22c55e;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);border-radius:14px;padding:3px 10px;font-family:'Manrope',sans-serif">{{ b.status }}</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div v-else-if="activeTab === 'Billing'" style="display:flex;flex-direction:column;gap:16px">
+          <!-- Summary row -->
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+            <div style="background:#f8f9fa;border-radius:16px;padding:16px 20px">
+              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Total Billed</p>
+              <p style="font-size:20px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">
+                GHS {{ billingHistory.reduce((s, b) => s + b.amountRaw, 0).toLocaleString() }}
+              </p>
+            </div>
+            <div style="background:#f8f9fa;border-radius:16px;padding:16px 20px">
+              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Paid</p>
+              <p style="font-size:20px;font-weight:700;color:#22c55e;font-family:'Manrope',sans-serif">
+                GHS {{ billingHistory.filter(b => b.status === 'paid').reduce((s, b) => s + b.amountRaw, 0).toLocaleString() }}
+              </p>
+            </div>
+            <div style="background:#f8f9fa;border-radius:16px;padding:16px 20px">
+              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Outstanding</p>
+              <p style="font-size:20px;font-weight:700;font-family:'Manrope',sans-serif"
+                :style="billingHistory.filter(b => b.status !== 'paid').reduce((s, b) => s + b.amountRaw, 0) > 0 ? 'color:#ef4444' : 'color:#22c55e'">
+                GHS {{ billingHistory.filter(b => b.status !== 'paid').reduce((s, b) => s + b.amountRaw, 0).toLocaleString() }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Table -->
+          <div style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
+            <table style="width:100%;border-collapse:collapse">
+              <thead>
+                <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Date</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Invoice</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Description</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Amount</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Status</th>
+                  <th style="padding:14px 16px;text-align:right;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="(b, i) in billingHistory"
+                  :key="i"
+                  style="border-bottom:1px solid #e5e7eb"
+                  @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
+                  @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
+                >
+                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ b.date }}</td>
+                  <td style="padding:16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ b.invoice }}</td>
+                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ b.description }}</td>
+                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">GHS {{ b.amountRaw }}</td>
+                  <td style="padding:16px">
+                    <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;
+                      color:${b.status === 'paid' ? '#22c55e' : b.status === 'overdue' ? '#ef4444' : '#d49a00'};
+                      background:${b.status === 'paid' ? 'rgba(34,197,94,0.1)' : b.status === 'overdue' ? 'rgba(239,68,68,0.1)' : 'rgba(255,180,0,0.1)'};
+                      border:1px solid ${b.status === 'paid' ? 'rgba(34,197,94,0.2)' : b.status === 'overdue' ? 'rgba(239,68,68,0.2)' : 'rgba(255,180,0,0.2)'}`">
+                      {{ b.status }}
+                    </span>
+                  </td>
+                  <td style="padding:16px;text-align:right">
+                    <button
+                      style="height:32px;padding:0 12px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer;white-space:nowrap"
+                      @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
+                      @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
+                    >View Invoice</button>
+                  </td>
+                </tr>
+                <tr v-if="billingHistory.length === 0">
+                  <td colspan="6" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No billing records found</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- Assigned Bins -->
         <div v-else-if="activeTab === 'Assigned Bins'">
-          <div style="display:flex;flex-direction:column;gap:12px">
-            <div v-for="bin in bins" :key="bin.id" style="background:#f8f9fa;border-radius:16px;padding:16px;display:flex;align-items:center;gap:16px">
-              <div style="width:40px;height:40px;background:#ffb400;border-radius:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                <UIcon name="i-lucide-trash-2" style="width:20px;height:20px;color:white" />
-              </div>
-              <div style="flex:1">
-                <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ bin.id }} — {{ bin.type }}</p>
-                <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:2px">{{ bin.size }} · Assigned {{ bin.assigned }}</p>
-              </div>
-            </div>
+          <div style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
+            <table style="width:100%;border-collapse:collapse">
+              <thead>
+                <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Bin Type</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Size</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Assigned Date</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="(bin, i) in bins"
+                  :key="i"
+                  style="border-bottom:1px solid #e5e7eb"
+                  @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
+                  @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
+                >
+                  <td style="padding:18px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ bin.type }}</td>
+                  <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ bin.size }}</td>
+                  <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ bin.assigned }}</td>
+                  <td style="padding:18px 16px">
+                    <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;
+                      color:${bin.status === 'active' ? '#22c55e' : '#6b7280'};
+                      background:${bin.status === 'active' ? 'rgba(34,197,94,0.1)' : '#e5e7eb'};
+                      border:1px solid ${bin.status === 'active' ? 'rgba(34,197,94,0.2)' : '#e5e7eb'}`">
+                      {{ bin.status }}
+                    </span>
+                  </td>
+                </tr>
+                <tr v-if="bins.length === 0">
+                  <td colspan="4" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No bins assigned</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -294,4 +435,12 @@ function addNote() {
       </div>
     </div>
   </div>
+
+  <!-- Suspend Account Modal -->
+  <SuspendModal
+    v-if="showSuspendModal"
+    :customer-name="`${customer.firstName} ${customer.lastName}`"
+    @close="showSuspendModal = false"
+    @confirm="handleSuspend"
+  />
 </template>

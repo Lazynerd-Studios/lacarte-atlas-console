@@ -31,7 +31,7 @@ const paginated = computed(() => filtered.value.slice((page.value - 1) * perPage
 
 watch([search, statusFilter, planFilter], () => { page.value = 1 })
 
-function handleAddCustomer(data: Record<string, string>) {
+function handleAddCustomer(data: Record<string, unknown>) {
   // TODO: call API to create customer
   console.log('New customer:', data)
   showModal.value = false
