@@ -160,11 +160,28 @@ function addStaffNote() {
         <!-- Right: actions -->
         <div style="display:flex;gap:8px;flex-shrink:0">
           <button
-            style="height:40px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px"
+            style="height:40px;width:40px;background:#ffb400;border:none;border-radius:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0"
+            title="Download QR"
             @click="downloadQR"
           >
             <UIcon name="i-lucide-qr-code" style="width:16px;height:16px;color:#0a0d12" />
-            Download QR
+          </button>
+          <NuxtLink :to="`/pay/${customer.id}`" target="_blank" style="text-decoration:none">
+            <button
+              style="height:40px;width:40px;background:#ececec;border:none;border-radius:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0"
+              title="Payment Link"
+              @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
+              @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
+            >
+              <UIcon name="i-lucide-link" style="width:16px;height:16px;color:#111" />
+            </button>
+          </NuxtLink>
+          <button
+            style="height:40px;padding:0 16px;background:#22c55e;border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px"
+            @click="$router.push(`/pay/${customer.id}`)"
+          >
+            <UIcon name="i-lucide-credit-card" style="width:16px;height:16px;color:white" />
+            Make Payment
           </button>
           <button
             style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
