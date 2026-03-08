@@ -75,14 +75,16 @@ function deliveryBadge(s: string) {
             </td>
             <td style="padding:20px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ order.date }}</td>
             <td style="padding:20px 16px;text-align:right">
-              <button
-                style="width:32px;height:28px;background:none;border:none;border-radius:20px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center"
-                title="View"
-                @mouseover="($event.currentTarget as HTMLElement).style.background='#f3f4f6'"
-                @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
-              >
-                <UIcon name="i-lucide-eye" style="width:16px;height:16px;color:#6b7280" />
-              </button>
+              <NuxtLink :to="`/shop/orders/${order.id}`" style="text-decoration:none">
+                <button
+                  style="width:32px;height:28px;background:none;border:none;border-radius:20px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center"
+                  title="View"
+                  @mouseover="($event.currentTarget as HTMLElement).style.background='#f3f4f6'"
+                  @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
+                >
+                  <UIcon name="i-lucide-eye" style="width:16px;height:16px;color:#6b7280" />
+                </button>
+              </NuxtLink>
             </td>
           </tr>
         </tbody>
