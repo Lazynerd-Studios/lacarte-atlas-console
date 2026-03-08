@@ -31,7 +31,7 @@ const statusBadge = computed(() => {
 })
 
 const activeTab = ref('Current Route')
-const tabs = ['Current Route', 'Route History', 'Performance', 'Earnings', 'Assigned Bins']
+const tabs = ['Current Route', 'Route History', 'Performance', 'Earnings', 'Assigned Pickups']
 
 const routeProgress = { completed: 12, total: 28, estimatedCompletion: '3:30 PM' }
 const progressPct = computed(() => Math.round((routeProgress.completed / routeProgress.total) * 100))
@@ -151,6 +151,12 @@ const assignedBins = ref([
 ])
 
 const showAssignBinModal = ref(false)
+const showEditModal = ref(false)
+
+function handleEditDriver(data: Record<string, unknown>) {
+  console.log('Updated driver:', data)
+  showEditModal.value = false
+}
 
 function handleAssignBin(data: { binType: string; quantity: number; zone: string; date: string; notes: string }) {
   assignedBins.value.push({ type: data.binType, quantity: data.quantity, zone: data.zone, assigned: data.date })
@@ -214,6 +220,7 @@ function stopBadge(status: string) {
         <div style="display:flex;gap:8px;flex-shrink:0">
           <button
             style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
+            @click="showEditModal = true"
             @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
           >Edit Driver</button>
@@ -498,13 +505,13 @@ function stopBadge(status: string) {
           </div>
         </div>
 
-        <!-- Assigned Bins -->
-        <div v-else-if="activeTab === 'Assigned Bins'" style="display:flex;flex-direction:column;gap:16px">
+        <!-- Assigned Pickups -->
+        <div v-else-if="activeTab === 'Assigned Pickups'" style="display:flex;flex-direction:column;gap:16px">
           <!-- Header -->
           <div style="display:flex;align-items:center;justify-content:space-between">
             <div style="display:flex;flex-direction:column;gap:4px">
-              <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Assigned Waste Bins</p>
-              <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Bins currently assigned to this driver</p>
+              <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Assigned Pickups</p>
+              <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Pickups currently assigned to this driver</p>
             </div>
             <button
               style="height:40px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
@@ -565,5 +572,12 @@ function stopBadge(status: string) {
     :driverName="`${driver.firstName} ${driver.lastName}`"
     @close="showAssignBinModal = false"
     @submit="handleAssignBin"
+  />
+
+  <EditDriverModal
+    v-if="showEditModal"
+    :driver="driver"
+    @close="showEditModal = false"
+    @submit="handleEditDriver"
   />
 </template>

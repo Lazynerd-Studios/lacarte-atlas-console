@@ -3,6 +3,20 @@ definePageMeta({ layout: 'dashboard' })
 
 const { format } = useCurrency()
 
+const showAssignPickupModal = ref(false)
+const selectedDriver = ref<typeof drivers[0] | null>(null)
+
+function openAssignPickup(d: typeof drivers[0]) {
+  selectedDriver.value = d
+  showAssignPickupModal.value = true
+}
+
+function handleAssignPickup(data: Record<string, unknown>) {
+  console.log('Assigned pickup:', data)
+  showAssignPickupModal.value = false
+  selectedDriver.value = null
+}
+
 const drivers = [
   { initials: 'JS', name: 'John Smith',    phone: '(555) 111-2222', truck: 'T-001', zone: 'Downtown', bins: 3, status: 'on-route', todayPickups: 12, earnings: 1805,   incomplete: 3, deductionAmt: 45,  completed: 142, total: 145 },
   { initials: 'MG', name: 'Maria Garcia',  phone: '(555) 222-3333', truck: 'T-003', zone: 'Westside',  bins: 4, status: 'on-route', todayPickups: 15, earnings: 2070,   incomplete: 2, deductionAmt: 30,  completed: 158, total: 160 },
@@ -75,7 +89,7 @@ function statusStyle(s: string) {
           </div>
           <div style="display:flex;align-items:center;gap:8px">
             <UIcon name="i-lucide-package" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
-            <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ d.bins }} Assigned Bins</span>
+            <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ d.bins }} Assigned Pickups</span>
           </div>
         </div>
 
@@ -105,11 +119,19 @@ function statusStyle(s: string) {
           >View Details</NuxtLink>
           <button
             style="height:40px;padding:0 16px;background:none;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
+            @click="openAssignPickup(d)"
             @mouseover="($event.currentTarget as HTMLElement).style.background='#f3f4f6'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
-          >Assign Bins</button>
+          >Assign Pickups</button>
         </div>
       </div>
     </div>
   </div>
+
+  <AssignPickupModal
+    v-if="showAssignPickupModal && selectedDriver"
+    :driver-name="selectedDriver.name"
+    @close="showAssignPickupModal = false"
+    @submit="handleAssignPickup"
+  />
 </template>

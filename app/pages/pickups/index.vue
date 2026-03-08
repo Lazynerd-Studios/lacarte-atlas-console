@@ -42,6 +42,8 @@ const filtered = computed(() => {
   return requests.value.filter(r => r.status.toLowerCase() === activeFilter.value.toLowerCase())
 })
 
+watch(activeFilter, () => { currentPage.value = 1 })
+
 const stats = computed(() => ({
   pending:    requests.value.filter(r => r.status === 'pending').length,
   assigned:   requests.value.filter(r => r.status === 'assigned').length,
@@ -51,8 +53,15 @@ const stats = computed(() => ({
 
 function paymentTypeBadge(type: string) {
   if (type === 'subscription') return { bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)', color: '#3b82f6', label: 'Subscription' }
-  return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: 'One-time' }
+  return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: 'Pay as you go' }
 }
+
+const currentPage = ref(1)
+const perPage = 10
+const paginated = computed(() => {
+  const start = (currentPage.value - 1) * perPage
+  return filtered.value.slice(start, start + perPage)
+})
 
 function paymentStatusBadge(s: string) {
   if (s === 'active-plan') return { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#22c55e', label: 'Active Plan' }
@@ -146,9 +155,9 @@ function handleAssignDriver(data: { driver: string; scheduledDate: string; sched
         </thead>
         <tbody>
           <tr
-            v-for="(req, i) in filtered"
+            v-for="(req, i) in paginated"
             :key="req.id"
-            :style="`border-bottom:${i < filtered.length - 1 ? '1px solid #e5e7eb' : 'none'}`"
+            :style="`border-bottom:${i < paginated.length - 1 ? '1px solid #e5e7eb' : 'none'}`"
             @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
           >
@@ -172,7 +181,6 @@ function handleAssignDriver(data: { driver: string; scheduledDate: string; sched
               <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;color:${paymentTypeBadge(req.paymentType).color};background:${paymentTypeBadge(req.paymentType).bg};border:1px solid ${paymentTypeBadge(req.paymentType).border}`">
                 {{ paymentTypeBadge(req.paymentType).label }}
               </span>
-              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:4px">{{ req.paymentDetail }}</p>
             </td>
 
             <!-- Payment Status -->
@@ -187,7 +195,6 @@ function handleAssignDriver(data: { driver: string; scheduledDate: string; sched
               <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;color:${statusBadge(req.status).color};background:${statusBadge(req.status).bg};border:1px solid ${statusBadge(req.status).border}`">
                 {{ statusBadge(req.status).label }}
               </span>
-              <p v-if="req.driver" style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:4px">{{ req.driver }}</p>
             </td>
 
             <!-- Actions -->
@@ -220,6 +227,14 @@ function handleAssignDriver(data: { driver: string; scheduledDate: string; sched
         </tbody>
       </table>
     </div>
+
+    <!-- Pagination -->
+    <AppPagination
+      :page="currentPage"
+      :total="filtered.length"
+      :per-page="perPage"
+      @update:page="currentPage = $event"
+    />
 
   </div>
 

@@ -24,6 +24,19 @@ const truck = reactive({
 })
 
 const showEditModal = ref(false)
+const showMaintenanceModal = ref(false)
+
+function handleMaintenance(data: { type: string; technician: string; date: string; estimatedCost: string; notes: string }) {
+  maintenanceHistory.unshift({
+    date: data.date,
+    type: data.type,
+    technician: data.technician,
+    cost: `GHS ${parseFloat(data.estimatedCost || '0').toFixed(2)}`,
+    status: 'scheduled',
+    notes: data.notes,
+  })
+  showMaintenanceModal.value = false
+}
 
 function handleEdit(data: { plate: string; vin: string; make: string; model: string; year: number; capacity: string; status: string; driver: string }) {
   truck.plate = data.plate
@@ -119,6 +132,7 @@ const routeHistory = [
             style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
             @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
+            @click="showMaintenanceModal = true"
           >Schedule Maintenance</button>
         </div>
       </div>
@@ -275,5 +289,12 @@ const routeHistory = [
     :truck="{ id: truck.id, plate: truck.plate, vin: truck.vin, make: truck.make, model: truck.model, year: truck.year, capacity: truck.capacity, status: truck.status, driver: truck.driver }"
     @close="showEditModal = false"
     @submit="handleEdit"
+  />
+
+  <MaintenanceModal
+    v-if="showMaintenanceModal"
+    :truck-id="truck.id"
+    @close="showMaintenanceModal = false"
+    @submit="handleMaintenance"
   />
 </template>
