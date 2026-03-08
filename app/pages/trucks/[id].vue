@@ -1,7 +1,7 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'dashboard' })
 
-const truck = {
+const truck = reactive({
   id: 'T-001',
   status: 'active',
   plate: 'LCT-1001',
@@ -14,11 +14,28 @@ const truck = {
   nextServiceDue: '2 weeks',
   vin: '1HGBH41JXMN109186',
   makeModel: 'Freightliner M2 106',
+  make: 'Freightliner',
+  model: 'M2 106',
   gpsId: 'GPS-T-001-001',
   lastGps: '2 minutes ago',
   currentLocation: 'Downtown Zone',
   registrationExpiry: 'Dec 31, 2026',
   insuranceExpiry: 'Aug 15, 2026',
+})
+
+const showEditModal = ref(false)
+
+function handleEdit(data: { plate: string; vin: string; make: string; model: string; year: number; capacity: string; status: string; driver: string }) {
+  truck.plate = data.plate
+  truck.vin = data.vin
+  truck.make = data.make
+  truck.model = data.model
+  truck.makeModel = `${data.make} ${data.model}`
+  truck.year = String(data.year)
+  truck.capacity = data.capacity
+  truck.status = data.status
+  truck.driver = data.driver
+  showEditModal.value = false
 }
 
 const statusBadge = computed(() => {
@@ -96,6 +113,7 @@ const routeHistory = [
             style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
             @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
+            @click="showEditModal = true"
           >Edit Truck</button>
           <button
             style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
@@ -251,4 +269,11 @@ const routeHistory = [
     </div>
 
   </div>
+
+  <EditTruckModal
+    v-if="showEditModal"
+    :truck="{ id: truck.id, plate: truck.plate, vin: truck.vin, make: truck.make, model: truck.model, year: truck.year, capacity: truck.capacity, status: truck.status, driver: truck.driver }"
+    @close="showEditModal = false"
+    @submit="handleEdit"
+  />
 </template>
