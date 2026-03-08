@@ -3,20 +3,33 @@ const route = useRoute()
 const authStore = useAuthStore()
 
 const navLinks = [
-  { label: 'Dashboard',        icon: 'i-lucide-layout-dashboard', to: '/' },
-  { label: 'Customers',        icon: 'i-lucide-users',            to: '/customers' },
-  { label: 'Drivers & Trucks', icon: 'i-lucide-truck',            to: '/drivers' },
-  { label: 'Pickup Requests',  icon: 'i-lucide-package',          to: '/pickups' },
-  { label: 'Routes',           icon: 'i-lucide-map',              to: '/routes' },
-  { label: 'Live Tracking',    icon: 'i-lucide-map-pin',          to: '/tracking' },
-  { label: 'Billing & Payments', icon: 'i-lucide-credit-card',   to: '/billing' },
-  { label: 'Shop',             icon: 'i-lucide-shopping-bag',     to: '/shop' },
-  { label: 'Inventory',        icon: 'i-lucide-boxes',            to: '/inventory' },
-  { label: 'Support Tickets',  icon: 'i-lucide-headphones',       to: '/support' },
-  { label: 'Reports',          icon: 'i-lucide-bar-chart-2',      to: '/reports' },
-  { label: 'Team',             icon: 'i-lucide-users-round',      to: '/team' },
-  { label: 'Settings',         icon: 'i-lucide-settings',         to: '/settings' },
+  { label: 'Dashboard',          icon: 'i-lucide-layout-dashboard', to: '/' },
+  { label: 'Customers',          icon: 'i-lucide-users',            to: '/customers' },
+  { label: 'Drivers & Trucks',   icon: 'i-lucide-truck',            to: '/drivers' },
+  { label: 'Pickup Requests',    icon: 'i-lucide-package',          to: '/pickups' },
+  { label: 'Live Tracking',      icon: 'i-lucide-map-pin',          to: '/tracking' },
+  { label: 'Billing & Payments', icon: 'i-lucide-credit-card',      to: '/billing' },
+  { label: 'Shop',               icon: 'i-lucide-shopping-bag',     to: '/shop' },
+  { label: 'Inventory',          icon: 'i-lucide-boxes',            to: '/inventory' },
+  { label: 'Support Tickets',    icon: 'i-lucide-headphones',       to: '/support' },
+  { label: 'Team',               icon: 'i-lucide-users-round',      to: '/team' },
+  { label: 'Settings',           icon: 'i-lucide-settings',         to: '/settings' },
 ]
+
+const reportsSubLinks = [
+  { label: 'Analytics',           to: '/reports/analytics' },
+  { label: 'Operations Analytics', to: '/reports/operations' },
+  { label: 'Customer Analytics',  to: '/reports/customers' },
+  { label: 'Zone Performance',    to: '/reports/zones' },
+]
+
+const isReportsOpen = ref(route.path.startsWith('/reports'))
+
+const isReportsActive = computed(() => route.path.startsWith('/reports'))
+
+watch(() => route.path, (p) => {
+  if (p.startsWith('/reports')) isReportsOpen.value = true
+})
 
 const userInitial = computed(() => {
   const name = authStore.user?.name || 'Admin User'
@@ -81,6 +94,45 @@ function isActive(to: string) {
           </span>
         </div>
       </NuxtLink>
+
+      <!-- Reports with submenu -->
+      <div>
+        <!-- Reports parent row -->
+        <div
+          :style="`position:relative;display:flex;align-items:center;gap:12px;height:40px;padding-left:12px;border-radius:20px;cursor:pointer;background:${isReportsActive ? '#fff9e6' : 'transparent'}`"
+          @click="isReportsOpen = !isReportsOpen"
+          @mouseover="!isReportsActive && (($event.currentTarget as HTMLElement).style.background = '#f9fafb')"
+          @mouseleave="!isReportsActive && (($event.currentTarget as HTMLElement).style.background = 'transparent')"
+        >
+          <div v-if="isReportsActive" style="position:absolute;left:0;top:0;width:4px;height:40px;background:#ffb400;border-radius:0 4px 4px 0" />
+          <UIcon name="i-lucide-bar-chart-2" :style="`width:20px;height:20px;flex-shrink:0;color:${isReportsActive ? '#ffb400' : '#6b7280'}`" />
+          <span :style="`font-size:14px;font-family:'Manrope',sans-serif;flex:1;color:${isReportsActive ? '#111' : '#6b7280'};white-space:nowrap`">Reports</span>
+          <UIcon
+            :name="isReportsOpen ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+            style="width:16px;height:16px;color:#6b7280;margin-right:12px;flex-shrink:0"
+          />
+        </div>
+
+        <!-- Submenu -->
+        <div v-if="isReportsOpen" style="margin-top:2px;display:flex;flex-direction:column;gap:2px">
+          <NuxtLink
+            v-for="sub in reportsSubLinks"
+            :key="sub.to"
+            :to="sub.to"
+            style="text-decoration:none"
+          >
+            <div
+              :style="`display:flex;align-items:center;gap:10px;height:36px;padding-left:44px;border-radius:20px;cursor:pointer;background:${isActive(sub.to) ? '#fff9e6' : 'transparent'}`"
+              @mouseover="!isActive(sub.to) && (($event.currentTarget as HTMLElement).style.background = '#f9fafb')"
+              @mouseleave="!isActive(sub.to) && (($event.currentTarget as HTMLElement).style.background = 'transparent')"
+            >
+              <div :style="`width:6px;height:6px;border-radius:50%;background:${isActive(sub.to) ? '#ffb400' : '#d1d5db'};flex-shrink:0`" />
+              <span :style="`font-size:13px;font-family:'Manrope',sans-serif;color:${isActive(sub.to) ? '#111' : '#6b7280'};white-space:nowrap`">{{ sub.label }}</span>
+            </div>
+          </NuxtLink>
+        </div>
+      </div>
+
     </nav>
 
     <!-- User footer -->

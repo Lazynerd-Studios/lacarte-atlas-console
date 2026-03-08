@@ -14,6 +14,7 @@ const props = defineProps<{
     subscriptionInterval: string
     subscriptionType: string
     instructions: string
+    bins?: { type: string; capacity: string }[]
   }
 }>()
 
@@ -23,6 +24,16 @@ const emit = defineEmits<{
 }>()
 
 const form = reactive({ ...props.customer })
+const bins = ref<{ type: string; capacity: string }[]>(
+  props.customer.bins?.length ? props.customer.bins.map(b => ({ ...b })) : [{ type: '', capacity: '' }]
+)
+
+function addBin() {
+  bins.value.push({ type: '', capacity: '' })
+}
+function removeBin(i: number) {
+  bins.value.splice(i, 1)
+}
 const errors = reactive<Record<string, string>>({})
 
 function validate() {
@@ -39,7 +50,7 @@ function validate() {
 
 function submit() {
   if (!validate()) return
-  emit('submit', { ...form })
+  emit('submit', { ...form, bins: bins.value.filter(b => b.type.trim()) })
 }
 
 const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
@@ -178,6 +189,49 @@ function onBlur(e: Event, field: string) {
             <option value="prepaid">Prepaid</option>
             <option value="postpaid">Postpaid</option>
           </select>
+        </div>
+
+        <!-- BINs -->
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Assigned BINs</label>
+            <button
+              type="button"
+              style="height:30px;padding:0 12px;background:#ffb400;border:none;border-radius:20px;font-size:13px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px"
+              @click="addBin"
+            >
+              <UIcon name="i-lucide-plus" style="width:13px;height:13px;color:#0a0d12" />
+              Add BIN
+            </button>
+          </div>
+          <div v-for="(bin, i) in bins" :key="i" style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center">
+            <input
+              v-model="bin.type"
+              type="text"
+              placeholder="BIN type (e.g. Standard)"
+              :style="inputStyle('')"
+              @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+              @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
+            />
+            <input
+              v-model="bin.capacity"
+              type="text"
+              placeholder="Capacity (e.g. 120L)"
+              :style="inputStyle('')"
+              @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+              @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
+            />
+            <button
+              type="button"
+              style="width:32px;height:32px;border:none;background:#f3f4f6;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0"
+              :disabled="bins.length === 1"
+              @click="removeBin(i)"
+              @mouseover="($event.currentTarget as HTMLElement).style.background='#fee2e2'"
+              @mouseleave="($event.currentTarget as HTMLElement).style.background='#f3f4f6'"
+            >
+              <UIcon name="i-lucide-x" style="width:13px;height:13px;color:#ef4444" />
+            </button>
+          </div>
         </div>
 
         <!-- Special instructions -->

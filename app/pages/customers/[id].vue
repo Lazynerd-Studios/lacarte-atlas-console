@@ -27,6 +27,12 @@ const customer = {
   totalPickups: 42,
   balance: 0,
   lifetimeValue: 'GHS 1,890',
+  pickupRate: 'GHS 45.00 / pickup',
+  monthlyRate: 'GHS 45.00 / month',
+  gpsLat: 5.6037,
+  gpsLng: -0.1870,
+  gpsLastUpdated: '2026-03-07 08:42 AM',
+  gpsAddress: '123 Oak Street, Downtown, Accra',
 }
 
 const initials = computed(() => `${customer.firstName[0]}${customer.lastName[0]}`)
@@ -58,7 +64,7 @@ function downloadQR() {
 }
 
 const activeTab = ref('Overview')
-const tabs = ['Overview', 'Pickup History', 'Billing', 'Assigned Bins', 'Notes']
+const tabs = ['Overview', 'Pickup History', 'Billing', 'Assigned Bins', 'GPS Location', 'Notes']
 
 const pickupHistory = [
   { date: '2026-03-01', time: '08:45 AM', driver: 'John Smith',    status: 'completed', amount: 45 },
@@ -85,15 +91,25 @@ const bins = [
   { type: 'Recycling Bin', size: '80L',  assigned: '2025-06-15', status: 'active' },
 ]
 
-const notes = ref([
+const customerNotes = ref([
+  { date: '2026-01-15', author: 'Sarah Johnson', text: 'Please ensure the bin is collected before 9am on Saturdays.' },
+])
+const staffNotes = ref([
   { date: '2026-02-10', author: 'Admin', text: 'Customer requested bin relocation to side entrance.' },
 ])
-const newNote = ref('')
+const newCustomerNote = ref('')
+const newStaffNote = ref('')
 
-function addNote() {
-  if (!newNote.value.trim()) return
-  notes.value.unshift({ date: new Date().toISOString().slice(0, 10), author: 'Admin', text: newNote.value.trim() })
-  newNote.value = ''
+function addCustomerNote() {
+  if (!newCustomerNote.value.trim()) return
+  customerNotes.value.unshift({ date: new Date().toISOString().slice(0, 10), author: `${customer.firstName} ${customer.lastName}`, text: newCustomerNote.value.trim() })
+  newCustomerNote.value = ''
+}
+
+function addStaffNote() {
+  if (!newStaffNote.value.trim()) return
+  staffNotes.value.unshift({ date: new Date().toISOString().slice(0, 10), author: 'Admin', text: newStaffNote.value.trim() })
+  newStaffNote.value = ''
 }
 </script>
 
@@ -217,8 +233,9 @@ function addNote() {
             <div style="display:flex;flex-direction:column;gap:12px">
               <div v-for="row in [
                 { label: 'Customer ID',       value: customer.id },
-                { label: 'Subscription Plan', value: customer.plan === 'subscription' ? customer.subscriptionInterval.charAt(0).toUpperCase() + customer.subscriptionInterval.slice(1) : 'Pay-as-you-go' },
+                { label: 'Customer Type',     value: customer.userType.charAt(0).toUpperCase() + customer.userType.slice(1) },
                 { label: customer.userType !== 'regular' ? 'Entity Name' : 'User Type', value: customer.userType !== 'regular' ? customer.entityName : 'Regular' },
+                { label: 'Subscription Plan', value: customer.plan === 'subscription' ? customer.subscriptionInterval.charAt(0).toUpperCase() + customer.subscriptionInterval.slice(1) : 'Pay-as-you-go' },
                 { label: 'Next Pickup',       value: customer.nextPickup },
               ]" :key="row.label" style="display:flex;flex-direction:column;gap:2px">
                 <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ row.label }}</p>
@@ -226,17 +243,31 @@ function addNote() {
               </div>
             </div>
           </div>
-          <div style="display:flex;flex-direction:column;gap:16px">
-            <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Service Address</p>
-            <div style="display:flex;flex-direction:column;gap:12px">
-              <div v-for="row in [
-                { label: 'Street Address',       value: customer.street },
-                { label: 'City',                 value: customer.city },
-                { label: 'Postal Code',          value: customer.postalCode },
-                { label: 'Special Instructions', value: customer.instructions },
-              ]" :key="row.label" style="display:flex;flex-direction:column;gap:2px">
-                <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ row.label }}</p>
-                <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.value }}</p>
+          <div style="display:flex;flex-direction:column;gap:24px">
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Service Address</p>
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <div v-for="row in [
+                  { label: 'Street Address',       value: customer.street },
+                  { label: 'City',                 value: customer.city },
+                  { label: 'Postal Code',          value: customer.postalCode },
+                  { label: 'Special Instructions', value: customer.instructions },
+                ]" :key="row.label" style="display:flex;flex-direction:column;gap:2px">
+                  <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ row.label }}</p>
+                  <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.value }}</p>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Rates</p>
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <div v-for="row in [
+                  { label: 'Pickup Rate',   value: customer.pickupRate },
+                  { label: 'Monthly Rate',  value: customer.monthlyRate },
+                ]" :key="row.label" style="display:flex;flex-direction:column;gap:2px">
+                  <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ row.label }}</p>
+                  <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.value }}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -416,24 +447,145 @@ function addNote() {
           </div>
         </div>
 
-        <!-- Notes -->
-        <div v-else-if="activeTab === 'Notes'" style="display:flex;flex-direction:column;gap:16px">
-          <!-- Notes list -->
-          <div style="display:flex;flex-direction:column;gap:12px">
-            <p v-if="notes.length === 0" style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;text-align:center;padding:32px 0">No notes yet</p>
-            <div v-for="(note, i) in notes" :key="i" style="background:#f8f9fa;border:1px solid #e5e7eb;border-radius:16px;padding:16px">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                <div style="display:flex;align-items:center;gap:8px">
-                  <div style="width:28px;height:28px;border-radius:9999px;background:#ffb400;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                    <span style="font-size:11px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">A</span>
-                  </div>
-                  <span style="font-size:13px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ note.author }}</span>
-                </div>
-                <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ note.date }}</span>
-              </div>
-              <p style="font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;line-height:1.6;margin-left:36px">{{ note.text }}</p>
+        <!-- GPS Location -->
+        <div v-else-if="activeTab === 'GPS Location'" style="display:flex;flex-direction:column;gap:20px">
+          <!-- Info row -->
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+            <div style="background:#f8f9fa;border-radius:16px;padding:16px 20px">
+              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Latitude</p>
+              <p style="font-size:16px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ customer.gpsLat }}</p>
+            </div>
+            <div style="background:#f8f9fa;border-radius:16px;padding:16px 20px">
+              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Longitude</p>
+              <p style="font-size:16px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ customer.gpsLng }}</p>
+            </div>
+            <div style="background:#f8f9fa;border-radius:16px;padding:16px 20px">
+              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Last Updated</p>
+              <p style="font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ customer.gpsLastUpdated }}</p>
             </div>
           </div>
+
+          <!-- Address -->
+          <div style="background:#f8f9fa;border-radius:16px;padding:16px 20px;display:flex;align-items:center;gap:12px">
+            <UIcon name="i-lucide-map-pin" style="width:18px;height:18px;color:#ffb400;flex-shrink:0" />
+            <div>
+              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:2px">Resolved Address</p>
+              <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ customer.gpsAddress }}</p>
+            </div>
+          </div>
+
+          <!-- Map placeholder -->
+          <div style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;height:340px;background:#f0f4f8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;position:relative">
+            <!-- Grid lines to simulate map -->
+            <svg style="position:absolute;inset:0;width:100%;height:100%;opacity:0.15" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                  <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#6b7280" stroke-width="1"/>
+                </pattern>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#grid)" />
+            </svg>
+            <!-- Pin -->
+            <div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:8px">
+              <div style="width:48px;height:48px;border-radius:9999px;background:#ffb400;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(255,180,0,0.4)">
+                <UIcon name="i-lucide-map-pin" style="width:24px;height:24px;color:#1a1a1a" />
+              </div>
+              <div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:8px 16px;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
+                <p style="font-size:13px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;text-align:center">{{ customer.firstName }} {{ customer.lastName }}</p>
+                <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;text-align:center">{{ customer.gpsLat }}, {{ customer.gpsLng }}</p>
+              </div>
+            </div>
+            <p style="position:absolute;bottom:12px;font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Map integration — connect to Google Maps or Mapbox</p>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div v-else-if="activeTab === 'Notes'" style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+
+          <!-- Customer Notes -->
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <p style="font-size:18px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Customer Notes</p>
+            <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:-8px">Notes submitted by the customer</p>
+
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <p v-if="customerNotes.length === 0" style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;text-align:center;padding:24px 0">No customer notes yet</p>
+              <div v-for="(note, i) in customerNotes" :key="i" style="background:#f8f9fa;border:1px solid #e5e7eb;border-radius:16px;padding:16px">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <div style="width:28px;height:28px;border-radius:9999px;background:#3b82f6;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                      <span style="font-size:11px;font-weight:700;color:white;font-family:'Manrope',sans-serif">{{ note.author[0] }}</span>
+                    </div>
+                    <span style="font-size:13px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ note.author }}</span>
+                  </div>
+                  <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ note.date }}</span>
+                </div>
+                <p style="font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;line-height:1.6;margin-left:36px">{{ note.text }}</p>
+              </div>
+            </div>
+
+            <!-- Add customer note -->
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <textarea
+                v-model="newCustomerNote"
+                placeholder="Add a customer note..."
+                rows="3"
+                style="width:100%;padding:10px 12px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;resize:none;box-sizing:border-box;line-height:1.5"
+                @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+                @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
+              />
+              <div style="display:flex;justify-content:flex-end">
+                <button
+                  style="height:36px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer"
+                  @click="addCustomerNote"
+                  @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
+                  @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
+                >Add Note</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Staff Notes -->
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <p style="font-size:18px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Staff Notes</p>
+            <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:-8px">Internal notes visible to staff only</p>
+
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <p v-if="staffNotes.length === 0" style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;text-align:center;padding:24px 0">No staff notes yet</p>
+              <div v-for="(note, i) in staffNotes" :key="i" style="background:#fff9e6;border:1px solid rgba(255,180,0,0.2);border-radius:16px;padding:16px">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <div style="width:28px;height:28px;border-radius:9999px;background:#ffb400;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                      <span style="font-size:11px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ note.author[0] }}</span>
+                    </div>
+                    <span style="font-size:13px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ note.author }}</span>
+                  </div>
+                  <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ note.date }}</span>
+                </div>
+                <p style="font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;line-height:1.6;margin-left:36px">{{ note.text }}</p>
+              </div>
+            </div>
+
+            <!-- Add staff note -->
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <textarea
+                v-model="newStaffNote"
+                placeholder="Add a staff note..."
+                rows="3"
+                style="width:100%;padding:10px 12px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;resize:none;box-sizing:border-box;line-height:1.5"
+                @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+                @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
+              />
+              <div style="display:flex;justify-content:flex-end">
+                <button
+                  style="height:36px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer"
+                  @click="addStaffNote"
+                  @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
+                  @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
+                >Add Note</button>
+              </div>
+            </div>
+          </div>
+
         </div>
 
       </div>

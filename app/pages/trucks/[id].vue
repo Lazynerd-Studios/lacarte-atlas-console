@@ -8,10 +8,13 @@ const truck = reactive({
   year: '2023',
   lastService: 'Feb 15, 2026',
   driver: 'John Smith',
+  lastDriver: 'John Smith',
+  lastDriverPhone: '+233 24 123 4567',
+  lastDriverZone: 'Downtown Zone',
+  lastDriverDate: 'Mar 7, 2026',
+  totalPickups: 284,
   capacity: '10 tons',
-  mileage: '45,820 mi',
-  fuelEfficiency: '8.5 MPG',
-  nextServiceDue: '2 weeks',
+  nextServiceDue: 'Mar 22, 2026',
   vin: '1HGBH41JXMN109186',
   makeModel: 'Freightliner M2 106',
   make: 'Freightliner',
@@ -140,19 +143,43 @@ const routeHistory = [
 
     <!-- Stat cards -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:24px">
-      <div
-        v-for="stat in [
-          { label: 'Capacity',        value: truck.capacity,        color: '#1a1a1a' },
-          { label: 'Total Mileage',   value: truck.mileage,         color: '#1a1a1a' },
-          { label: 'Fuel Efficiency', value: truck.fuelEfficiency,  color: '#1a1a1a' },
-          { label: 'Next Service Due',value: truck.nextServiceDue,  color: '#ffb400' },
-        ]"
-        :key="stat.label"
-        style="background:white;border:1px solid #ececec;border-radius:16px;padding:10px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)"
-      >
-        <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">{{ stat.label }}</p>
-        <p :style="`font-size:20px;font-weight:700;font-family:'Manrope',sans-serif;color:${stat.color}`">{{ stat.value }}</p>
+
+      <!-- Last Driver -->
+      <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:10px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+        <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:10px">Last Driver</p>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="width:36px;height:36px;border-radius:9999px;background:#ffb400;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <span style="font-size:13px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ truck.lastDriver.split(' ').map((n: string) => n[0]).join('') }}</span>
+          </div>
+          <span style="font-size:16px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ truck.lastDriver }}</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ truck.lastDriverPhone }}</span>
+          <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ truck.lastDriverZone }} · {{ truck.lastDriverDate }}</span>
+        </div>
       </div>
+
+      <!-- Total Pickups -->
+      <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:10px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+        <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">Total Pickups</p>
+        <p style="font-size:28px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ truck.totalPickups }}</p>
+        <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:4px">All time</p>
+      </div>
+
+      <!-- Last Service -->
+      <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:10px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+        <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">Last Service</p>
+        <p style="font-size:20px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ truck.lastService }}</p>
+        <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:4px">Oil Change</p>
+      </div>
+
+      <!-- Next Service Due -->
+      <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:10px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+        <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">Next Service Due</p>
+        <p style="font-size:20px;font-weight:700;color:#ffb400;font-family:'Manrope',sans-serif">{{ truck.nextServiceDue }}</p>
+        <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:4px">Scheduled</p>
+      </div>
+
     </div>
 
     <!-- Tabbed card -->
