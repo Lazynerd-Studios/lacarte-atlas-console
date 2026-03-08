@@ -3,6 +3,7 @@ definePageMeta({ layout: 'dashboard' })
 
 const route = useRoute()
 const id = route.params.id as string
+const { format } = useCurrency()
 
 // Mock invoice data — in real app this would be fetched by id
 const invoice = reactive({
@@ -24,12 +25,12 @@ const invoice = reactive({
   dueDate: 'March 15, 2026',
   paymentMethod: 'Card ending 4242',
   items: [
-    { description: 'Monthly Subscription - Weekly Pickup', qty: 1, rate: '$45.00', amount: '$45.00' },
+    { description: 'Monthly Subscription - Weekly Pickup', qty: 1, rate: 45, amount: 45 },
   ],
-  subtotal: '$45.00',
-  tax: '$0.00',
+  subtotal: 45,
+  tax: 0,
   taxRate: '0%',
-  total: '$45.00',
+  total: 45,
 })
 
 function statusBadge(s: string) {
@@ -141,8 +142,8 @@ function statusBadge(s: string) {
               >
                 <td style="padding:12px 0;font-size:16px;color:#111;font-family:'Manrope',sans-serif">{{ item.description }}</td>
                 <td style="padding:12px 0;font-size:16px;color:#111;font-family:'Manrope',sans-serif;text-align:right">{{ item.qty }}</td>
-                <td style="padding:12px 0;font-size:16px;color:#111;font-family:'Manrope',sans-serif;text-align:right">{{ item.rate }}</td>
-                <td style="padding:12px 0;font-size:16px;color:#111;font-family:'Manrope',sans-serif;text-align:right">{{ item.amount }}</td>
+                <td style="padding:12px 0;font-size:16px;color:#111;font-family:'Manrope',sans-serif;text-align:right">{{ format(item.rate) }}</td>
+                <td style="padding:12px 0;font-size:16px;color:#111;font-family:'Manrope',sans-serif;text-align:right">{{ format(item.amount) }}</td>
               </tr>
             </tbody>
           </table>
@@ -153,15 +154,15 @@ function statusBadge(s: string) {
           <div style="width:256px;display:flex;flex-direction:column;gap:8px">
             <div style="display:flex;justify-content:space-between">
               <span style="font-size:16px;color:#6b7280;font-family:'Manrope',sans-serif">Subtotal</span>
-              <span style="font-size:16px;color:#111;font-family:'Manrope',sans-serif">{{ invoice.subtotal }}</span>
+              <span style="font-size:16px;color:#111;font-family:'Manrope',sans-serif">{{ format(invoice.subtotal) }}</span>
             </div>
             <div style="display:flex;justify-content:space-between">
               <span style="font-size:16px;color:#6b7280;font-family:'Manrope',sans-serif">Tax ({{ invoice.taxRate }})</span>
-              <span style="font-size:16px;color:#111;font-family:'Manrope',sans-serif">{{ invoice.tax }}</span>
+              <span style="font-size:16px;color:#111;font-family:'Manrope',sans-serif">{{ format(invoice.tax) }}</span>
             </div>
             <div style="border-top:1px solid #e5e7eb;padding-top:8px;display:flex;justify-content:space-between">
               <span style="font-size:16px;font-weight:700;color:#111;font-family:'Manrope',sans-serif">Total</span>
-              <span style="font-size:18px;font-weight:700;color:#111;font-family:'Manrope',sans-serif">{{ invoice.total }}</span>
+              <span style="font-size:18px;font-weight:700;color:#111;font-family:'Manrope',sans-serif">{{ format(invoice.total) }}</span>
             </div>
           </div>
         </div>

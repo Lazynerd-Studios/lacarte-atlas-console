@@ -1,6 +1,8 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'dashboard' })
 
+const { format } = useCurrency()
+
 // Mock customer data — replace with API call using useRoute().params.id
 const customer = {
   id: 'CUST-2025-1',
@@ -13,15 +15,18 @@ const customer = {
   city: 'Downtown',
   postalCode: '12345',
   instructions: 'Leave bins at side entrance',
-  plan: 'Subscription',
-  planDetail: 'Weekly Pickup - $45/month',
-  paymentMethod: 'Auto-pay (Card ending 4242)',
+  userType: 'commercial',
+  entityName: 'Johnson Enterprises Ltd',
+  plan: 'subscription',
+  subscriptionInterval: 'monthly',
+  subscriptionType: 'prepaid',
+  planDetail: 'Weekly Pickup - GHS 45/month',
   nextPickup: 'March 8, 2026',
   since: 'Jan 2025',
   status: 'active',
   totalPickups: 42,
   balance: 0,
-  lifetimeValue: '$1,890',
+  lifetimeValue: 'GHS 1,890',
 }
 
 const initials = computed(() => `${customer.firstName[0]}${customer.lastName[0]}`)
@@ -56,14 +61,14 @@ const activeTab = ref('Overview')
 const tabs = ['Overview', 'Pickup History', 'Billing', 'Assigned Bins', 'Notes']
 
 const pickupHistory = [
-  { date: '2026-03-01', time: '08:45 AM', driver: 'John Smith',   zone: 'Downtown', truck: 'T-001', weight: '42 kg', status: 'completed' },
-  { date: '2026-02-22', time: '09:10 AM', driver: 'Maria Garcia',  zone: 'Downtown', truck: 'T-003', weight: '38 kg', status: 'completed' },
-  { date: '2026-02-15', time: '08:30 AM', driver: 'John Smith',   zone: 'Downtown', truck: 'T-001', weight: '45 kg', status: 'completed' },
-  { date: '2026-02-08', time: '10:00 AM', driver: 'James Wilson',  zone: 'Downtown', truck: 'T-007', weight: '0 kg',  status: 'missed' },
-  { date: '2026-02-01', time: '08:55 AM', driver: 'John Smith',   zone: 'Downtown', truck: 'T-001', weight: '40 kg', status: 'completed' },
-  { date: '2026-01-25', time: '09:20 AM', driver: 'Maria Garcia',  zone: 'Downtown', truck: 'T-003', weight: '36 kg', status: 'completed' },
-  { date: '2026-01-18', time: '08:40 AM', driver: 'John Smith',   zone: 'Downtown', truck: 'T-001', weight: '41 kg', status: 'completed' },
-  { date: '2026-01-11', time: '09:05 AM', driver: 'Lisa Anderson', zone: 'Downtown', truck: 'T-012', weight: '39 kg', status: 'rescheduled' },
+  { date: '2026-03-01', time: '08:45 AM', driver: 'John Smith',    status: 'completed', amount: 45 },
+  { date: '2026-02-22', time: '09:10 AM', driver: 'Maria Garcia',  status: 'completed', amount: 45 },
+  { date: '2026-02-15', time: '08:30 AM', driver: 'John Smith',    status: 'completed', amount: 45 },
+  { date: '2026-02-08', time: '10:00 AM', driver: 'James Wilson',  status: 'missed',    amount: 0  },
+  { date: '2026-02-01', time: '08:55 AM', driver: 'John Smith',    status: 'completed', amount: 45 },
+  { date: '2026-01-25', time: '09:20 AM', driver: 'Maria Garcia',  status: 'completed', amount: 45 },
+  { date: '2026-01-18', time: '08:40 AM', driver: 'John Smith',    status: 'completed', amount: 45 },
+  { date: '2026-01-11', time: '09:05 AM', driver: 'Lisa Anderson', status: 'rescheduled', amount: 0 },
 ]
 
 const billingHistory = [
@@ -163,7 +168,9 @@ function addNote() {
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:1px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
         <div style="padding:10px 24px 10px">
           <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">Plan Type</p>
-          <p style="font-size:20px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ customer.plan }}</p>
+          <p style="font-size:20px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">
+            {{ customer.plan === 'subscription' ? `Subscription (${customer.subscriptionType.charAt(0).toUpperCase() + customer.subscriptionType.slice(1)})` : 'Pay-as-you-go' }}
+          </p>
         </div>
       </div>
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:1px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
@@ -210,8 +217,8 @@ function addNote() {
             <div style="display:flex;flex-direction:column;gap:12px">
               <div v-for="row in [
                 { label: 'Customer ID',       value: customer.id },
-                { label: 'Subscription Plan', value: customer.planDetail },
-                { label: 'Payment Method',    value: customer.paymentMethod },
+                { label: 'Subscription Plan', value: customer.plan === 'subscription' ? customer.subscriptionInterval.charAt(0).toUpperCase() + customer.subscriptionInterval.slice(1) : 'Pay-as-you-go' },
+                { label: customer.userType !== 'regular' ? 'Entity Name' : 'User Type', value: customer.userType !== 'regular' ? customer.entityName : 'Regular' },
                 { label: 'Next Pickup',       value: customer.nextPickup },
               ]" :key="row.label" style="display:flex;flex-direction:column;gap:2px">
                 <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ row.label }}</p>
@@ -260,11 +267,8 @@ function addNote() {
                 <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Date</th>
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Driver</th>
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Zone</th>
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Truck</th>
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Weight</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Amount</th>
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Status</th>
-                  <th style="padding:14px 16px;text-align:right;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -282,9 +286,7 @@ function addNote() {
                     </div>
                   </td>
                   <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ p.driver }}</td>
-                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ p.zone }}</td>
-                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ p.truck }}</td>
-                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ p.weight }}</td>
+                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ p.amount > 0 ? format(p.amount) : '—' }}</td>
                   <td style="padding:16px">
                     <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;
                       color:${p.status === 'completed' ? '#22c55e' : p.status === 'missed' ? '#ef4444' : '#d49a00'};
@@ -293,19 +295,9 @@ function addNote() {
                       {{ p.status }}
                     </span>
                   </td>
-                  <td style="padding:16px;text-align:right">
-                    <button
-                      style="width:32px;height:32px;border-radius:20px;background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center"
-                      title="View details"
-                      @mouseover="($event.currentTarget as HTMLElement).style.background='#f3f4f6'"
-                      @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
-                    >
-                      <UIcon name="i-lucide-eye" style="width:16px;height:16px;color:#6b7280" />
-                    </button>
-                  </td>
                 </tr>
                 <tr v-if="pickupHistory.length === 0">
-                  <td colspan="7" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No pickup history found</td>
+                  <td colspan="4" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No pickup history found</td>
                 </tr>
               </tbody>
             </table>
@@ -344,7 +336,6 @@ function addNote() {
                 <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Date</th>
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Invoice</th>
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Description</th>
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Amount</th>
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Status</th>
                   <th style="padding:14px 16px;text-align:right;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Actions</th>
@@ -360,8 +351,7 @@ function addNote() {
                 >
                   <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ b.date }}</td>
                   <td style="padding:16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ b.invoice }}</td>
-                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ b.description }}</td>
-                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">GHS {{ b.amountRaw }}</td>
+                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ format(b.amountRaw) }}</td>
                   <td style="padding:16px">
                     <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;
                       color:${b.status === 'paid' ? '#22c55e' : b.status === 'overdue' ? '#ef4444' : '#d49a00'};
@@ -379,7 +369,7 @@ function addNote() {
                   </td>
                 </tr>
                 <tr v-if="billingHistory.length === 0">
-                  <td colspan="6" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No billing records found</td>
+                  <td colspan="5" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No billing records found</td>
                 </tr>
               </tbody>
             </table>
@@ -428,25 +418,6 @@ function addNote() {
 
         <!-- Notes -->
         <div v-else-if="activeTab === 'Notes'" style="display:flex;flex-direction:column;gap:16px">
-          <!-- Add note box -->
-          <div style="background:#f8f9fa;border:1px solid #e5e7eb;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px">
-            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Add a Note</label>
-            <textarea
-              v-model="newNote"
-              placeholder="Write a note about this customer..."
-              rows="3"
-              style="width:100%;padding:10px 12px;background:white;border:1px solid #e5e7eb;border-radius:12px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;resize:none;box-sizing:border-box;line-height:1.5"
-              @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
-              @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
-            />
-            <div style="display:flex;justify-content:flex-end">
-              <button
-                style="height:36px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer"
-                @click="addNote"
-              >Add Note</button>
-            </div>
-          </div>
-
           <!-- Notes list -->
           <div style="display:flex;flex-direction:column;gap:12px">
             <p v-if="notes.length === 0" style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;text-align:center;padding:32px 0">No notes yet</p>

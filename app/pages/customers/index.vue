@@ -2,6 +2,19 @@
 definePageMeta({ layout: 'dashboard' })
 
 const showModal = ref(false)
+const showSuspendModal = ref(false)
+const selectedCustomer = ref<typeof allCustomers[0] | null>(null)
+
+function openSuspend(c: typeof allCustomers[0]) {
+  selectedCustomer.value = c
+  showSuspendModal.value = true
+}
+
+function handleSuspend(reason: string) {
+  console.log('Suspend', selectedCustomer.value?.name, 'reason:', reason)
+  showSuspendModal.value = false
+  selectedCustomer.value = null
+}
 
 const search = ref('')
 const statusFilter = ref('all')
@@ -172,7 +185,8 @@ function statusBadge(status: string) {
                 </NuxtLink>
                 <button
                   style="width:32px;height:32px;border-radius:20px;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center"
-                  title="Deactivate"
+                  title="Suspend"
+                  @click="openSuspend(c)"
                   @mouseover="($event.currentTarget as HTMLElement).style.background='#fef2f2'"
                   @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
                 >
@@ -194,4 +208,12 @@ function statusBadge(status: string) {
 
   <!-- Add Customer Modal -->
   <CustomerModal v-if="showModal" @close="showModal = false" @submit="handleAddCustomer" />
+
+  <!-- Suspend Modal -->
+  <SuspendModal
+    v-if="showSuspendModal && selectedCustomer"
+    :customer-name="selectedCustomer.name"
+    @close="showSuspendModal = false"
+    @confirm="handleSuspend"
+  />
 </template>

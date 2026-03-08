@@ -14,7 +14,11 @@ const form = reactive({
   street: '',
   city: '',
   postalCode: '',
+  userType: 'regular',
+  entityName: '',
   plan: 'subscription',
+  subscriptionInterval: 'monthly',
+  subscriptionType: 'prepaid',
   instructions: '',
   sendWelcome: true,
 })
@@ -114,6 +118,27 @@ function onBlur(e: Event, field: string) {
           <span v-if="errors.phone" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.phone }}</span>
         </div>
 
+        <!-- User Type -->
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">User Type</label>
+          <select
+            v-model="form.userType"
+            :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+          >
+            <option value="regular">Regular</option>
+            <option value="commercial">Commercial</option>
+            <option value="estate">Estate</option>
+            <option value="industrial">Industrial</option>
+          </select>
+        </div>
+
+        <!-- Entity Name (non-regular types only) -->
+        <div v-if="form.userType !== 'regular'" style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Entity Name</label>
+          <input v-model="form.entityName" type="text" placeholder="Company / Estate / Organisation name" :style="inputStyle('entityName')"
+            @focus="onFocus($event, 'entityName')" @blur="onBlur($event, 'entityName')" />
+        </div>
+
         <!-- Portal access section -->
         <div style="background:#f9fafb;border:1px solid #ececec;border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px">
           <div style="display:flex;align-items:center;gap:8px">
@@ -176,6 +201,31 @@ function onBlur(e: Event, field: string) {
           >
             <option value="subscription">Subscription</option>
             <option value="pay-as-you-go">Pay-as-you-go</option>
+          </select>
+        </div>
+
+        <!-- Subscription Interval (only when plan = subscription) -->
+        <div v-if="form.plan === 'subscription'" style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Subscription Interval</label>
+          <select
+            v-model="form.subscriptionInterval"
+            :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+          >
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="yearly">Yearly</option>
+          </select>
+        </div>
+
+        <!-- Subscription Type -->
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Subscription Type</label>
+          <select
+            v-model="form.subscriptionType"
+            :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+          >
+            <option value="prepaid">Prepaid</option>
+            <option value="postpaid">Postpaid</option>
           </select>
         </div>
 

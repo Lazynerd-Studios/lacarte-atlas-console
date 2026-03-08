@@ -1,12 +1,14 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'dashboard' })
 
+const { format } = useCurrency()
+
 const drivers = [
-  { initials: 'JS', name: 'John Smith',    phone: '(555) 111-2222', truck: 'T-001', zone: 'Downtown', bins: 3, status: 'on-route', todayPickups: 12, earnings: '$1,805.00', incomplete: 3, deduction: '$45',  completed: 142, total: 145 },
-  { initials: 'MG', name: 'Maria Garcia',  phone: '(555) 222-3333', truck: 'T-003', zone: 'Westside',  bins: 4, status: 'on-route', todayPickups: 15, earnings: '$2,070.00', incomplete: 2, deduction: '$30',  completed: 158, total: 160 },
-  { initials: 'JW', name: 'James Wilson',  phone: '(555) 333-4444', truck: 'T-007', zone: 'Eastside',  bins: 2, status: 'on-route', todayPickups: 10, earnings: '$1,545.00', incomplete: 7, deduction: '$105', completed: 128, total: 135 },
-  { initials: 'LA', name: 'Lisa Anderson', phone: '(555) 444-5555', truck: 'T-012', zone: 'Northside', bins: 3, status: 'online',   todayPickups: 0,  earnings: '$1,890.00', incomplete: 2, deduction: '$30',  completed: 150, total: 152 },
-  { initials: 'RT', name: 'Robert Taylor', phone: '(555) 555-6666', truck: 'T-015', zone: 'Southside', bins: 2, status: 'offline',  todayPickups: 0,  earnings: '$1,705.00', incomplete: 5, deduction: '$75',  completed: 135, total: 140 },
+  { initials: 'JS', name: 'John Smith',    phone: '(555) 111-2222', truck: 'T-001', zone: 'Downtown', bins: 3, status: 'on-route', todayPickups: 12, earnings: 1805,   incomplete: 3, deductionAmt: 45,  completed: 142, total: 145 },
+  { initials: 'MG', name: 'Maria Garcia',  phone: '(555) 222-3333', truck: 'T-003', zone: 'Westside',  bins: 4, status: 'on-route', todayPickups: 15, earnings: 2070,   incomplete: 2, deductionAmt: 30,  completed: 158, total: 160 },
+  { initials: 'JW', name: 'James Wilson',  phone: '(555) 333-4444', truck: 'T-007', zone: 'Eastside',  bins: 2, status: 'on-route', todayPickups: 10, earnings: 1545,   incomplete: 7, deductionAmt: 105, completed: 128, total: 135 },
+  { initials: 'LA', name: 'Lisa Anderson', phone: '(555) 444-5555', truck: 'T-012', zone: 'Northside', bins: 3, status: 'online',   todayPickups: 0,  earnings: 1890,   incomplete: 2, deductionAmt: 30,  completed: 150, total: 152 },
+  { initials: 'RT', name: 'Robert Taylor', phone: '(555) 555-6666', truck: 'T-015', zone: 'Southside', bins: 2, status: 'offline',  todayPickups: 0,  earnings: 1705,   incomplete: 5, deductionAmt: 75,  completed: 135, total: 140 },
 ]
 
 function statusStyle(s: string) {
@@ -89,8 +91,8 @@ function statusStyle(s: string) {
             <UIcon name="i-lucide-dollar-sign" style="width:16px;height:16px;color:#15803d;flex-shrink:0" />
             <span style="font-size:14px;font-weight:500;color:#15803d;font-family:'Manrope',sans-serif">Period Earnings</span>
           </div>
-          <p style="font-size:20px;font-weight:700;color:#15803d;font-family:'Manrope',sans-serif;margin:0">{{ d.earnings }}</p>
-          <p style="font-size:12px;color:#dc2626;font-family:'Manrope',sans-serif;margin:0">-{{ d.incomplete }} incomplete ({{ d.incomplete }} × $15 = -{{ d.deduction }})</p>
+          <p style="font-size:20px;font-weight:700;color:#15803d;font-family:'Manrope',sans-serif;margin:0">{{ format(d.earnings) }}</p>
+          <p style="font-size:12px;color:#dc2626;font-family:'Manrope',sans-serif;margin:0">-{{ d.incomplete }} incomplete ({{ d.incomplete }} × GHS 15 = -{{ format(d.deductionAmt) }})</p>
           <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">{{ d.completed }}/{{ d.total }} tasks completed</p>
         </div>
 

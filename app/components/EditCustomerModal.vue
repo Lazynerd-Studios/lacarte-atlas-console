@@ -8,7 +8,11 @@ const props = defineProps<{
     street: string
     city: string
     postalCode: string
+    userType: string
+    entityName: string
     plan: string
+    subscriptionInterval: string
+    subscriptionType: string
     instructions: string
   }
 }>()
@@ -109,6 +113,13 @@ function onBlur(e: Event, field: string) {
           <span v-if="errors.phone" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.phone }}</span>
         </div>
 
+        <!-- Entity Name (non-regular types only) -->
+        <div v-if="form.userType !== 'regular'" style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Entity Name</label>
+          <input v-model="form.entityName" type="text" placeholder="Company / Estate / Organisation name" :style="inputStyle('entityName')"
+            @focus="onFocus($event, 'entityName')" @blur="onBlur($event, 'entityName')" />
+        </div>
+
         <!-- Street address -->
         <div style="display:flex;flex-direction:column;gap:6px">
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Street Address</label>
@@ -141,6 +152,31 @@ function onBlur(e: Event, field: string) {
           >
             <option value="subscription">Subscription</option>
             <option value="pay-as-you-go">Pay-as-you-go</option>
+          </select>
+        </div>
+
+        <!-- Subscription Interval -->
+        <div v-if="form.plan === 'subscription'" style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Subscription Interval</label>
+          <select
+            v-model="form.subscriptionInterval"
+            :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+          >
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="yearly">Yearly</option>
+          </select>
+        </div>
+
+        <!-- Subscription Type -->
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Subscription Type</label>
+          <select
+            v-model="form.subscriptionType"
+            :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+          >
+            <option value="prepaid">Prepaid</option>
+            <option value="postpaid">Postpaid</option>
           </select>
         </div>
 

@@ -11,13 +11,13 @@ const requests = ref([
   {
     id: 'PR-2026-002', customer: 'Michael Chen',   address: '456 Maple Ave, Westside, 12346',
     date: '2026-03-03', timeSlot: 'Afternoon (12PM - 4PM)',
-    paymentType: 'one-time', paymentDetail: '$25.00',
+    paymentType: 'one-time', paymentDetail: 'GHS 25.00',
     paymentStatus: 'paid', status: 'assigned', driver: 'Maria Garcia',
   },
   {
     id: 'PR-2026-003', customer: 'Emma Williams',  address: '789 Pine Road, Eastside, 12347',
     date: '2026-03-04', timeSlot: 'Morning (8AM - 12PM)',
-    paymentType: 'one-time', paymentDetail: '$25.00',
+    paymentType: 'one-time', paymentDetail: 'GHS 25.00',
     paymentStatus: 'unpaid', status: 'pending', driver: '',
   },
   {
@@ -29,7 +29,7 @@ const requests = ref([
   {
     id: 'PR-2026-005', customer: 'Olivia Brown',   address: '654 Cedar Court, Southside, 12349',
     date: '2026-03-03', timeSlot: 'Morning (8AM - 12PM)',
-    paymentType: 'one-time', paymentDetail: '$25.00',
+    paymentType: 'one-time', paymentDetail: 'GHS 25.00',
     paymentStatus: 'paid', status: 'completed', driver: 'John Smith',
   },
 ])

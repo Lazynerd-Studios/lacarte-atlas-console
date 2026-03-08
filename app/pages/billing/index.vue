@@ -29,24 +29,26 @@ function handleApprove(id: string) {
   selectedTransfer.value = null
 }
 
+const { format } = useCurrency()
+
 const transfers = ref([
-  { id: 'BT-001', customer: 'Michael Chen',  invoiceId: 'INV-2026-002', amount: 'GHS 65',  reference: 'REF123456789', submitted: '2026-03-03' },
-  { id: 'BT-002', customer: 'David Wilson',  invoiceId: 'INV-2026-012', amount: 'GHS 120', reference: 'REF987654321', submitted: '2026-03-04' },
-  { id: 'BT-003', customer: 'Lisa Anderson', invoiceId: 'INV-2026-018', amount: 'GHS 45',  reference: 'REF456789123', submitted: '2026-03-04' },
+  { id: 'BT-001', customer: 'Michael Chen',  invoiceId: 'INV-2026-002', amount: 65,  reference: 'REF123456789', submitted: '2026-03-03' },
+  { id: 'BT-002', customer: 'David Wilson',  invoiceId: 'INV-2026-012', amount: 120, reference: 'REF987654321', submitted: '2026-03-04' },
+  { id: 'BT-003', customer: 'Lisa Anderson', invoiceId: 'INV-2026-018', amount: 45,  reference: 'REF456789123', submitted: '2026-03-04' },
 ])
 
 const invoices = ref([
-  { id: 'INV-2026-001', customer: 'Sarah Johnson',  planType: 'subscription', amount: '$45',  date: '2026-03-01', status: 'paid' },
-  { id: 'INV-2026-002', customer: 'Michael Chen',   planType: 'payg',         amount: '$65',  date: '2026-03-01', status: 'pending' },
-  { id: 'INV-2026-003', customer: 'Emma Williams',  planType: 'subscription', amount: '$45',  date: '2026-03-01', status: 'paid' },
-  { id: 'INV-2026-004', customer: 'James Martinez', planType: 'payg',         amount: '$120', date: '2026-02-15', status: 'overdue' },
-  { id: 'INV-2026-005', customer: 'Olivia Brown',   planType: 'subscription', amount: '$45',  date: '2026-03-01', status: 'paid' },
+  { id: 'INV-2026-001', customer: 'Sarah Johnson',  planType: 'subscription', amount: 45,  date: '2026-03-01', status: 'paid' },
+  { id: 'INV-2026-002', customer: 'Michael Chen',   planType: 'payg',         amount: 65,  date: '2026-03-01', status: 'pending' },
+  { id: 'INV-2026-003', customer: 'Emma Williams',  planType: 'subscription', amount: 45,  date: '2026-03-01', status: 'paid' },
+  { id: 'INV-2026-004', customer: 'James Martinez', planType: 'payg',         amount: 120, date: '2026-02-15', status: 'overdue' },
+  { id: 'INV-2026-005', customer: 'Olivia Brown',   planType: 'subscription', amount: 45,  date: '2026-03-01', status: 'paid' },
 ])
 
 const revenue = [
-  { label: 'Monthly Subscriptions', amount: '$52,340', pct: 62, color: '#22c55e' },
-  { label: 'Pay-as-you-go',         amount: '$31,890', pct: 38, color: '#3b82f6' },
-  { label: 'Outstanding',           amount: '$12,480', pct: 15, color: '#ef4444', amountColor: '#ef4444' },
+  { label: 'Monthly Subscriptions', amount: 52340, pct: 62, color: '#22c55e' },
+  { label: 'Pay-as-you-go',         amount: 31890, pct: 38, color: '#3b82f6' },
+  { label: 'Outstanding',           amount: 12480, pct: 15, color: '#ef4444', amountColor: '#ef4444' },
 ]
 
 const agingSlices = [
@@ -150,7 +152,7 @@ const donutSlices = computed(() => {
             <td style="padding:20px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ t.id }}</td>
             <td style="padding:20px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ t.customer }}</td>
             <td style="padding:20px 16px;font-size:14px;color:#ffb400;font-family:'Manrope',sans-serif;white-space:nowrap">{{ t.invoiceId }}</td>
-            <td style="padding:20px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ t.amount }}</td>
+            <td style="padding:20px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ format(t.amount) }}</td>
             <td style="padding:20px 16px">
               <span style="font-size:12px;color:#1a1a1a;background:#f9fafb;padding:4px 8px;border-radius:4px;font-family:monospace">{{ t.reference }}</span>
             </td>
@@ -225,7 +227,7 @@ const donutSlices = computed(() => {
           >
             <div style="display:flex;align-items:center;justify-content:space-between">
               <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ r.label }}</span>
-              <span :style="`font-size:14px;font-weight:500;font-family:'Manrope',sans-serif;color:${r.amountColor || '#111'}`">{{ r.amount }}</span>
+              <span :style="`font-size:14px;font-weight:500;font-family:'Manrope',sans-serif;color:${r.amountColor || '#111'}`">{{ format(r.amount) }}</span>
             </div>
             <div style="height:8px;background:#e5e7eb;border-radius:999px;overflow:hidden">
               <div :style="`height:8px;background:${r.color};border-radius:999px;width:${r.pct}%`"></div>
@@ -272,7 +274,7 @@ const donutSlices = computed(() => {
                 {{ planBadge(inv.planType).label }}
               </span>
             </td>
-            <td style="padding:20px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ inv.amount }}</td>
+            <td style="padding:20px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ format(inv.amount) }}</td>
             <td style="padding:20px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ inv.date }}</td>
             <td style="padding:20px 16px">
               <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;color:${statusBadge(inv.status).color};background:${statusBadge(inv.status).bg};border:1px solid ${statusBadge(inv.status).border}`">

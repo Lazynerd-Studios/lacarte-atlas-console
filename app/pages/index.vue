@@ -73,8 +73,8 @@ function revenueArea() {
     const y = padT + innerH - (d.value / revenueMax) * innerH
     return `${x},${y}`
   })
-  const first = pts[0].split(',')
-  const last  = pts[pts.length - 1].split(',')
+  const first = pts[0]!.split(',')
+  const last  = pts[pts.length - 1]!.split(',')
   return `${pts.join(' ')} ${last[0]},${padT + innerH} ${first[0]},${padT + innerH}`
 }
 
@@ -237,29 +237,33 @@ function barH(v: number) { return (v / pickupMax) * innerH }
     </div>
 
     <!-- Active trucks -->
-    <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:25px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-      <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin-bottom:16px">Active Trucks</p>
-      <div style="display:flex;flex-direction:column;gap:16px">
-        <div v-for="truck in trucks" :key="truck.id" style="height:64px;background:#f8f9fa;border-radius:16px;padding:0 12px;display:flex;align-items:center;gap:12px">
-          <div style="width:40px;height:40px;background:#22c55e;border-radius:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <UIcon name="i-lucide-truck" style="width:20px;height:20px;color:white" />
-          </div>
-          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
-            <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ truck.id }}</span>
-              <span style="font-size:12px;font-weight:500;color:#22c55e;background:rgba(34,197,94,0.1);border-radius:14px;padding:3px 11px">on-route</span>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+      <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:25px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+        <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin-bottom:16px">Active Trucks</p>
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div v-for="truck in trucks" :key="truck.id" style="height:64px;background:#f8f9fa;border-radius:16px;padding:0 12px;display:flex;align-items:center;gap:12px">
+            <div style="width:40px;height:40px;background:#22c55e;border-radius:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <UIcon name="i-lucide-truck" style="width:20px;height:20px;color:white" />
             </div>
-            <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ truck.driver }}</p>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:2px;align-items:flex-end">
-            <div style="display:flex;align-items:center;gap:4px">
-              <UIcon name="i-lucide-map-pin" style="width:12px;height:12px;color:#6b7280" />
-              <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ truck.zone }}</span>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ truck.id }}</span>
+                <span style="font-size:12px;font-weight:500;color:#22c55e;background:rgba(34,197,94,0.1);border-radius:14px;padding:3px 11px">on-route</span>
+              </div>
+              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ truck.driver }}</p>
             </div>
-            <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">ETA: {{ truck.eta }}</p>
+            <div style="display:flex;flex-direction:column;gap:2px;align-items:flex-end">
+              <div style="display:flex;align-items:center;gap:4px">
+                <UIcon name="i-lucide-map-pin" style="width:12px;height:12px;color:#6b7280" />
+                <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ truck.zone }}</span>
+              </div>
+              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">ETA: {{ truck.eta }}</p>
+            </div>
           </div>
         </div>
       </div>
+      <!-- Right col intentionally empty -->
+      <div></div>
     </div>
   </div>
 </template>
