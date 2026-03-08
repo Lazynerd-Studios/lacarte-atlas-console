@@ -214,13 +214,14 @@ function handleAssignDriver(data: { driver: string; scheduledDate: string; sched
                   @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
                   @click="openAssignModal(req)"
                 >Reassign</button>
-                <button
-                  style="width:32px;height:32px;background:none;border:none;border-radius:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0"
+                <NuxtLink
+                  :to="`/pickups/${req.id}`"
+                  style="width:32px;height:32px;background:none;border:none;border-radius:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;text-decoration:none"
                   @mouseover="($event.currentTarget as HTMLElement).style.background='#f3f4f6'"
                   @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
                 >
                   <UIcon name="i-lucide-eye" style="width:16px;height:16px;color:#6b7280" />
-                </button>
+                </NuxtLink>
               </div>
             </td>
           </tr>

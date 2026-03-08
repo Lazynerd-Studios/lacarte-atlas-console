@@ -2,10 +2,10 @@
 definePageMeta({ layout: 'dashboard' })
 
 const showDeclineModal = ref(false)
-const selectedDeclineTransfer = ref<typeof transfers.value[0] | null>(null)
+const selectedDeclineTransfer = ref<{ id: string; customer: string; invoiceId: string; amount: string; reference: string; submitted: string } | null>(null)
 
 function openDecline(t: typeof transfers.value[0]) {
-  selectedDeclineTransfer.value = t
+  selectedDeclineTransfer.value = { ...t, amount: format(t.amount) }
   showDeclineModal.value = true
 }
 
@@ -16,10 +16,10 @@ function handleDecline(id: string) {
 }
 
 const showApproveModal = ref(false)
-const selectedTransfer = ref<typeof transfers.value[0] | null>(null)
+const selectedTransfer = ref<{ id: string; customer: string; invoiceId: string; amount: string; reference: string; submitted: string } | null>(null)
 
 function openApprove(t: typeof transfers.value[0]) {
-  selectedTransfer.value = t
+  selectedTransfer.value = { ...t, amount: format(t.amount) }
   showApproveModal.value = true
 }
 
@@ -32,10 +32,36 @@ function handleApprove(id: string) {
 const { format } = useCurrency()
 
 const transfers = ref([
-  { id: 'BT-001', customer: 'Michael Chen',  invoiceId: 'INV-2026-002', amount: 65,  reference: 'REF123456789', submitted: '2026-03-03' },
-  { id: 'BT-002', customer: 'David Wilson',  invoiceId: 'INV-2026-012', amount: 120, reference: 'REF987654321', submitted: '2026-03-04' },
-  { id: 'BT-003', customer: 'Lisa Anderson', invoiceId: 'INV-2026-018', amount: 45,  reference: 'REF456789123', submitted: '2026-03-04' },
+  { id: 'BT-001', customer: 'Michael Chen',   invoiceId: 'INV-2026-002', amount: 65,  reference: 'REF123456789', submitted: '2026-03-03' },
+  { id: 'BT-002', customer: 'David Wilson',   invoiceId: 'INV-2026-012', amount: 120, reference: 'REF987654321', submitted: '2026-03-04' },
+  { id: 'BT-003', customer: 'Lisa Anderson',  invoiceId: 'INV-2026-018', amount: 45,  reference: 'REF456789123', submitted: '2026-03-04' },
+  { id: 'BT-004', customer: 'James Martinez', invoiceId: 'INV-2026-021', amount: 90,  reference: 'REF321654987', submitted: '2026-03-05' },
+  { id: 'BT-005', customer: 'Olivia Brown',   invoiceId: 'INV-2026-025', amount: 55,  reference: 'REF654321098', submitted: '2026-03-05' },
+  { id: 'BT-006', customer: 'Sarah Johnson',  invoiceId: 'INV-2026-030', amount: 75,  reference: 'REF789012345', submitted: '2026-03-06' },
+  { id: 'BT-007', customer: 'Emma Williams',  invoiceId: 'INV-2026-033', amount: 110, reference: 'REF012345678', submitted: '2026-03-06' },
 ])
+
+const transferSearch = ref('')
+const transferPage = ref(1)
+const transferPerPage = 5
+
+const filteredTransfers = computed(() => {
+  const q = transferSearch.value.toLowerCase()
+  if (!q) return transfers.value
+  return transfers.value.filter(t =>
+    t.customer.toLowerCase().includes(q) ||
+    t.id.toLowerCase().includes(q) ||
+    t.invoiceId.toLowerCase().includes(q) ||
+    t.reference.toLowerCase().includes(q)
+  )
+})
+
+const paginatedTransfers = computed(() => {
+  const start = (transferPage.value - 1) * transferPerPage
+  return filteredTransfers.value.slice(start, start + transferPerPage)
+})
+
+watch(transferSearch, () => { transferPage.value = 1 })
 
 const invoices = ref([
   { id: 'INV-2026-001', customer: 'Sarah Johnson',  planType: 'subscription', amount: 45,  date: '2026-03-01', status: 'paid' },
@@ -43,7 +69,35 @@ const invoices = ref([
   { id: 'INV-2026-003', customer: 'Emma Williams',  planType: 'subscription', amount: 45,  date: '2026-03-01', status: 'paid' },
   { id: 'INV-2026-004', customer: 'James Martinez', planType: 'payg',         amount: 120, date: '2026-02-15', status: 'overdue' },
   { id: 'INV-2026-005', customer: 'Olivia Brown',   planType: 'subscription', amount: 45,  date: '2026-03-01', status: 'paid' },
+  { id: 'INV-2026-006', customer: 'David Wilson',   planType: 'payg',         amount: 80,  date: '2026-03-02', status: 'paid' },
+  { id: 'INV-2026-007', customer: 'Lisa Anderson',  planType: 'subscription', amount: 45,  date: '2026-03-02', status: 'pending' },
+  { id: 'INV-2026-008', customer: 'Robert Taylor',  planType: 'payg',         amount: 55,  date: '2026-03-02', status: 'paid' },
+  { id: 'INV-2026-009', customer: 'Karen White',    planType: 'subscription', amount: 45,  date: '2026-02-20', status: 'overdue' },
+  { id: 'INV-2026-010', customer: 'Chris Harris',   planType: 'payg',         amount: 95,  date: '2026-03-03', status: 'paid' },
+  { id: 'INV-2026-011', customer: 'Amanda Clark',   planType: 'subscription', amount: 45,  date: '2026-03-03', status: 'paid' },
+  { id: 'INV-2026-012', customer: 'Daniel Lewis',   planType: 'payg',         amount: 70,  date: '2026-03-03', status: 'pending' },
 ])
+
+const invoiceSearch = ref('')
+const invoicePage = ref(1)
+const invoicePerPage = 10
+
+const filteredInvoices = computed(() => {
+  const q = invoiceSearch.value.toLowerCase()
+  if (!q) return invoices.value
+  return invoices.value.filter(inv =>
+    inv.customer.toLowerCase().includes(q) ||
+    inv.id.toLowerCase().includes(q) ||
+    inv.status.toLowerCase().includes(q)
+  )
+})
+
+const paginatedInvoices = computed(() => {
+  const start = (invoicePage.value - 1) * invoicePerPage
+  return filteredInvoices.value.slice(start, start + invoicePerPage)
+})
+
+watch(invoiceSearch, () => { invoicePage.value = 1 })
 
 const revenue = [
   { label: 'Monthly Subscriptions', amount: 52340, pct: 62, color: '#22c55e' },
@@ -119,7 +173,7 @@ const donutSlices = computed(() => {
     </div>
 
     <!-- Pending Bank Transfers -->
-    <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:25px 25px 1px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+    <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:25px 25px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
         <div>
           <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Pending Bank Transfers</p>
@@ -129,6 +183,20 @@ const donutSlices = computed(() => {
           {{ transfers.length }} pending
         </span>
       </div>
+
+      <!-- Search -->
+      <div style="position:relative;margin-bottom:16px;max-width:320px">
+        <UIcon name="i-lucide-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#6b7280;pointer-events:none" />
+        <input
+          v-model="transferSearch"
+          type="text"
+          placeholder="Search transfers..."
+          style="width:100%;height:38px;padding:0 12px 0 36px;border:1px solid #e5e7eb;border-radius:20px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;background:white"
+          @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+          @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
+        />
+      </div>
+
       <table style="width:100%;border-collapse:collapse">
         <thead>
           <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
@@ -143,9 +211,9 @@ const donutSlices = computed(() => {
         </thead>
         <tbody>
           <tr
-            v-for="(t, i) in transfers"
+            v-for="(t, i) in paginatedTransfers"
             :key="t.id"
-            :style="`border-bottom:${i < transfers.length - 1 ? '1px solid #e5e7eb' : 'none'}`"
+            :style="`border-bottom:${i < paginatedTransfers.length - 1 ? '1px solid #e5e7eb' : 'none'}`"
             @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
           >
@@ -180,8 +248,21 @@ const donutSlices = computed(() => {
               </div>
             </td>
           </tr>
+          <tr v-if="paginatedTransfers.length === 0">
+            <td colspan="7" style="padding:32px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No transfers match your search.</td>
+          </tr>
         </tbody>
       </table>
+
+      <!-- Pagination -->
+      <div style="padding-top:16px;border-top:1px solid #e5e7eb;margin-top:4px">
+        <AppPagination
+          :page="transferPage"
+          :total="filteredTransfers.length"
+          :per-page="transferPerPage"
+          @update:page="transferPage = $event"
+        />
+      </div>
     </div>
 
     <!-- Payment Aging + Revenue Breakdown -->
@@ -238,7 +319,7 @@ const donutSlices = computed(() => {
     </div>
 
     <!-- Recent Invoices -->
-    <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:25px 25px 1px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+    <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:25px 25px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
         <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Recent Invoices</p>
         <button
@@ -247,6 +328,20 @@ const donutSlices = computed(() => {
           @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
         >Export All</button>
       </div>
+
+      <!-- Search -->
+      <div style="position:relative;margin-bottom:16px;max-width:320px">
+        <UIcon name="i-lucide-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#6b7280;pointer-events:none" />
+        <input
+          v-model="invoiceSearch"
+          type="text"
+          placeholder="Search invoices..."
+          style="width:100%;height:38px;padding:0 12px 0 36px;border:1px solid #e5e7eb;border-radius:20px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;background:white"
+          @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+          @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
+        />
+      </div>
+
       <table style="width:100%;border-collapse:collapse">
         <thead>
           <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
@@ -261,9 +356,9 @@ const donutSlices = computed(() => {
         </thead>
         <tbody>
           <tr
-            v-for="(inv, i) in invoices"
+            v-for="(inv, i) in paginatedInvoices"
             :key="inv.id"
-            :style="`border-bottom:${i < invoices.length - 1 ? '1px solid #e5e7eb' : 'none'}`"
+            :style="`border-bottom:${i < paginatedInvoices.length - 1 ? '1px solid #e5e7eb' : 'none'}`"
             @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
           >
@@ -291,8 +386,21 @@ const donutSlices = computed(() => {
               </NuxtLink>
             </td>
           </tr>
+          <tr v-if="paginatedInvoices.length === 0">
+            <td colspan="7" style="padding:32px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No invoices match your search.</td>
+          </tr>
         </tbody>
       </table>
+
+      <!-- Pagination -->
+      <div style="padding-top:16px;border-top:1px solid #e5e7eb;margin-top:4px">
+        <AppPagination
+          :page="invoicePage"
+          :total="filteredInvoices.length"
+          :per-page="invoicePerPage"
+          @update:page="invoicePage = $event"
+        />
+      </div>
     </div>
 
   </div>
