@@ -24,11 +24,21 @@ const reportsSubLinks = [
 ]
 
 const isReportsOpen = ref(route.path.startsWith('/reports'))
+const isManagementOpen = ref(route.path.startsWith('/management'))
 
 const isReportsActive = computed(() => route.path.startsWith('/reports'))
+const isManagementActive = computed(() => route.path.startsWith('/management'))
+
+const managementSubLinks = [
+  { label: 'Customer Types',       to: '/management/customer-types' },
+  { label: 'Subscription Management', to: '/management/subscriptions' },
+  { label: 'Rate Management',      to: '/management/rates' },
+  { label: 'Zone Management',      to: '/management/zones' },
+]
 
 watch(() => route.path, (p) => {
   if (p.startsWith('/reports')) isReportsOpen.value = true
+  if (p.startsWith('/management')) isManagementOpen.value = true
 })
 
 const userInitial = computed(() => {
@@ -117,6 +127,42 @@ function isActive(to: string) {
         <div v-if="isReportsOpen" style="margin-top:2px;display:flex;flex-direction:column;gap:2px">
           <NuxtLink
             v-for="sub in reportsSubLinks"
+            :key="sub.to"
+            :to="sub.to"
+            style="text-decoration:none"
+          >
+            <div
+              :style="`display:flex;align-items:center;gap:10px;height:36px;padding-left:44px;border-radius:20px;cursor:pointer;background:${isActive(sub.to) ? '#fff9e6' : 'transparent'}`"
+              @mouseover="!isActive(sub.to) && (($event.currentTarget as HTMLElement).style.background = '#f9fafb')"
+              @mouseleave="!isActive(sub.to) && (($event.currentTarget as HTMLElement).style.background = 'transparent')"
+            >
+              <div :style="`width:6px;height:6px;border-radius:50%;background:${isActive(sub.to) ? '#ffb400' : '#d1d5db'};flex-shrink:0`" />
+              <span :style="`font-size:13px;font-family:'Manrope',sans-serif;color:${isActive(sub.to) ? '#111' : '#6b7280'};white-space:nowrap`">{{ sub.label }}</span>
+            </div>
+          </NuxtLink>
+        </div>
+      </div>
+
+      <!-- Management with submenu -->
+      <div>
+        <div
+          :style="`position:relative;display:flex;align-items:center;gap:12px;height:40px;padding-left:12px;border-radius:20px;cursor:pointer;background:${isManagementActive ? '#fff9e6' : 'transparent'}`"
+          @click="isManagementOpen = !isManagementOpen"
+          @mouseover="!isManagementActive && (($event.currentTarget as HTMLElement).style.background = '#f9fafb')"
+          @mouseleave="!isManagementActive && (($event.currentTarget as HTMLElement).style.background = 'transparent')"
+        >
+          <div v-if="isManagementActive" style="position:absolute;left:0;top:0;width:4px;height:40px;background:#ffb400;border-radius:0 4px 4px 0" />
+          <UIcon name="i-lucide-sliders" :style="`width:20px;height:20px;flex-shrink:0;color:${isManagementActive ? '#ffb400' : '#6b7280'}`" />
+          <span :style="`font-size:14px;font-family:'Manrope',sans-serif;flex:1;color:${isManagementActive ? '#111' : '#6b7280'};white-space:nowrap`">Management</span>
+          <UIcon
+            :name="isManagementOpen ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+            style="width:16px;height:16px;color:#6b7280;margin-right:12px;flex-shrink:0"
+          />
+        </div>
+
+        <div v-if="isManagementOpen" style="margin-top:2px;display:flex;flex-direction:column;gap:2px">
+          <NuxtLink
+            v-for="sub in managementSubLinks"
             :key="sub.to"
             :to="sub.to"
             style="text-decoration:none"
