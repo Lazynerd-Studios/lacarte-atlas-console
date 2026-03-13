@@ -6,9 +6,7 @@ const activeTab = ref('general')
 const tabs = [
   { key: 'general',       label: 'General' },
   { key: 'notifications', label: 'Notifications' },
-  { key: 'team',          label: 'Team' },
   { key: 'security',      label: 'Security' },
-  { key: 'subscription',  label: 'Subscription' },
 ]
 
 // General tab state
@@ -60,13 +58,7 @@ const security = reactive({
   twoFactor: false,
 })
 
-// Subscription tab state
-const plan = reactive({
-  current: 'Professional',
-  billing: 'monthly',
-  nextBilling: '2026-04-08',
-  amount: 'GHS 299/mo',
-})
+
 </script>
 
 <template>
@@ -256,27 +248,6 @@ const plan = reactive({
           </button>
         </div>
 
-        <!-- Team -->
-        <div v-else-if="activeTab === 'team'" style="display:flex;flex-direction:column;gap:16px;max-width:672px">
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <h3 style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Team Members</h3>
-            <button
-              style="height:36px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px"
-              @click="$router.push('/team/add')"
-              @mouseover="($event.currentTarget as HTMLElement).style.background='#e6a200'"
-              @mouseleave="($event.currentTarget as HTMLElement).style.background='#ffb400'"
-            >
-              <UIcon name="i-lucide-plus" style="width:15px;height:15px" />
-              Add Member
-            </button>
-          </div>
-          <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">
-            Manage team members and their roles from the
-            <NuxtLink to="/team" style="color:#ffb400;text-decoration:none;font-weight:500">Team Management</NuxtLink>
-            page.
-          </p>
-        </div>
-
         <!-- Security -->
         <div v-else-if="activeTab === 'security'" style="display:flex;flex-direction:column;gap:24px;max-width:480px">
           <h3 style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Change Password</h3>
@@ -334,43 +305,6 @@ const plan = reactive({
           >
             Update Password
           </button>
-        </div>
-
-        <!-- Subscription -->
-        <div v-else-if="activeTab === 'subscription'" style="display:flex;flex-direction:column;gap:24px;max-width:672px">
-          <h3 style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Subscription Plan</h3>
-
-          <div style="border:1px solid #e5e7eb;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:16px">
-            <div style="display:flex;align-items:center;justify-content:space-between">
-              <div>
-                <p style="font-size:16px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ plan.current }}</p>
-                <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin:4px 0 0">{{ plan.amount }}</p>
-              </div>
-              <span style="font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;padding:4px 12px;border-radius:14px;color:#22c55e;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2)">Active</span>
-            </div>
-            <div style="height:1px;background:#e5e7eb" />
-            <div style="display:flex;align-items:center;gap:8px">
-              <UIcon name="i-lucide-calendar" style="width:16px;height:16px;color:#6b7280" />
-              <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Next billing date: {{ plan.nextBilling }}</span>
-            </div>
-          </div>
-
-          <div style="display:flex;gap:12px">
-            <button
-              style="height:40px;padding:0 24px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
-              @mouseover="($event.currentTarget as HTMLElement).style.background='#e6a200'"
-              @mouseleave="($event.currentTarget as HTMLElement).style.background='#ffb400'"
-            >
-              Upgrade Plan
-            </button>
-            <button
-              style="height:40px;padding:0 24px;background:white;border:1px solid #e5e7eb;border-radius:20px;font-size:14px;font-weight:500;color:#6b7280;font-family:'Manrope',sans-serif;cursor:pointer"
-              @mouseover="($event.currentTarget as HTMLElement).style.background='#f9fafb'"
-              @mouseleave="($event.currentTarget as HTMLElement).style.background='white'"
-            >
-              Cancel Subscription
-            </button>
-          </div>
         </div>
 
       </div>
