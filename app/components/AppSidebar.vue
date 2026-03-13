@@ -2,6 +2,8 @@
 const route = useRoute()
 const authStore = useAuthStore()
 
+const collapsed = useState('sidebarCollapsed', () => false)
+
 const navLinks = [
   { label: 'Dashboard',          icon: 'i-lucide-layout-dashboard', to: '/' },
   { label: 'Customers',          icon: 'i-lucide-users',            to: '/customers' },
@@ -17,10 +19,10 @@ const navLinks = [
 ]
 
 const reportsSubLinks = [
-  { label: 'Analytics',           to: '/reports/analytics' },
+  { label: 'Analytics',            to: '/reports/analytics' },
   { label: 'Operations Analytics', to: '/reports/operations' },
-  { label: 'Customer Analytics',  to: '/reports/customers' },
-  { label: 'Zone Performance',    to: '/reports/zones' },
+  { label: 'Customer Analytics',   to: '/reports/customers' },
+  { label: 'Zone Performance',     to: '/reports/zones' },
 ]
 
 const isReportsOpen = ref(route.path.startsWith('/reports'))
@@ -37,50 +39,93 @@ const commsSubLinks = [
 ]
 
 const managementSubLinks = [
-  { label: 'Customer Types',       to: '/management/customer-types' },
+  { label: 'Customer Types',          to: '/management/customer-types' },
   { label: 'Subscription Management', to: '/management/subscriptions' },
-  { label: 'Rate Management',      to: '/management/rates' },
-  { label: 'Zone Management',      to: '/management/zones' },
+  { label: 'Rate Management',         to: '/management/rates' },
+  { label: 'Zone Management',         to: '/management/zones' },
 ]
 
 watch(() => route.path, (p) => {
-  if (p.startsWith('/reports')) isReportsOpen.value = true
+  if (p.startsWith('/reports'))    isReportsOpen.value = true
   if (p.startsWith('/management')) isManagementOpen.value = true
-  if (p.startsWith('/comms')) isCommsOpen.value = true
+  if (p.startsWith('/comms'))      isCommsOpen.value = true
 })
 
-const userInitial = computed(() => {
-  const name = authStore.user?.name || 'Admin User'
-  return name.charAt(0).toUpperCase()
-})
-
-const userName = computed(() => authStore.user?.name || 'Admin User')
-const userEmail = computed(() => authStore.user?.email || 'admin@lacarte.com')
+const userInitial = computed(() => (authStore.user?.name || 'Admin User').charAt(0).toUpperCase())
+const userName    = computed(() => authStore.user?.name  || 'Admin User')
+const userEmail   = computed(() => authStore.user?.email || 'admin@lacarte.com')
 
 function isActive(to: string) {
   if (to === '/') return route.path === '/'
   return route.path.startsWith(to)
 }
+
+function toggleGroup(group: 'reports' | 'management' | 'comms') {
+  if (collapsed.value) {
+    collapsed.value = false
+    nextTick(() => {
+      if (group === 'reports')    isReportsOpen.value = true
+      if (group === 'management') isManagementOpen.value = true
+      if (group === 'comms')      isCommsOpen.value = true
+    })
+  } else {
+    if (group === 'reports')    isReportsOpen.value = !isReportsOpen.value
+    if (group === 'management') isManagementOpen.value = !isManagementOpen.value
+    if (group === 'comms')      isCommsOpen.value = !isCommsOpen.value
+  }
+}
 </script>
 
 <template>
-  <aside style="width:256px;min-width:256px;height:100vh;background:white;border-right:1px solid #ececec;display:flex;flex-direction:column">
-    <!-- Logo -->
-    <div style="height:64px;padding:0 24px;display:flex;align-items:center;border-bottom:1px solid #ececec;flex-shrink:0">
+  <aside
+    :style="`
+      width:${collapsed ? 64 : 256}px;
+      min-width:${collapsed ? 64 : 256}px;
+      height:100vh;
+      background:white;
+      border-right:1px solid #ececec;
+      display:flex;
+      flex-direction:column;
+      transition:width 0.2s ease,min-width 0.2s ease;
+      overflow:hidden;
+    `"
+  >
+    <!-- Logo / collapse toggle -->
+    <div style="height:64px;padding:0 12px;display:flex;align-items:center;border-bottom:1px solid #ececec;flex-shrink:0;gap:8px">
       <img
+        v-if="!collapsed"
         src="https://www.figma.com/api/mcp/asset/f733ef86-dfb4-4f16-b178-19d3757b9227"
         alt="LaCarte"
-        style="height:40px;width:auto"
+        style="height:40px;width:auto;flex:1;min-width:0"
       />
+      <button
+        :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+        :style="`
+          width:36px;height:36px;border-radius:20px;background:none;border:none;cursor:pointer;
+          display:flex;align-items:center;justify-content:center;flex-shrink:0;
+          ${collapsed ? 'margin:0 auto' : ''}
+        `"
+        @click="collapsed = !collapsed"
+        @mouseover="($event.currentTarget as HTMLElement).style.background='#f9fafb'"
+        @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
+      >
+        <UIcon
+          :name="collapsed ? 'i-lucide-panel-left-open' : 'i-lucide-panel-left-close'"
+          style="width:20px;height:20px;color:#6b7280"
+        />
+      </button>
     </div>
 
     <!-- Nav -->
-    <nav style="flex:1;overflow-y:auto;padding:16px 12px;display:flex;flex-direction:column;gap:4px">
+    <nav style="flex:1;overflow-y:auto;overflow-x:hidden;padding:16px 8px;display:flex;flex-direction:column;gap:4px">
+
+      <!-- Regular links -->
       <NuxtLink
         v-for="link in navLinks"
         :key="link.to"
         :to="link.to"
         style="text-decoration:none"
+        :title="collapsed ? link.label : undefined"
       >
         <div
           :style="`
@@ -89,16 +134,16 @@ function isActive(to: string) {
             align-items:center;
             gap:12px;
             height:40px;
-            padding-left:12px;
+            padding-left:${collapsed ? 0 : 12}px;
+            ${collapsed ? 'justify-content:center;' : ''}
             border-radius:20px;
             cursor:pointer;
             background:${isActive(link.to) ? '#fff9e6' : 'transparent'};
             transition:background 0.15s;
           `"
           @mouseover="!isActive(link.to) && (($event.currentTarget as HTMLElement).style.background = '#f9fafb')"
-          @mouseleave="!isActive(link.to) && (($event.currentTarget as HTMLElement).style.background = 'transparent')"
+          @mouseleave="!isActive(link.to) && (($event.currentTarget as HTMLElement).style.background = isActive(link.to) ? '#fff9e6' : 'transparent')"
         >
-          <!-- Active indicator -->
           <div
             v-if="isActive(link.to)"
             style="position:absolute;left:0;top:0;width:4px;height:40px;background:#ffb400;border-radius:0 4px 4px 0"
@@ -107,38 +152,41 @@ function isActive(to: string) {
             :name="link.icon"
             :style="`width:20px;height:20px;flex-shrink:0;color:${isActive(link.to) ? '#ffb400' : '#6b7280'}`"
           />
-          <span :style="`font-size:14px;font-family:'Manrope',sans-serif;color:${isActive(link.to) ? '#111' : '#6b7280'};white-space:nowrap`">
+          <span
+            v-if="!collapsed"
+            :style="`font-size:14px;font-family:'Manrope',sans-serif;color:${isActive(link.to) ? '#111' : '#6b7280'};white-space:nowrap`"
+          >
             {{ link.label }}
           </span>
         </div>
       </NuxtLink>
 
-      <!-- Reports with submenu -->
+      <!-- Reports -->
       <div>
-        <!-- Reports parent row -->
         <div
-          :style="`position:relative;display:flex;align-items:center;gap:12px;height:40px;padding-left:12px;border-radius:20px;cursor:pointer;background:${isReportsActive ? '#fff9e6' : 'transparent'}`"
-          @click="isReportsOpen = !isReportsOpen"
+          :style="`
+            position:relative;display:flex;align-items:center;gap:12px;height:40px;
+            padding-left:${collapsed ? 0 : 12}px;
+            ${collapsed ? 'justify-content:center;' : ''}
+            border-radius:20px;cursor:pointer;
+            background:${isReportsActive ? '#fff9e6' : 'transparent'};
+          `"
+          :title="collapsed ? 'Reports' : undefined"
+          @click="toggleGroup('reports')"
           @mouseover="!isReportsActive && (($event.currentTarget as HTMLElement).style.background = '#f9fafb')"
           @mouseleave="!isReportsActive && (($event.currentTarget as HTMLElement).style.background = 'transparent')"
         >
           <div v-if="isReportsActive" style="position:absolute;left:0;top:0;width:4px;height:40px;background:#ffb400;border-radius:0 4px 4px 0" />
           <UIcon name="i-lucide-bar-chart-2" :style="`width:20px;height:20px;flex-shrink:0;color:${isReportsActive ? '#ffb400' : '#6b7280'}`" />
-          <span :style="`font-size:14px;font-family:'Manrope',sans-serif;flex:1;color:${isReportsActive ? '#111' : '#6b7280'};white-space:nowrap`">Reports</span>
+          <span v-if="!collapsed" :style="`font-size:14px;font-family:'Manrope',sans-serif;flex:1;color:${isReportsActive ? '#111' : '#6b7280'};white-space:nowrap`">Reports</span>
           <UIcon
+            v-if="!collapsed"
             :name="isReportsOpen ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
             style="width:16px;height:16px;color:#6b7280;margin-right:12px;flex-shrink:0"
           />
         </div>
-
-        <!-- Submenu -->
-        <div v-if="isReportsOpen" style="margin-top:2px;display:flex;flex-direction:column;gap:2px">
-          <NuxtLink
-            v-for="sub in reportsSubLinks"
-            :key="sub.to"
-            :to="sub.to"
-            style="text-decoration:none"
-          >
+        <div v-if="isReportsOpen && !collapsed" style="margin-top:2px;display:flex;flex-direction:column;gap:2px">
+          <NuxtLink v-for="sub in reportsSubLinks" :key="sub.to" :to="sub.to" style="text-decoration:none">
             <div
               :style="`display:flex;align-items:center;gap:10px;height:36px;padding-left:44px;border-radius:20px;cursor:pointer;background:${isActive(sub.to) ? '#fff9e6' : 'transparent'}`"
               @mouseover="!isActive(sub.to) && (($event.currentTarget as HTMLElement).style.background = '#f9fafb')"
@@ -151,30 +199,32 @@ function isActive(to: string) {
         </div>
       </div>
 
-      <!-- Management with submenu -->
+      <!-- Management -->
       <div>
         <div
-          :style="`position:relative;display:flex;align-items:center;gap:12px;height:40px;padding-left:12px;border-radius:20px;cursor:pointer;background:${isManagementActive ? '#fff9e6' : 'transparent'}`"
-          @click="isManagementOpen = !isManagementOpen"
+          :style="`
+            position:relative;display:flex;align-items:center;gap:12px;height:40px;
+            padding-left:${collapsed ? 0 : 12}px;
+            ${collapsed ? 'justify-content:center;' : ''}
+            border-radius:20px;cursor:pointer;
+            background:${isManagementActive ? '#fff9e6' : 'transparent'};
+          `"
+          :title="collapsed ? 'Management' : undefined"
+          @click="toggleGroup('management')"
           @mouseover="!isManagementActive && (($event.currentTarget as HTMLElement).style.background = '#f9fafb')"
           @mouseleave="!isManagementActive && (($event.currentTarget as HTMLElement).style.background = 'transparent')"
         >
           <div v-if="isManagementActive" style="position:absolute;left:0;top:0;width:4px;height:40px;background:#ffb400;border-radius:0 4px 4px 0" />
           <UIcon name="i-lucide-sliders" :style="`width:20px;height:20px;flex-shrink:0;color:${isManagementActive ? '#ffb400' : '#6b7280'}`" />
-          <span :style="`font-size:14px;font-family:'Manrope',sans-serif;flex:1;color:${isManagementActive ? '#111' : '#6b7280'};white-space:nowrap`">Management</span>
+          <span v-if="!collapsed" :style="`font-size:14px;font-family:'Manrope',sans-serif;flex:1;color:${isManagementActive ? '#111' : '#6b7280'};white-space:nowrap`">Management</span>
           <UIcon
+            v-if="!collapsed"
             :name="isManagementOpen ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
             style="width:16px;height:16px;color:#6b7280;margin-right:12px;flex-shrink:0"
           />
         </div>
-
-        <div v-if="isManagementOpen" style="margin-top:2px;display:flex;flex-direction:column;gap:2px">
-          <NuxtLink
-            v-for="sub in managementSubLinks"
-            :key="sub.to"
-            :to="sub.to"
-            style="text-decoration:none"
-          >
+        <div v-if="isManagementOpen && !collapsed" style="margin-top:2px;display:flex;flex-direction:column;gap:2px">
+          <NuxtLink v-for="sub in managementSubLinks" :key="sub.to" :to="sub.to" style="text-decoration:none">
             <div
               :style="`display:flex;align-items:center;gap:10px;height:36px;padding-left:44px;border-radius:20px;cursor:pointer;background:${isActive(sub.to) ? '#fff9e6' : 'transparent'}`"
               @mouseover="!isActive(sub.to) && (($event.currentTarget as HTMLElement).style.background = '#f9fafb')"
@@ -187,30 +237,32 @@ function isActive(to: string) {
         </div>
       </div>
 
-      <!-- Communications with submenu -->
+      <!-- Communications -->
       <div>
         <div
-          :style="`position:relative;display:flex;align-items:center;gap:12px;height:40px;padding-left:12px;border-radius:20px;cursor:pointer;background:${isCommsActive ? '#fff9e6' : 'transparent'}`"
-          @click="isCommsOpen = !isCommsOpen"
+          :style="`
+            position:relative;display:flex;align-items:center;gap:12px;height:40px;
+            padding-left:${collapsed ? 0 : 12}px;
+            ${collapsed ? 'justify-content:center;' : ''}
+            border-radius:20px;cursor:pointer;
+            background:${isCommsActive ? '#fff9e6' : 'transparent'};
+          `"
+          :title="collapsed ? 'Communications' : undefined"
+          @click="toggleGroup('comms')"
           @mouseover="!isCommsActive && (($event.currentTarget as HTMLElement).style.background = '#f9fafb')"
           @mouseleave="!isCommsActive && (($event.currentTarget as HTMLElement).style.background = 'transparent')"
         >
           <div v-if="isCommsActive" style="position:absolute;left:0;top:0;width:4px;height:40px;background:#ffb400;border-radius:0 4px 4px 0" />
           <UIcon name="i-lucide-message-square" :style="`width:20px;height:20px;flex-shrink:0;color:${isCommsActive ? '#ffb400' : '#6b7280'}`" />
-          <span :style="`font-size:14px;font-family:'Manrope',sans-serif;flex:1;color:${isCommsActive ? '#111' : '#6b7280'};white-space:nowrap`">Communications</span>
+          <span v-if="!collapsed" :style="`font-size:14px;font-family:'Manrope',sans-serif;flex:1;color:${isCommsActive ? '#111' : '#6b7280'};white-space:nowrap`">Communications</span>
           <UIcon
+            v-if="!collapsed"
             :name="isCommsOpen ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
             style="width:16px;height:16px;color:#6b7280;margin-right:12px;flex-shrink:0"
           />
         </div>
-
-        <div v-if="isCommsOpen" style="margin-top:2px;display:flex;flex-direction:column;gap:2px">
-          <NuxtLink
-            v-for="sub in commsSubLinks"
-            :key="sub.to"
-            :to="sub.to"
-            style="text-decoration:none"
-          >
+        <div v-if="isCommsOpen && !collapsed" style="margin-top:2px;display:flex;flex-direction:column;gap:2px">
+          <NuxtLink v-for="sub in commsSubLinks" :key="sub.to" :to="sub.to" style="text-decoration:none">
             <div
               :style="`display:flex;align-items:center;gap:10px;height:36px;padding-left:44px;border-radius:20px;cursor:pointer;background:${isActive(sub.to) ? '#fff9e6' : 'transparent'}`"
               @mouseover="!isActive(sub.to) && (($event.currentTarget as HTMLElement).style.background = '#f9fafb')"
@@ -226,12 +278,20 @@ function isActive(to: string) {
     </nav>
 
     <!-- User footer -->
-    <div style="border-top:1px solid #ececec;padding:17px 16px;flex-shrink:0">
-      <div style="display:flex;align-items:center;gap:12px;padding:0 12px;height:52px">
+    <div style="border-top:1px solid #ececec;padding:17px 8px;flex-shrink:0">
+      <div
+        :style="`
+          display:flex;align-items:center;gap:12px;
+          padding:0 ${collapsed ? 0 : 12}px;
+          height:52px;
+          ${collapsed ? 'justify-content:center;' : ''}
+        `"
+        :title="collapsed ? `${userName} · ${userEmail}` : undefined"
+      >
         <div style="width:32px;height:32px;border-radius:9999px;background:#ffb400;display:flex;align-items:center;justify-content:center;flex-shrink:0">
           <span style="font-size:16px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">{{ userInitial }}</span>
         </div>
-        <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+        <div v-if="!collapsed" style="flex:1;min-width:0;display:flex;flex-direction:column">
           <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ userName }}</p>
           <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ userEmail }}</p>
         </div>
