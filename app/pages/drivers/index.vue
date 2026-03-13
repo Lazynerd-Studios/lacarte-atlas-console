@@ -58,7 +58,7 @@ function statusStyle(s: string) {
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px">
+    <div class="grid-cols-3">
       <div
         v-for="d in drivers"
         :key="d.name"

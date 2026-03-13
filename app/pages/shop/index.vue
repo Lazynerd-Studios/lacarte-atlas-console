@@ -25,7 +25,7 @@ const sections = [
     </div>
 
     <!-- Stat cards -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:24px">
+    <div class="grid-cols-4">
       <div
         v-for="stat in stats"
         :key="stat.label"
@@ -45,7 +45,7 @@ const sections = [
     </div>
 
     <!-- Section cards: Products / Orders / Inventory -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px">
+    <div class="grid-cols-3">
       <div
         v-for="s in sections"
         :key="s.title"

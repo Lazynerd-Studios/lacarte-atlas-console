@@ -43,7 +43,7 @@ function statusStyle(s: string) {
     </div>
 
     <!-- Stat cards -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px">
+    <div class="grid-cols-4" style="gap:20px">
       <div v-for="s in stats" :key="s.label" style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
         <div :style="`width:40px;height:40px;background:${s.iconBg};border-radius:20px;display:flex;align-items:center;justify-content:center;margin-bottom:16px`">
           <UIcon :name="s.icon" :style="`width:20px;height:20px;color:${s.iconColor}`" />
@@ -54,7 +54,7 @@ function statusStyle(s: string) {
     </div>
 
     <!-- Members table -->
-    <div style="background:white;border:1px solid #ececec;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,0.1);overflow:hidden">
+    <div class="table-scroll" style="background:white;border:1px solid #ececec;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
       <table style="width:100%;border-collapse:collapse">
         <thead>
           <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">

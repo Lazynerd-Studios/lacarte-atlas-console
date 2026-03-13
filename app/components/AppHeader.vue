@@ -2,6 +2,8 @@
 const authStore = useAuthStore()
 const router = useRouter()
 
+const emit = defineEmits<{ (e: 'toggle-sidebar'): void }>()
+
 const userInitial = computed(() => {
   const name = authStore.user?.name || 'Admin User'
   return name.charAt(0).toUpperCase()
@@ -19,9 +21,18 @@ function logout() {
 </script>
 
 <template>
-  <header style="height:64px;background:white;border-bottom:1px solid #ececec;display:flex;align-items:center;justify-content:space-between;padding:0 24px;flex-shrink:0">
+  <header style="height:64px;background:white;border-bottom:1px solid #ececec;display:flex;align-items:center;justify-content:space-between;padding:0 24px;flex-shrink:0;gap:12px">
+    <!-- Hamburger (mobile only) -->
+    <button
+      class="header-hamburger"
+      style="width:36px;height:36px;border-radius:20px;background:none;border:none;cursor:pointer;align-items:center;justify-content:center;flex-shrink:0"
+      @click="emit('toggle-sidebar')"
+    >
+      <UIcon name="i-lucide-menu" style="width:20px;height:20px;color:#6b7280" />
+    </button>
+
     <!-- Search -->
-    <div style="position:relative;width:448px">
+    <div class="header-search" style="position:relative;width:448px;flex-shrink:0">
       <UIcon name="i-lucide-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#6b7280" />
       <input
         v-model="search"
@@ -34,7 +45,7 @@ function logout() {
     </div>
 
     <!-- Right side -->
-    <div style="display:flex;align-items:center;gap:4px">
+    <div style="display:flex;align-items:center;gap:4px;margin-left:auto">
       <!-- Notifications -->
       <button
         style="position:relative;width:36px;height:36px;border-radius:20px;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center"
@@ -51,7 +62,7 @@ function logout() {
 
       <!-- User info -->
       <div style="display:flex;align-items:center;gap:12px">
-        <div style="display:flex;flex-direction:column;align-items:flex-end">
+        <div class="header-user-text" style="display:flex;flex-direction:column;align-items:flex-end">
           <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;white-space:nowrap">{{ userName }}</p>
           <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;white-space:nowrap">Administrator</p>
         </div>

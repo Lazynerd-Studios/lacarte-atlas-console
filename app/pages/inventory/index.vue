@@ -65,7 +65,7 @@ function openUpdate(item: typeof inventory.value[0]) {
 function confirmUpdate() {
   if (!selectedItem.value) return
   const idx = inventory.value.findIndex(i => i.id === selectedItem.value!.id)
-  if (idx !== -1) inventory.value[idx].stock = previewStock.value
+  if (idx !== -1) inventory.value[idx]!.stock = previewStock.value
   showUpdateModal.value = false
 }
 
@@ -132,7 +132,7 @@ function exportCSV() {
 
     <!-- Filters -->
     <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px" class="filters-grid">
         <!-- Search -->
         <div style="position:relative">
           <UIcon name="i-lucide-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#6b7280" />
@@ -165,7 +165,7 @@ function exportCSV() {
     </div>
 
     <!-- Table -->
-    <div style="background:white;border:1px solid #ececec;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+    <div class="table-scroll" style="background:white;border:1px solid #ececec;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
       <table style="width:100%;border-collapse:collapse">
         <thead>
           <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">

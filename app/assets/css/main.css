@@ -14,3 +14,172 @@
   --color-text: #111111;
   --color-text-muted: #6b7280;
 }
+
+/* ─── Responsive grid utilities ─────────────────────────────────────────── */
+
+.grid-cols-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.grid-cols-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+
+.grid-cols-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+/* Tracking page: map + sidebar */
+.grid-map {
+  display: grid;
+  grid-template-columns: 1fr 344px;
+  gap: 24px;
+  align-items: start;
+}
+
+/* Billing: donut + revenue */
+.grid-billing-charts {
+  display: grid;
+  grid-template-columns: 344px 1fr;
+  gap: 24px;
+}
+
+/* ─── Scrollable table wrapper ───────────────────────────────────────────── */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ─── Page padding ───────────────────────────────────────────────────────── */
+.page-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ─── Tablet: ≤ 1024px ───────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .grid-cols-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .grid-cols-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .grid-map {
+    grid-template-columns: 1fr;
+  }
+
+  .grid-billing-charts {
+    grid-template-columns: 1fr;
+  }
+
+  .filters-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+/* ─── Mobile: ≤ 640px ────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .grid-cols-4,
+  .grid-cols-3,
+  .grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .grid-map {
+    grid-template-columns: 1fr;
+  }
+
+  .grid-billing-charts {
+    grid-template-columns: 1fr;
+  }
+
+  /* Reduce main padding on mobile */
+  .dashboard-main {
+    padding: 16px !important;
+  }
+
+  /* Page headings */
+  .page-heading {
+    font-size: 24px !important;
+  }
+
+  /* Header search: hide on mobile */
+  .header-search {
+    display: none !important;
+  }
+
+  /* Header: show hamburger */
+  .header-hamburger {
+    display: flex !important;
+  }
+
+  /* Filters: stack on mobile */
+  .filters-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Tracking map height */
+  .tracking-map {
+    height: 300px !important;
+  }
+
+  /* Tracking sidebar */
+  .tracking-sidebar {
+    height: auto !important;
+  }
+}
+
+/* Hamburger hidden by default (desktop) */
+.header-hamburger {
+  display: none;
+}
+
+/* Sidebar overlay backdrop */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 40;
+}
+
+@media (max-width: 640px) {
+  .sidebar-backdrop.active {
+    display: block;
+  }
+}
+
+/* ─── Mobile sidebar ─────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .sidebar-mobile {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 256px !important;
+    min-width: 256px !important;
+    transform: translateX(-100%);
+    z-index: 50;
+  }
+
+  .sidebar-mobile.sidebar-mobile-open {
+    transform: translateX(0);
+  }
+}
+
+/* ─── Header responsive ──────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  /* Hide user name/role text on very small screens */
+  .header-user-text {
+    display: none !important;
+  }
+}

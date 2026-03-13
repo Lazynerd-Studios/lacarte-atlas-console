@@ -48,10 +48,10 @@ function progressPct(completed: number, total: number) {
     </div>
 
     <!-- Main layout: map + sidebar -->
-    <div style="display:grid;grid-template-columns:1fr 344px;gap:24px;align-items:start">
+    <div class="grid-map">
 
       <!-- Map card -->
-      <div style="background:white;border:1px solid #ececec;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);height:700px;display:flex;flex-direction:column;padding:1px">
+      <div class="tracking-map" style="background:white;border:1px solid #ececec;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);height:700px;display:flex;flex-direction:column;padding:1px">
         <div style="flex:1;background:#f8f9fa;border-radius:16px;display:flex;align-items:center;justify-content:center">
           <div style="display:flex;flex-direction:column;align-items:center;gap:16px">
             <!-- Map icon -->
@@ -80,7 +80,7 @@ function progressPct(completed: number, total: number) {
       </div>
 
       <!-- Active Trucks sidebar -->
-      <div style="background:white;border:1px solid #ececec;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,0.1);overflow:hidden;padding:1px;height:700px;display:flex;flex-direction:column">
+      <div class="tracking-sidebar" style="background:white;border:1px solid #ececec;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,0.1);overflow:hidden;padding:1px;height:700px;display:flex;flex-direction:column">
 
         <!-- Header -->
         <div style="padding:24px 24px 0;flex-shrink:0">

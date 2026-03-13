@@ -160,7 +160,7 @@ function fmtY(v: number) {
     </div>
 
     <!-- Stat Cards -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:24px">
+    <div class="grid-cols-4">
       <div
         v-for="card in statCards"
         :key="card.title"
@@ -200,7 +200,7 @@ function fmtY(v: number) {
     </div>
 
     <!-- 2x2 Chart Grid -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+    <div class="grid-cols-2">
 
       <!-- Revenue Trend (line) -->
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1),0 1px 2px rgba(0,0,0,0.1)">

@@ -110,7 +110,7 @@ function handleTicketUpdate(id: string, status: string) {
     </div>
 
     <!-- Stat cards -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:24px">
+    <div class="grid-cols-4">
 
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:1px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
         <div style="padding:24px">
@@ -191,7 +191,7 @@ function handleTicketUpdate(id: string, status: string) {
       </div>
 
       <!-- Table -->
-      <div style="overflow:hidden">
+      <div class="table-scroll">
         <table style="width:100%;border-collapse:collapse">
           <thead>
             <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">

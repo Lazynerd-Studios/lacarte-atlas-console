@@ -77,7 +77,7 @@ function statusBadge(status: string) {
 
     <!-- Filters card -->
     <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:25px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto auto;gap:16px;align-items:center">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto auto;gap:16px;align-items:center" class="filters-grid">
         <!-- Search -->
         <div style="position:relative">
           <UIcon name="i-lucide-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#6b7280" />
@@ -132,7 +132,7 @@ function statusBadge(status: string) {
     </div>
 
     <!-- Table card -->
-    <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:1px;box-shadow:0 1px 3px rgba(0,0,0,0.1);overflow:hidden">
+    <div class="table-scroll" style="background:white;border:1px solid #ececec;border-radius:16px;padding:1px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
       <table style="width:100%;border-collapse:collapse">
         <thead>
           <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">

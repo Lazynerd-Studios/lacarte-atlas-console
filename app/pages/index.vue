@@ -93,7 +93,7 @@ function barH(v: number) { return (v / pickupMax) * innerH }
     </div>
 
     <!-- Stat cards -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px">
+    <div class="grid-cols-3">
       <div
         v-for="stat in stats"
         :key="stat.label"
@@ -122,7 +122,7 @@ function barH(v: number) { return (v / pickupMax) * innerH }
     </div>
 
     <!-- Charts row -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+    <div class="grid-cols-2">
       <!-- Revenue chart -->
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
         <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Revenue Overview</p>
@@ -179,7 +179,7 @@ function barH(v: number) { return (v / pickupMax) * innerH }
     </div>
 
     <!-- Activity + Pending pickups -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+    <div class="grid-cols-2">
       <!-- Recent activity -->
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
         <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin-bottom:16px">Recent Activity</p>
@@ -237,7 +237,7 @@ function barH(v: number) { return (v / pickupMax) * innerH }
     </div>
 
     <!-- Active trucks -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+    <div class="grid-cols-2">
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:25px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
         <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin-bottom:16px">Active Trucks</p>
         <div style="display:flex;flex-direction:column;gap:16px">

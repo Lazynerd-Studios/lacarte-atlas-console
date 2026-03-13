@@ -106,7 +106,7 @@ function handleAssignDriver(data: { driver: string; scheduledDate: string; sched
     </div>
 
     <!-- Stat cards -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:24px">
+    <div class="grid-cols-4">
       <div
         v-for="stat in [
           { label: 'Pending Requests', value: stats.pending,   color: '#ffb400' },
@@ -139,7 +139,7 @@ function handleAssignDriver(data: { driver: string; scheduledDate: string; sched
     </div>
 
     <!-- Table card -->
-    <div style="background:white;border:1px solid #ececec;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+    <div class="table-scroll" style="background:white;border:1px solid #ececec;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
       <table style="width:100%;border-collapse:collapse">
         <thead>
           <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">

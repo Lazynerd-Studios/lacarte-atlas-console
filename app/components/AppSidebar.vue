@@ -1,4 +1,7 @@
 <script setup lang="ts">
+const props = defineProps<{ mobileOpen?: boolean }>()
+const emit = defineEmits<{ (e: 'close'): void }>()
+
 const route = useRoute()
 const authStore = useAuthStore()
 
@@ -86,9 +89,12 @@ function toggleGroup(group: 'reports' | 'management' | 'comms') {
       border-right:1px solid #ececec;
       display:flex;
       flex-direction:column;
-      transition:width 0.2s ease,min-width 0.2s ease;
+      transition:width 0.2s ease,min-width 0.2s ease,transform 0.25s ease;
       overflow:hidden;
+      z-index:50;
+      position:relative;
     `"
+    :class="{ 'sidebar-mobile': true, 'sidebar-mobile-open': props.mobileOpen }"
   >
     <!-- Logo / collapse toggle -->
     <div style="height:64px;padding:0 12px;display:flex;align-items:center;border-bottom:1px solid #ececec;flex-shrink:0;gap:8px">
