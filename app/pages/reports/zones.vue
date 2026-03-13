@@ -18,16 +18,24 @@ function yLabels(max: number, steps = 4) {
 }
 function fmtY(v: number) { return v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v) }
 
-function linePoints(data: number[], maxVal: number) {
-  return data.map((v, i) => `${padL + (i / (data.length - 1)) * innerW},${padT + innerH - (v / maxVal) * innerH}`).join(' ')
+function linePoints(data: number[], minVal: number, maxVal: number) {
+  const range = maxVal - minVal
+  return data.map((v, i) => `${padL + (i / (data.length - 1)) * innerW},${padT + innerH - ((v - minVal) / range) * innerH}`).join(' ')
 }
-function areaPoints(data: number[], maxVal: number) {
-  const pts = data.map((v, i) => `${padL + (i / (data.length - 1)) * innerW},${padT + innerH - (v / maxVal) * innerH}`)
+function areaPoints(data: number[], minVal: number, maxVal: number) {
+  const range = maxVal - minVal
+  const pts = data.map((v, i) => `${padL + (i / (data.length - 1)) * innerW},${padT + innerH - ((v - minVal) / range) * innerH}`)
   const fx = pts[0]!.split(',')[0], lx = pts[pts.length - 1]!.split(',')[0]
   return `${pts.join(' ')} ${lx},${padT + innerH} ${fx},${padT + innerH}`
 }
 function dotX(i: number, len: number) { return padL + (i / (len - 1)) * innerW }
-function dotY(v: number, max: number) { return padT + innerH - (v / max) * innerH }
+function dotY(v: number, minVal: number, maxVal: number) { return padT + innerH - ((v - minVal) / (maxVal - minVal)) * innerH }
+function yLabelsRange(minVal: number, maxVal: number, steps = 4) {
+  return Array.from({ length: steps + 1 }, (_, i) => ({
+    val: Math.round(minVal + ((maxVal - minVal) / steps) * (steps - i)),
+    y: padT + (innerH / steps) * i + 4
+  }))
+}
 
 // ── Period filter ──
 const period = ref<'week' | 'month' | 'quarter'>('month')
@@ -170,10 +178,11 @@ function completionColor(v: number) {
       </div>
       <svg :width="chartW" :height="chartH" style="overflow:visible;width:100%;height:auto">
         <line v-for="i in 5" :key="i" :x1="padL" :x2="chartW-padR" :y1="padT+(innerH/4)*(i-1)" :y2="padT+(innerH/4)*(i-1)" stroke="#f0f0f0" stroke-width="1"/>
-        <text v-for="l in yLabels(100)" :key="l.val" :x="padL-8" :y="l.y" text-anchor="end" font-size="11" fill="#6b7280" font-family="Manrope,sans-serif">{{ l.val }}%</text>
-        <polygon :points="areaPoints(trendData, 100)" fill="rgba(59,130,246,0.08)"/>
-        <polyline :points="linePoints(trendData, 100)" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-        <circle v-for="(v,i) in trendData" :key="i" :cx="dotX(i,trendData.length)" :cy="dotY(v,100)" r="4" fill="#3b82f6" stroke="white" stroke-width="2"/>
+        <text v-for="l in yLabelsRange(80, 100)" :key="l.val" :x="padL-8" :y="l.y" text-anchor="end" font-size="11" fill="#6b7280" font-family="Manrope,sans-serif">{{ l.val }}%</text>
+        <polygon :points="areaPoints(trendData, 80, 100)" fill="rgba(59,130,246,0.08)"/>
+        <polyline :points="linePoints(trendData, 80, 100)" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle v-for="(v,i) in trendData" :key="i" :cx="dotX(i,trendData.length)" :cy="dotY(v,80,100)" r="4" fill="#3b82f6" stroke="white" stroke-width="2"/>
+        <text v-for="(v,i) in trendData" :key="`lbl-${i}`" :x="dotX(i,trendData.length)" :y="dotY(v,80,100)-10" text-anchor="middle" font-size="11" font-weight="600" fill="#3b82f6" font-family="Manrope,sans-serif">{{ v }}%</text>
         <text v-for="(m,i) in months" :key="m" :x="dotX(i,months.length)" :y="chartH-6" text-anchor="middle" font-size="11" fill="#6b7280" font-family="Manrope,sans-serif">{{ m }}</text>
       </svg>
     </div>

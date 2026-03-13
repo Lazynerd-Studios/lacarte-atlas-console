@@ -25,9 +25,16 @@ const reportsSubLinks = [
 
 const isReportsOpen = ref(route.path.startsWith('/reports'))
 const isManagementOpen = ref(route.path.startsWith('/management'))
+const isCommsOpen = ref(route.path.startsWith('/comms'))
 
 const isReportsActive = computed(() => route.path.startsWith('/reports'))
 const isManagementActive = computed(() => route.path.startsWith('/management'))
+const isCommsActive = computed(() => route.path.startsWith('/comms'))
+
+const commsSubLinks = [
+  { label: 'Quick SMS',  to: '/comms/sms' },
+  { label: 'Quick Mail', to: '/comms/mail' },
+]
 
 const managementSubLinks = [
   { label: 'Customer Types',       to: '/management/customer-types' },
@@ -39,6 +46,7 @@ const managementSubLinks = [
 watch(() => route.path, (p) => {
   if (p.startsWith('/reports')) isReportsOpen.value = true
   if (p.startsWith('/management')) isManagementOpen.value = true
+  if (p.startsWith('/comms')) isCommsOpen.value = true
 })
 
 const userInitial = computed(() => {
@@ -163,6 +171,42 @@ function isActive(to: string) {
         <div v-if="isManagementOpen" style="margin-top:2px;display:flex;flex-direction:column;gap:2px">
           <NuxtLink
             v-for="sub in managementSubLinks"
+            :key="sub.to"
+            :to="sub.to"
+            style="text-decoration:none"
+          >
+            <div
+              :style="`display:flex;align-items:center;gap:10px;height:36px;padding-left:44px;border-radius:20px;cursor:pointer;background:${isActive(sub.to) ? '#fff9e6' : 'transparent'}`"
+              @mouseover="!isActive(sub.to) && (($event.currentTarget as HTMLElement).style.background = '#f9fafb')"
+              @mouseleave="!isActive(sub.to) && (($event.currentTarget as HTMLElement).style.background = 'transparent')"
+            >
+              <div :style="`width:6px;height:6px;border-radius:50%;background:${isActive(sub.to) ? '#ffb400' : '#d1d5db'};flex-shrink:0`" />
+              <span :style="`font-size:13px;font-family:'Manrope',sans-serif;color:${isActive(sub.to) ? '#111' : '#6b7280'};white-space:nowrap`">{{ sub.label }}</span>
+            </div>
+          </NuxtLink>
+        </div>
+      </div>
+
+      <!-- Communications with submenu -->
+      <div>
+        <div
+          :style="`position:relative;display:flex;align-items:center;gap:12px;height:40px;padding-left:12px;border-radius:20px;cursor:pointer;background:${isCommsActive ? '#fff9e6' : 'transparent'}`"
+          @click="isCommsOpen = !isCommsOpen"
+          @mouseover="!isCommsActive && (($event.currentTarget as HTMLElement).style.background = '#f9fafb')"
+          @mouseleave="!isCommsActive && (($event.currentTarget as HTMLElement).style.background = 'transparent')"
+        >
+          <div v-if="isCommsActive" style="position:absolute;left:0;top:0;width:4px;height:40px;background:#ffb400;border-radius:0 4px 4px 0" />
+          <UIcon name="i-lucide-message-square" :style="`width:20px;height:20px;flex-shrink:0;color:${isCommsActive ? '#ffb400' : '#6b7280'}`" />
+          <span :style="`font-size:14px;font-family:'Manrope',sans-serif;flex:1;color:${isCommsActive ? '#111' : '#6b7280'};white-space:nowrap`">Communications</span>
+          <UIcon
+            :name="isCommsOpen ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+            style="width:16px;height:16px;color:#6b7280;margin-right:12px;flex-shrink:0"
+          />
+        </div>
+
+        <div v-if="isCommsOpen" style="margin-top:2px;display:flex;flex-direction:column;gap:2px">
+          <NuxtLink
+            v-for="sub in commsSubLinks"
             :key="sub.to"
             :to="sub.to"
             style="text-decoration:none"
