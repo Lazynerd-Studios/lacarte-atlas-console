@@ -3,7 +3,7 @@ const props = defineProps<{
   transfer: {
     id: string
     customer: string
-    invoiceId: string
+    paymentType: string
     amount: string
     reference: string
     submitted: string
@@ -71,8 +71,8 @@ function decline() {
             <span style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">{{ transfer.customer }}</span>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Invoice ID:</span>
-            <span style="font-size:14px;font-weight:500;color:#ffb400;font-family:'Manrope',sans-serif">{{ transfer.invoiceId }}</span>
+            <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Payment Type:</span>
+            <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;${transfer.paymentType === 'Subscription' ? 'color:#3b82f6;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2)' : 'color:#22c55e;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2)'}`">{{ transfer.paymentType }}</span>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center">
             <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Amount:</span>

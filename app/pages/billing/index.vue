@@ -2,7 +2,7 @@
 definePageMeta({ layout: 'dashboard' })
 
 const showDeclineModal = ref(false)
-const selectedDeclineTransfer = ref<{ id: string; customer: string; invoiceId: string; amount: string; reference: string; submitted: string } | null>(null)
+const selectedDeclineTransfer = ref<{ id: string; customer: string; paymentType: string; amount: string; reference: string; submitted: string } | null>(null)
 
 function openDecline(t: typeof transfers.value[0]) {
   selectedDeclineTransfer.value = { ...t, amount: format(t.amount) }
@@ -16,7 +16,7 @@ function handleDecline(id: string) {
 }
 
 const showApproveModal = ref(false)
-const selectedTransfer = ref<{ id: string; customer: string; invoiceId: string; amount: string; reference: string; submitted: string } | null>(null)
+const selectedTransfer = ref<{ id: string; customer: string; paymentType: string; amount: string; reference: string; submitted: string } | null>(null)
 
 function openApprove(t: typeof transfers.value[0]) {
   selectedTransfer.value = { ...t, amount: format(t.amount) }
@@ -32,13 +32,13 @@ function handleApprove(id: string) {
 const { format } = useCurrency()
 
 const transfers = ref([
-  { id: 'BT-001', customer: 'Michael Chen',   invoiceId: 'INV-2026-002', amount: 65,  reference: 'REF123456789', submitted: '2026-03-03' },
-  { id: 'BT-002', customer: 'David Wilson',   invoiceId: 'INV-2026-012', amount: 120, reference: 'REF987654321', submitted: '2026-03-04' },
-  { id: 'BT-003', customer: 'Lisa Anderson',  invoiceId: 'INV-2026-018', amount: 45,  reference: 'REF456789123', submitted: '2026-03-04' },
-  { id: 'BT-004', customer: 'James Martinez', invoiceId: 'INV-2026-021', amount: 90,  reference: 'REF321654987', submitted: '2026-03-05' },
-  { id: 'BT-005', customer: 'Olivia Brown',   invoiceId: 'INV-2026-025', amount: 55,  reference: 'REF654321098', submitted: '2026-03-05' },
-  { id: 'BT-006', customer: 'Sarah Johnson',  invoiceId: 'INV-2026-030', amount: 75,  reference: 'REF789012345', submitted: '2026-03-06' },
-  { id: 'BT-007', customer: 'Emma Williams',  invoiceId: 'INV-2026-033', amount: 110, reference: 'REF012345678', submitted: '2026-03-06' },
+  { id: 'BT-001', customer: 'Michael Chen',   paymentType: 'Pickup',       amount: 65,  reference: 'REF123456789', submitted: '2026-03-03' },
+  { id: 'BT-002', customer: 'David Wilson',   paymentType: 'Subscription', amount: 120, reference: 'REF987654321', submitted: '2026-03-04' },
+  { id: 'BT-003', customer: 'Lisa Anderson',  paymentType: 'Pickup',       amount: 45,  reference: 'REF456789123', submitted: '2026-03-04' },
+  { id: 'BT-004', customer: 'James Martinez', paymentType: 'Subscription', amount: 90,  reference: 'REF321654987', submitted: '2026-03-05' },
+  { id: 'BT-005', customer: 'Olivia Brown',   paymentType: 'Pickup',       amount: 55,  reference: 'REF654321098', submitted: '2026-03-05' },
+  { id: 'BT-006', customer: 'Sarah Johnson',  paymentType: 'Subscription', amount: 75,  reference: 'REF789012345', submitted: '2026-03-06' },
+  { id: 'BT-007', customer: 'Emma Williams',  paymentType: 'Pickup',       amount: 110, reference: 'REF012345678', submitted: '2026-03-06' },
 ])
 
 const transferSearch = ref('')
@@ -51,7 +51,7 @@ const filteredTransfers = computed(() => {
   return transfers.value.filter(t =>
     t.customer.toLowerCase().includes(q) ||
     t.id.toLowerCase().includes(q) ||
-    t.invoiceId.toLowerCase().includes(q) ||
+    t.paymentType.toLowerCase().includes(q) ||
     t.reference.toLowerCase().includes(q)
   )
 })
@@ -203,7 +203,7 @@ const donutSlices = computed(() => {
           <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Transfer ID</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Customer</th>
-            <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Invoice ID</th>
+            <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Payment Type</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Amount</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Reference</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Submitted</th>
@@ -220,7 +220,11 @@ const donutSlices = computed(() => {
           >
             <td style="padding:20px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ t.id }}</td>
             <td style="padding:20px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ t.customer }}</td>
-            <td style="padding:20px 16px;font-size:14px;color:#ffb400;font-family:'Manrope',sans-serif;white-space:nowrap">{{ t.invoiceId }}</td>
+            <td style="padding:20px 16px">
+              <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;${t.paymentType === 'Subscription' ? 'color:#3b82f6;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2)' : 'color:#22c55e;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2)'}`">
+                {{ t.paymentType }}
+              </span>
+            </td>
             <td style="padding:20px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ format(t.amount) }}</td>
             <td style="padding:20px 16px">
               <span style="font-size:12px;color:#1a1a1a;background:#f9fafb;padding:4px 8px;border-radius:4px;font-family:monospace">{{ t.reference }}</span>
