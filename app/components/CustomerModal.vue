@@ -69,27 +69,11 @@ function onBlur(e: Event, field: string) {
 }
 </script>
 
-const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
-
-function inputStyle(field: string) {
-  return `width:100%;height:39px;padding:0 12px;background:white;border:1px solid ${errors[field] ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box`
-}
-
-function onFocus(e: Event, field: string) {
-  if (!errors[field]) (e.target as HTMLElement).style.borderColor = '#ffb400'
-}
-function onBlur(e: Event, field: string) {
-  if (!errors[field]) (e.target as HTMLElement).style.borderColor = '#e5e7eb'
-}
-</script>
-
 <template>
-  <!-- Backdrop -->
   <div
     style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:50;display:flex;align-items:center;justify-content:center;padding:24px"
     @click.self="emit('close')"
   >
-    <!-- Modal -->
     <div style="background:white;border:1px solid #e5e7eb;border-radius:16px;width:510px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 10px 15px rgba(0,0,0,0.1),0 4px 6px rgba(0,0,0,0.1);position:relative">
 
       <!-- Header -->
@@ -142,7 +126,7 @@ function onBlur(e: Event, field: string) {
           <span v-if="errors.phone" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.phone }}</span>
         </div>
 
-        <!-- User Type -->
+        <!-- Customer Type -->
         <div style="display:flex;flex-direction:column;gap:6px">
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Customer Type</label>
           <select
@@ -172,21 +156,18 @@ function onBlur(e: Event, field: string) {
           <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;line-height:1.5">
             Set an initial password for the customer to access their portal. They can change this after their first login.
           </p>
-
           <div style="display:flex;flex-direction:column;gap:6px">
             <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Initial Password</label>
             <input v-model="form.password" type="password" placeholder="Create a temporary password" :style="inputStyle('password')"
               @focus="onFocus($event, 'password')" @blur="onBlur($event, 'password')" />
             <span v-if="errors.password" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.password }}</span>
           </div>
-
           <div style="display:flex;flex-direction:column;gap:6px">
             <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Confirm Password</label>
             <input v-model="form.confirmPassword" type="password" placeholder="Confirm password" :style="inputStyle('confirmPassword')"
               @focus="onFocus($event, 'confirmPassword')" @blur="onBlur($event, 'confirmPassword')" />
             <span v-if="errors.confirmPassword" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.confirmPassword }}</span>
           </div>
-
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
             <input v-model="form.sendWelcome" type="checkbox" style="width:16px;height:16px;accent-color:#ffb400;cursor:pointer" />
             <span style="font-size:12px;font-weight:500;color:#6b7280;font-family:'Manrope',sans-serif">Send welcome email with login credentials to customer</span>
@@ -219,17 +200,15 @@ function onBlur(e: Event, field: string) {
         <!-- Zone -->
         <div style="display:flex;flex-direction:column;gap:6px">
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Zone</label>
-          <div style="position:relative">
-            <select
-              v-model="form.zone"
-              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:${form.zone ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
-              @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
-              @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
-            >
-              <option value="" disabled>Select a zone</option>
-              <option v-for="z in zones" :key="z.id" :value="z.id">{{ z.name }}</option>
-            </select>
-          </div>
+          <select
+            v-model="form.zone"
+            :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:${form.zone ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+            @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+            @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
+          >
+            <option value="" disabled>Select a zone</option>
+            <option v-for="z in zones" :key="z.id" :value="z.id">{{ z.name }}</option>
+          </select>
         </div>
 
         <!-- Plan type -->
@@ -244,7 +223,7 @@ function onBlur(e: Event, field: string) {
           </select>
         </div>
 
-        <!-- Subscription Interval (only when plan = subscription) -->
+        <!-- Subscription Interval -->
         <div v-if="form.plan === 'subscription'" style="display:flex;flex-direction:column;gap:6px">
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Subscription Interval</label>
           <select
