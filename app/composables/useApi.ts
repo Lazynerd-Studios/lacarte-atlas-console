@@ -1,6 +1,8 @@
 export function useApi() {
   const config = useRuntimeConfig()
   const authStore = useAuthStore()
+  const router = useRouter()
+  const { run } = useErrorHandler()
 
   async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const headers: Record<string, string> = {
@@ -17,17 +19,32 @@ export function useApi() {
       headers,
     })
 
+    if (res.status === 401) {
+      authStore.logout()
+      await router.push('/login')
+      throw new Error('Session expired. Please log in again.')
+    }
+
     if (!res.ok) {
-      throw new Error(`API error: ${res.status}`)
+      let detail: string | undefined
+      try { detail = (await res.clone().json()).message } catch {}
+      throw new Error(detail ?? `Request failed (${res.status})`)
     }
 
     return res.json()
   }
 
+  // Wrapped versions auto-show error toasts on failure and return null
   return {
-    get: <T>(path: string) => request<T>(path),
-    post: <T>(path: string, body: unknown) => request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
-    put: <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
-    del: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+    get:  <T>(path: string, title?: string) =>
+      run(() => request<T>(path), title ?? 'Failed to load data'),
+    post: <T>(path: string, body: unknown, title?: string) =>
+      run(() => request<T>(path, { method: 'POST', body: JSON.stringify(body) }), title ?? 'Request failed'),
+    put:  <T>(path: string, body: unknown, title?: string) =>
+      run(() => request<T>(path, { method: 'PUT',  body: JSON.stringify(body) }), title ?? 'Update failed'),
+    del:  <T>(path: string, title?: string) =>
+      run(() => request<T>(path, { method: 'DELETE' }), title ?? 'Delete failed'),
+    // Raw request for cases where the caller wants to handle errors themselves
+    request,
   }
 }

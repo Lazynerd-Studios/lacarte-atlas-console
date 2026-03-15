@@ -14,21 +14,7 @@ const form = reactive({
   truck: '',
 })
 
-const zones = [
-  { id: 'Zone A – Central',   name: 'Zone A – Central' },
-  { id: 'Zone B – Westside',  name: 'Zone B – Westside' },
-  { id: 'Zone C – Eastside',  name: 'Zone C – Eastside' },
-  { id: 'Zone D – Northside', name: 'Zone D – Northside' },
-  { id: 'Zone E – Southside', name: 'Zone E – Southside' },
-]
-
-const trucks = [
-  { id: 'T-001', label: 'T-001 — LCT-1001 (10 tons)' },
-  { id: 'T-003', label: 'T-003 — LCT-1003 (10 tons)' },
-  { id: 'T-007', label: 'T-007 — LCT-1007 (12 tons)' },
-  { id: 'T-012', label: 'T-012 — LCT-1012 (10 tons)' },
-  { id: 'T-015', label: 'T-015 — LCT-1015 (12 tons)' },
-]
+const { zones, trucks } = useMockData()
 
 const errors = reactive<Record<string, string>>({})
 

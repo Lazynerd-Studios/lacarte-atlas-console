@@ -24,13 +24,7 @@ const emit = defineEmits<{
 }>()
 
 const form = reactive({ ...props.customer, zone: (props.customer as any).zone ?? '', binCount: (props.customer as any).binCount ?? (props.customer.bins?.length || 1) })
-const zones = [
-  { id: 'Zone A – Central',   name: 'Zone A – Central' },
-  { id: 'Zone B – Westside',  name: 'Zone B – Westside' },
-  { id: 'Zone C – Eastside',  name: 'Zone C – Eastside' },
-  { id: 'Zone D – Northside', name: 'Zone D – Northside' },
-  { id: 'Zone E – Southside', name: 'Zone E – Southside' },
-]
+const { zones, customerTypes } = useMockData()
 
 
 const errors = reactive<Record<string, string>>({})
@@ -130,10 +124,7 @@ function onBlur(e: Event, field: string) {
             v-model="form.userType"
             :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
           >
-            <option value="regular">Regular</option>
-            <option value="commercial">Commercial</option>
-            <option value="estate">Estate</option>
-            <option value="industrial">Industrial</option>
+            <option v-for="t in customerTypes" :key="t.id" :value="t.id">{{ t.name }}</option>
           </select>
         </div>
 
