@@ -1,22 +1,21 @@
 <script setup lang="ts">
-const props = defineProps<{
-  driver: {
-    firstName: string
-    lastName: string
-    email: string
-    phone: string
-    truck: string
-    zone: string
-  }
-}>()
-
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'submit', data: Record<string, unknown>): void
 }>()
 
-const form = reactive({ ...props.driver })
-const errors = reactive<Record<string, string>>({})
+const form = reactive({
+  firstName: '',
+  lastName: '',
+  email: '',
+  phone: '',
+  licenseNumber: '',
+  zone: '',
+  truck: '',
+  password: '',
+  confirmPassword: '',
+  sendWelcome: true,
+})
 
 const zones = [
   { id: 'Zone A – Central',   name: 'Zone A – Central' },
@@ -26,15 +25,18 @@ const zones = [
   { id: 'Zone E – Southside', name: 'Zone E – Southside' },
 ]
 
-const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
+const errors = reactive<Record<string, string>>({})
 
 function validate() {
   Object.keys(errors).forEach(k => delete errors[k])
-  if (!form.firstName.trim()) errors.firstName = 'Required'
-  if (!form.lastName.trim())  errors.lastName = 'Required'
-  if (!form.email.trim())     errors.email = 'Required'
+  if (!form.firstName.trim())  errors.firstName = 'Required'
+  if (!form.lastName.trim())   errors.lastName = 'Required'
+  if (!form.email.trim())      errors.email = 'Required'
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = 'Invalid email'
-  if (!form.phone.trim())     errors.phone = 'Required'
+  if (!form.phone.trim())      errors.phone = 'Required'
+  if (!form.password)          errors.password = 'Required'
+  else if (form.password.length < 6) errors.password = 'Min 6 characters'
+  if (form.confirmPassword !== form.password) errors.confirmPassword = 'Passwords do not match'
   return Object.keys(errors).length === 0
 }
 
@@ -42,6 +44,8 @@ function submit() {
   if (!validate()) return
   emit('submit', { ...form })
 }
+
+const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
 
 function inputStyle(field: string) {
   return `width:100%;height:39px;padding:0 12px;background:white;border:1px solid ${errors[field] ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box`
@@ -64,7 +68,7 @@ function onBlur(e: Event, field: string) {
 
       <!-- Header -->
       <div style="padding:24px 24px 16px;flex-shrink:0;border-bottom:1px solid #e5e7eb">
-        <p style="font-size:20px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Edit Driver</p>
+        <p style="font-size:20px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Add New Driver</p>
       </div>
 
       <!-- Close -->
@@ -84,13 +88,13 @@ function onBlur(e: Event, field: string) {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
           <div style="display:flex;flex-direction:column;gap:6px">
             <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">First Name</label>
-            <input v-model="form.firstName" type="text" :style="inputStyle('firstName')"
+            <input v-model="form.firstName" type="text" placeholder="John" :style="inputStyle('firstName')"
               @focus="onFocus($event, 'firstName')" @blur="onBlur($event, 'firstName')" />
             <span v-if="errors.firstName" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.firstName }}</span>
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
             <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Last Name</label>
-            <input v-model="form.lastName" type="text" :style="inputStyle('lastName')"
+            <input v-model="form.lastName" type="text" placeholder="Doe" :style="inputStyle('lastName')"
               @focus="onFocus($event, 'lastName')" @blur="onBlur($event, 'lastName')" />
             <span v-if="errors.lastName" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.lastName }}</span>
           </div>
@@ -99,7 +103,7 @@ function onBlur(e: Event, field: string) {
         <!-- Email -->
         <div style="display:flex;flex-direction:column;gap:6px">
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Email</label>
-          <input v-model="form.email" type="email" :style="inputStyle('email')"
+          <input v-model="form.email" type="email" placeholder="john.doe@email.com" :style="inputStyle('email')"
             @focus="onFocus($event, 'email')" @blur="onBlur($event, 'email')" />
           <span v-if="errors.email" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.email }}</span>
         </div>
@@ -107,30 +111,64 @@ function onBlur(e: Event, field: string) {
         <!-- Phone -->
         <div style="display:flex;flex-direction:column;gap:6px">
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Phone</label>
-          <input v-model="form.phone" type="tel" :style="inputStyle('phone')"
+          <input v-model="form.phone" type="tel" placeholder="(555) 000-0000" :style="inputStyle('phone')"
             @focus="onFocus($event, 'phone')" @blur="onBlur($event, 'phone')" />
           <span v-if="errors.phone" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.phone }}</span>
         </div>
 
-        <!-- Truck / Zone -->
+        <!-- License Number -->
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">License Number</label>
+          <input v-model="form.licenseNumber" type="text" placeholder="e.g. GH-DL-123456" :style="inputStyle('licenseNumber')"
+            @focus="onFocus($event, 'licenseNumber')" @blur="onBlur($event, 'licenseNumber')" />
+        </div>
+
+        <!-- Zone / Truck -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Zone</label>
+            <select
+              v-model="form.zone"
+              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:${form.zone ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+              @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+              @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
+            >
+              <option value="" disabled>Select zone</option>
+              <option v-for="z in zones" :key="z.id" :value="z.id">{{ z.name }}</option>
+            </select>
+          </div>
           <div style="display:flex;flex-direction:column;gap:6px">
             <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Assigned Truck</label>
             <input v-model="form.truck" type="text" placeholder="e.g. T-001" :style="inputStyle('truck')"
               @focus="onFocus($event, 'truck')" @blur="onBlur($event, 'truck')" />
           </div>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Zone</label>
-            <select
-              v-model="form.zone"
-              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
-              @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
-              @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
-            >
-              <option value="" disabled>Select a zone</option>
-              <option v-for="z in zones" :key="z.id" :value="z.id">{{ z.name }}</option>
-            </select>
+        </div>
+
+        <!-- Portal access -->
+        <div style="background:#f9fafb;border:1px solid #ececec;border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <UIcon name="i-lucide-lock" style="width:16px;height:16px;color:#111;flex-shrink:0" />
+            <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">Driver Portal Access</p>
           </div>
+          <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;line-height:1.5">
+            Set an initial password for the driver to access their portal. They can change this after their first login.
+          </p>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Initial Password</label>
+            <input v-model="form.password" type="password" placeholder="Create a temporary password" :style="inputStyle('password')"
+              @focus="onFocus($event, 'password')" @blur="onBlur($event, 'password')" />
+            <span v-if="errors.password" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.password }}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Confirm Password</label>
+            <input v-model="form.confirmPassword" type="password" placeholder="Confirm password" :style="inputStyle('confirmPassword')"
+              @focus="onFocus($event, 'confirmPassword')" @blur="onBlur($event, 'confirmPassword')" />
+            <span v-if="errors.confirmPassword" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.confirmPassword }}</span>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input v-model="form.sendWelcome" type="checkbox" style="width:16px;height:16px;accent-color:#ffb400;cursor:pointer" />
+            <span style="font-size:12px;font-weight:500;color:#6b7280;font-family:'Manrope',sans-serif">Send welcome email with login credentials to driver</span>
+          </label>
         </div>
 
       </div>
@@ -142,9 +180,9 @@ function onBlur(e: Event, field: string) {
           @click="emit('close')"
         >Cancel</button>
         <button
-          style="height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer"
+          style="height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
           @click="submit"
-        >Save Changes</button>
+        >Add Driver</button>
       </div>
     </div>
   </div>

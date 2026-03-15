@@ -4,6 +4,7 @@ definePageMeta({ layout: 'dashboard' })
 const { format } = useCurrency()
 
 const showAssignPickupModal = ref(false)
+const showAddDriverModal = ref(false)
 const selectedDriver = ref<typeof drivers[0] | null>(null)
 
 function openAssignPickup(d: typeof drivers[0]) {
@@ -15,6 +16,11 @@ function handleAssignPickup(data: Record<string, unknown>) {
   console.log('Assigned pickup:', data)
   showAssignPickupModal.value = false
   selectedDriver.value = null
+}
+
+function handleAddDriver(data: Record<string, unknown>) {
+  console.log('Add driver:', data)
+  showAddDriverModal.value = false
 }
 
 const drivers = [
@@ -43,13 +49,13 @@ function statusStyle(s: string) {
       <div style="display:flex;gap:12px;flex-shrink:0">
         <button
           style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px"
+          @click="showAddDriverModal = true"
           @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
           @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
         >
           <UIcon name="i-lucide-plus" style="width:16px;height:16px;color:#111" />
           Add Driver
-        </button>
-        <NuxtLink
+        </button>        <NuxtLink
           to="/trucks"
           style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;text-decoration:none"
           @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
@@ -133,5 +139,11 @@ function statusStyle(s: string) {
     :driver-name="selectedDriver.name"
     @close="showAssignPickupModal = false"
     @submit="handleAssignPickup"
+  />
+
+  <AddDriverModal
+    v-if="showAddDriverModal"
+    @close="showAddDriverModal = false"
+    @submit="handleAddDriver"
   />
 </template>

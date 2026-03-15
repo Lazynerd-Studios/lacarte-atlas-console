@@ -23,17 +23,16 @@ const emit = defineEmits<{
   (e: 'submit', data: Record<string, unknown>): void
 }>()
 
-const form = reactive({ ...props.customer })
-const bins = ref<{ type: string; capacity: string }[]>(
-  props.customer.bins?.length ? props.customer.bins.map(b => ({ ...b })) : [{ type: '', capacity: '' }]
-)
+const form = reactive({ ...props.customer, zone: (props.customer as any).zone ?? '', binCount: (props.customer as any).binCount ?? (props.customer.bins?.length || 1) })
+const zones = [
+  { id: 'Zone A – Central',   name: 'Zone A – Central' },
+  { id: 'Zone B – Westside',  name: 'Zone B – Westside' },
+  { id: 'Zone C – Eastside',  name: 'Zone C – Eastside' },
+  { id: 'Zone D – Northside', name: 'Zone D – Northside' },
+  { id: 'Zone E – Southside', name: 'Zone E – Southside' },
+]
 
-function addBin() {
-  bins.value.push({ type: '', capacity: '' })
-}
-function removeBin(i: number) {
-  bins.value.splice(i, 1)
-}
+
 const errors = reactive<Record<string, string>>({})
 
 function validate() {
@@ -50,7 +49,7 @@ function validate() {
 
 function submit() {
   if (!validate()) return
-  emit('submit', { ...form, bins: bins.value.filter(b => b.type.trim()) })
+  emit('submit', { ...form })
 }
 
 const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
@@ -124,6 +123,20 @@ function onBlur(e: Event, field: string) {
           <span v-if="errors.phone" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.phone }}</span>
         </div>
 
+        <!-- Customer Type -->
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Customer Type</label>
+          <select
+            v-model="form.userType"
+            :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+          >
+            <option value="regular">Regular</option>
+            <option value="commercial">Commercial</option>
+            <option value="estate">Estate</option>
+            <option value="industrial">Industrial</option>
+          </select>
+        </div>
+
         <!-- Entity Name (non-regular types only) -->
         <div v-if="form.userType !== 'regular'" style="display:flex;flex-direction:column;gap:6px">
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Entity Name</label>
@@ -152,6 +165,20 @@ function onBlur(e: Event, field: string) {
             <input v-model="form.postalCode" type="text" :style="inputStyle('postalCode')"
               @focus="onFocus($event, 'postalCode')" @blur="onBlur($event, 'postalCode')" />
           </div>
+        </div>
+
+        <!-- Zone -->
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Zone</label>
+          <select
+            v-model="form.zone"
+            :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:${form.zone ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+            @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+            @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
+          >
+            <option value="" disabled>Select a zone</option>
+            <option v-for="z in zones" :key="z.id" :value="z.id">{{ z.name }}</option>
+          </select>
         </div>
 
         <!-- Plan type -->
@@ -191,46 +218,22 @@ function onBlur(e: Event, field: string) {
           </select>
         </div>
 
-        <!-- BINs -->
-        <div style="display:flex;flex-direction:column;gap:10px">
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Assigned BINs</label>
+        <!-- Assigned BINs -->
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Assigned BINs</label>
+          <div style="display:flex;align-items:center;gap:12px">
             <button
               type="button"
-              style="height:30px;padding:0 12px;background:#ffb400;border:none;border-radius:20px;font-size:13px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px"
-              @click="addBin"
-            >
-              <UIcon name="i-lucide-plus" style="width:13px;height:13px;color:#0a0d12" />
-              Add BIN
-            </button>
-          </div>
-          <div v-for="(bin, i) in bins" :key="i" style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center">
-            <input
-              v-model="bin.type"
-              type="text"
-              placeholder="BIN type (e.g. Standard)"
-              :style="inputStyle('')"
-              @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
-              @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
-            />
-            <input
-              v-model="bin.capacity"
-              type="text"
-              placeholder="Capacity (e.g. 120L)"
-              :style="inputStyle('')"
-              @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
-              @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
-            />
+              style="width:36px;height:36px;border:1px solid #e5e7eb;border-radius:12px;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;color:#6b7280"
+              @click="form.binCount = Math.max(1, form.binCount - 1)"
+            >−</button>
+            <span style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;min-width:32px;text-align:center">{{ form.binCount }}</span>
             <button
               type="button"
-              style="width:32px;height:32px;border:none;background:#f3f4f6;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0"
-              :disabled="bins.length === 1"
-              @click="removeBin(i)"
-              @mouseover="($event.currentTarget as HTMLElement).style.background='#fee2e2'"
-              @mouseleave="($event.currentTarget as HTMLElement).style.background='#f3f4f6'"
-            >
-              <UIcon name="i-lucide-x" style="width:13px;height:13px;color:#ef4444" />
-            </button>
+              style="width:36px;height:36px;border:1px solid #e5e7eb;border-radius:12px;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;color:#6b7280"
+              @click="form.binCount++"
+            >+</button>
+            <span style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">bin{{ form.binCount !== 1 ? 's' : '' }} assigned</span>
           </div>
         </div>
 
