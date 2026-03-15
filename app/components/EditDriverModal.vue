@@ -26,6 +26,14 @@ const zones = [
   { id: 'Zone E – Southside', name: 'Zone E – Southside' },
 ]
 
+const trucks = [
+  { id: 'T-001', label: 'T-001 — LCT-1001 (10 tons)' },
+  { id: 'T-003', label: 'T-003 — LCT-1003 (10 tons)' },
+  { id: 'T-007', label: 'T-007 — LCT-1007 (12 tons)' },
+  { id: 'T-012', label: 'T-012 — LCT-1012 (10 tons)' },
+  { id: 'T-015', label: 'T-015 — LCT-1015 (12 tons)' },
+]
+
 const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
 
 function validate() {
@@ -116,8 +124,15 @@ function onBlur(e: Event, field: string) {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
           <div style="display:flex;flex-direction:column;gap:6px">
             <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Assigned Truck</label>
-            <input v-model="form.truck" type="text" placeholder="e.g. T-001" :style="inputStyle('truck')"
-              @focus="onFocus($event, 'truck')" @blur="onBlur($event, 'truck')" />
+            <select
+              v-model="form.truck"
+              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:${form.truck ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+              @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+              @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
+            >
+              <option value="" disabled>Select truck</option>
+              <option v-for="t in trucks" :key="t.id" :value="t.id">{{ t.label }}</option>
+            </select>
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
             <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Zone</label>

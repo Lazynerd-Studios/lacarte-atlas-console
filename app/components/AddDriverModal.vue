@@ -12,9 +12,6 @@ const form = reactive({
   licenseNumber: '',
   zone: '',
   truck: '',
-  password: '',
-  confirmPassword: '',
-  sendWelcome: true,
 })
 
 const zones = [
@@ -23,6 +20,14 @@ const zones = [
   { id: 'Zone C – Eastside',  name: 'Zone C – Eastside' },
   { id: 'Zone D – Northside', name: 'Zone D – Northside' },
   { id: 'Zone E – Southside', name: 'Zone E – Southside' },
+]
+
+const trucks = [
+  { id: 'T-001', label: 'T-001 — LCT-1001 (10 tons)' },
+  { id: 'T-003', label: 'T-003 — LCT-1003 (10 tons)' },
+  { id: 'T-007', label: 'T-007 — LCT-1007 (12 tons)' },
+  { id: 'T-012', label: 'T-012 — LCT-1012 (10 tons)' },
+  { id: 'T-015', label: 'T-015 — LCT-1015 (12 tons)' },
 ]
 
 const errors = reactive<Record<string, string>>({})
@@ -34,9 +39,6 @@ function validate() {
   if (!form.email.trim())      errors.email = 'Required'
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = 'Invalid email'
   if (!form.phone.trim())      errors.phone = 'Required'
-  if (!form.password)          errors.password = 'Required'
-  else if (form.password.length < 6) errors.password = 'Min 6 characters'
-  if (form.confirmPassword !== form.password) errors.confirmPassword = 'Passwords do not match'
   return Object.keys(errors).length === 0
 }
 
@@ -139,36 +141,16 @@ function onBlur(e: Event, field: string) {
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
             <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Assigned Truck</label>
-            <input v-model="form.truck" type="text" placeholder="e.g. T-001" :style="inputStyle('truck')"
-              @focus="onFocus($event, 'truck')" @blur="onBlur($event, 'truck')" />
+            <select
+              v-model="form.truck"
+              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:${form.truck ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+              @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+              @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
+            >
+              <option value="" disabled>Select truck</option>
+              <option v-for="t in trucks" :key="t.id" :value="t.id">{{ t.label }}</option>
+            </select>
           </div>
-        </div>
-
-        <!-- Portal access -->
-        <div style="background:#f9fafb;border:1px solid #ececec;border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px">
-          <div style="display:flex;align-items:center;gap:8px">
-            <UIcon name="i-lucide-lock" style="width:16px;height:16px;color:#111;flex-shrink:0" />
-            <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">Driver Portal Access</p>
-          </div>
-          <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;line-height:1.5">
-            Set an initial password for the driver to access their portal. They can change this after their first login.
-          </p>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Initial Password</label>
-            <input v-model="form.password" type="password" placeholder="Create a temporary password" :style="inputStyle('password')"
-              @focus="onFocus($event, 'password')" @blur="onBlur($event, 'password')" />
-            <span v-if="errors.password" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.password }}</span>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Confirm Password</label>
-            <input v-model="form.confirmPassword" type="password" placeholder="Confirm password" :style="inputStyle('confirmPassword')"
-              @focus="onFocus($event, 'confirmPassword')" @blur="onBlur($event, 'confirmPassword')" />
-            <span v-if="errors.confirmPassword" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.confirmPassword }}</span>
-          </div>
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-            <input v-model="form.sendWelcome" type="checkbox" style="width:16px;height:16px;accent-color:#ffb400;cursor:pointer" />
-            <span style="font-size:12px;font-weight:500;color:#6b7280;font-family:'Manrope',sans-serif">Send welcome email with login credentials to driver</span>
-          </label>
         </div>
 
       </div>
