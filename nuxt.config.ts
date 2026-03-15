@@ -7,6 +7,13 @@ export default defineNuxtConfig({
     '@nuxt/ui',
     '@pinia/nuxt',
   ],
+  app: {
+    head: {
+      meta: [
+        { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+      ],
+    },
+  },
   colorMode: {
     preference: 'light',
   },
