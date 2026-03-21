@@ -2,15 +2,15 @@
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'submit', data: {
-    truckId: string; plate: string; vin: string; make: string; model: string
+    truckId: string; plateNumber: string; vinNumber: string; make: string; model: string
     year: number; capacity: string; status: string; notes: string
   }): void
 }>()
 
 const form = reactive({
   truckId: '',
-  plate: '',
-  vin: '',
+  plateNumber: '',
+  vinNumber: '',
   make: '',
   model: '',
   year: new Date().getFullYear(),
@@ -68,13 +68,13 @@ function submit() {
         <!-- Plate Number -->
         <div style="display:flex;flex-direction:column;gap:6px">
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Plate Number</label>
-          <input v-model="form.plate" type="text" placeholder="LCT-XXXX" :style="inputStyle" @focus="onFocus" @blur="onBlur" />
+          <input v-model="form.plateNumber" type="text" placeholder="LCT-XXXX" :style="inputStyle" @focus="onFocus" @blur="onBlur" />
         </div>
 
         <!-- VIN Number -->
         <div style="display:flex;flex-direction:column;gap:6px">
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">VIN Number</label>
-          <input v-model="form.vin" type="text" placeholder="1HGBH41JXMN109186" :style="inputStyle" @focus="onFocus" @blur="onBlur" />
+          <input v-model="form.vinNumber" type="text" placeholder="1HGBH41JXMN109186" :style="inputStyle" @focus="onFocus" @blur="onBlur" />
         </div>
 
         <!-- Make + Model -->

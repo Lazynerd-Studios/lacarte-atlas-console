@@ -50,14 +50,12 @@ async function onSubmit() {
   error.value = ''
   try {
     const api = useApi()
-    const data = await api.post<{ user: any; token: string }>('/auth/login', {
-      email: form.email,
-      password: form.password,
+    const data = await api.request<{ token: string; user: any }>('/auth/sign-in/email', {
+      method: 'POST',
+      body: JSON.stringify({ email: form.email, password: form.password, rememberMe: form.remember }),
     })
-    if (data) {
-      authStore.setAuth(data.user, data.token)
-      router.push('/')
-    }
+    authStore.setAuth(data.user, data.token)
+    router.push('/')
   } catch (e: any) {
     error.value = e.message || 'Invalid email or password'
   } finally {

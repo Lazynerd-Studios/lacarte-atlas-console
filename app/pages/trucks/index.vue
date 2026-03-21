@@ -2,26 +2,27 @@
 definePageMeta({ layout: 'dashboard' })
 
 const showAddTruckModal = ref(false)
+const trucks = ref<any[]>([])
+const loading = ref(false)
 
-function handleAddTruck(data: { truckId: string; plate: string; vin: string; make: string; model: string; year: number; capacity: string; status: string; notes: string }) {
-  trucks.value.push({
-    id: data.truckId,
-    plate: data.plate,
-    capacity: data.capacity,
-    driver: 'Unassigned',
-    status: data.status,
-    gps: 'N/A',
-  })
-  showAddTruckModal.value = false
+async function fetchTrucks() {
+  loading.value = true
+  const api = useApi()
+  const data = await api.get<{ data: any[] }>('/api/trucks/admin/')
+  if (data) trucks.value = data.data
+  loading.value = false
 }
 
-const trucks = ref([
-  { id: 'T-001', plate: 'LCT-1001', capacity: '10 tons', driver: 'John Smith',    status: 'active',       gps: '2 min ago' },
-  { id: 'T-003', plate: 'LCT-1003', capacity: '10 tons', driver: 'Maria Garcia',  status: 'active',       gps: '1 min ago' },
-  { id: 'T-007', plate: 'LCT-1007', capacity: '12 tons', driver: 'James Wilson',  status: 'active',       gps: '3 min ago' },
-  { id: 'T-012', plate: 'LCT-1012', capacity: '10 tons', driver: 'Lisa Anderson', status: 'active',       gps: '5 min ago' },
-  { id: 'T-015', plate: 'LCT-1015', capacity: '12 tons', driver: 'Unassigned',    status: 'maintenance',  gps: 'N/A' },
-])
+async function handleAddTruck(formData: Record<string, any>) {
+  const api = useApi()
+  const result = await api.post('/api/trucks/admin/', formData, 'Failed to create truck')
+  if (result) {
+    showAddTruckModal.value = false
+    await fetchTrucks()
+  }
+}
+
+onMounted(fetchTrucks)
 
 function statusBadge(s: string) {
   if (s === 'active')      return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e' }
@@ -76,19 +77,19 @@ function statusBadge(s: string) {
             @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
           >
-            <td style="padding:23px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ truck.id }}</td>
-            <td style="padding:23px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ truck.plate }}</td>
+            <td style="padding:23px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ truck.truckId }}</td>
+            <td style="padding:23px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ truck.plateNumber }}</td>
             <td style="padding:23px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ truck.capacity }}</td>
-            <td style="padding:23px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ truck.driver }}</td>
+            <td style="padding:23px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ truck.assignedDriver?.name ?? 'Unassigned' }}</td>
             <td style="padding:23px 16px">
               <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;color:${statusBadge(truck.status).color};background:${statusBadge(truck.status).bg};border:1px solid ${statusBadge(truck.status).border}`">
                 {{ truck.status }}
               </span>
             </td>
-            <td style="padding:23px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ truck.gps }}</td>
+            <td style="padding:23px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ truck.lastGpsUpdate ?? 'N/A' }}</td>
             <td style="padding:23px 16px;text-align:right">
               <NuxtLink
-                :to="`/trucks/${truck.id.toLowerCase()}`"
+                :to="`/trucks/${truck.id}`"
                 style="height:32px;padding:0 16px;background:none;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer;display:inline-flex;align-items:center;text-decoration:none"
                 @mouseover="($event.currentTarget as HTMLElement).style.background='#f3f4f6'"
                 @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
