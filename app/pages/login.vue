@@ -54,8 +54,10 @@ async function onSubmit() {
       email: form.email,
       password: form.password,
     })
-    authStore.setAuth(data.user, data.token)
-    router.push('/')
+    if (data) {
+      authStore.setAuth(data.user, data.token)
+      router.push('/')
+    }
   } catch (e: any) {
     error.value = e.message || 'Invalid email or password'
   } finally {
@@ -112,7 +114,7 @@ async function onSubmit() {
             <div style="display:flex;flex-direction:column;gap:8px">
               <div style="display:flex;align-items:center;justify-content:space-between">
                 <label style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">Password</label>
-                <button type="button" style="font-size:12px;font-weight:500;color:#ffb400;background:none;border:none;cursor:pointer;font-family:'Manrope',sans-serif">Forgot password?</button>
+                <button type="button" style="font-size:12px;font-weight:500;color:#ffb400;background:none;border:none;cursor:pointer;font-family:'Manrope',sans-serif" @click="router.push('/forgot-password')">Forgot password?</button>
               </div>
               <div style="position:relative">
                 <UIcon name="i-lucide-lock" style="position:absolute;left:16px;top:50%;transform:translateY(-50%);width:20px;height:20px;color:#6b7280" />
@@ -151,19 +153,6 @@ async function onSubmit() {
           </form>
         </div>
 
-        <!-- Demo credentials -->
-        <div style="background:#f9fafb;border-top:1px solid #ececec;padding:17px 32px">
-          <div style="display:flex;align-items:flex-start;gap:12px">
-            <div style="background:#fff9e6;border-radius:16px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-              <img src="https://www.figma.com/api/mcp/asset/6eee20c3-599e-4e97-ad92-1fd1e307b7b0" alt="" style="width:16px;height:16px" />
-            </div>
-            <div style="display:flex;flex-direction:column;gap:4px">
-              <p style="font-size:12px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">Demo Credentials</p>
-              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Email: <span style="font-family:monospace;color:#111">admin@lacarte.com</span></p>
-              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Password: <span style="font-family:monospace;color:#111">admin123</span></p>
-            </div>
-          </div>
-        </div>
       </div>
 
       <p style="font-size:14px;color:#6b7280;text-align:center;font-family:'Manrope',sans-serif">© 2026 LaCarte Waste Management. All rights reserved.</p>
