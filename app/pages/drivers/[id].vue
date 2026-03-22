@@ -1,32 +1,26 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'dashboard' })
 
-const driver = {
-  initials: 'JS',
-  firstName: 'John',
-  lastName: 'Smith',
-  email: 'john.smith@lacarte.com',
-  phone: '(555) 111-2222',
-  truck: 'T-001',
-  zone: 'Downtown',
-  bins: 2,
-  status: 'on-route',
-  todayPickups: 12,
-  weekPickups: 67,
-  completionRate: '98.5%',
-  avgTimePerStop: '4.2 min',
-  periodEarnings: 'GHS 1,955.00',
-  incompleteCount: 3,
-  deduction: 'GHS 45',
-  completed: 142,
-  total: 145,
-}
+const route = useRoute()
+const driver = ref<any>(null)
+const loading = ref(true)
+const notFound = ref(false)
 
-const initials = computed(() => driver.initials)
+onMounted(async () => {
+  const api = useApi()
+  const data = await api.get<any>(`/api/drivers/admin/${route.params.id}`)
+  if (data) {
+    driver.value = data
+  } else {
+    notFound.value = true
+  }
+  loading.value = false
+})
 
 const statusBadge = computed(() => {
-  if (driver.status === 'on-route') return { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#22c55e', label: 'On Route' }
-  if (driver.status === 'online')   return { bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)', color: '#3b82f6', label: 'Online' }
+  const s = driver.value?.status
+  if (s === 'on-route') return { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#22c55e', label: 'On Route' }
+  if (s === 'online')   return { bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)', color: '#3b82f6', label: 'Online' }
   return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: 'Offline' }
 })
 
@@ -173,6 +167,14 @@ function stopBadge(status: string) {
 <template>
   <div style="display:flex;flex-direction:column;gap:21px">
 
+    <!-- Loading state -->
+    <div v-if="loading" style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Loading...</div>
+
+    <!-- Not found state -->
+    <div v-else-if="notFound" style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Driver not found</div>
+
+    <template v-else>
+
     <!-- Back link -->
     <NuxtLink to="/drivers" style="display:inline-flex;align-items:center;gap:8px;text-decoration:none">
       <UIcon name="i-lucide-arrow-left" style="width:16px;height:16px;color:#6b7280" />
@@ -184,11 +186,11 @@ function stopBadge(status: string) {
       <div style="display:flex;align-items:center;justify-content:space-between;min-height:87px">
         <div style="display:flex;align-items:center;gap:16px">
           <div style="width:64px;height:64px;border-radius:9999px;background:#ffb400;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <span style="font-size:24px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ initials }}</span>
+            <span style="font-size:24px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ (driver?.user?.name ?? 'U').split(' ').map((n: string) => n[0]).join('') }}</span>
           </div>
           <div style="display:flex;flex-direction:column;gap:8px">
             <div style="display:flex;align-items:center;gap:12px">
-              <span style="font-size:24px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">{{ driver.firstName }} {{ driver.lastName }}</span>
+              <span style="font-size:24px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">{{ driver?.user?.name }}</span>
               <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;color:${statusBadge.color};background:${statusBadge.bg};border:1px solid ${statusBadge.border};border-radius:14px;padding:3px 11px`">
                 {{ statusBadge.label }}
               </span>
@@ -196,23 +198,23 @@ function stopBadge(status: string) {
             <div style="display:flex;flex-wrap:wrap;gap:16px">
               <div style="display:flex;align-items:center;gap:8px">
                 <UIcon name="i-lucide-phone" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
-                <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ driver.phone }}</span>
+                <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ driver?.phoneNumber }}</span>
               </div>
               <div style="display:flex;align-items:center;gap:8px">
                 <UIcon name="i-lucide-mail" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
-                <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ driver.email }}</span>
+                <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ driver?.user?.email }}</span>
               </div>
               <div style="display:flex;align-items:center;gap:8px">
                 <UIcon name="i-lucide-truck" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
-                <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Truck {{ driver.truck }}</span>
+                <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Truck {{ driver?.assignedTruck?.truckId ?? 'Unassigned' }}</span>
               </div>
               <div style="display:flex;align-items:center;gap:8px">
                 <UIcon name="i-lucide-map-pin" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
-                <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ driver.zone }} Zone</span>
+                <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ driver?.zone?.name ?? 'No Zone' }} Zone</span>
               </div>
               <div style="display:flex;align-items:center;gap:8px">
                 <UIcon name="i-lucide-package" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
-                <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ driver.bins }} Bin Types Assigned</span>
+                <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ driver?.licenseNumber ?? 'N/A' }} | Exp: {{ driver?.licenseExpiry ?? 'N/A' }}</span>
               </div>
             </div>
           </div>
@@ -235,10 +237,10 @@ function stopBadge(status: string) {
     <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:24px">
       <div
         v-for="stat in [
-          { label: `Today's Pickups`, value: driver.todayPickups, color: '#1a1a1a' },
-          { label: 'This Week',       value: driver.weekPickups,  color: '#1a1a1a' },
-          { label: 'Completion Rate', value: driver.completionRate, color: '#22c55e' },
-          { label: 'Avg Time/Stop',   value: driver.avgTimePerStop, color: '#1a1a1a' },
+          { label: `Today's Pickups`, value: driver?.totalTrips ?? 0, color: '#1a1a1a' },
+          { label: 'This Week',       value: driver?.weekPickups ?? 0,  color: '#1a1a1a' },
+          { label: 'Completion Rate', value: driver?.completionRate ?? 'N/A', color: '#22c55e' },
+          { label: 'Avg Time/Stop',   value: driver?.avgTimePerStop ?? 'N/A', color: '#1a1a1a' },
         ]"
         :key="stat.label"
         style="background:white;border:1px solid #ececec;border-radius:16px;padding:10px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)"
@@ -251,7 +253,7 @@ function stopBadge(status: string) {
           <UIcon name="i-lucide-dollar-sign" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
           <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Period Earnings</p>
         </div>
-        <p style="font-size:20px;font-weight:700;color:#22c55e;font-family:'Manrope',sans-serif">{{ driver.periodEarnings }}</p>
+        <p style="font-size:20px;font-weight:700;color:#22c55e;font-family:'Manrope',sans-serif">{{ driver?.periodEarnings ?? 'N/A' }}</p>
       </div>
     </div>
 
@@ -565,11 +567,11 @@ function stopBadge(status: string) {
       </div>
     </div>
 
-  </div>
+    </template><!-- end v-else -->
 
   <AssignBinModal
     v-if="showAssignBinModal"
-    :driverName="`${driver.firstName} ${driver.lastName}`"
+    :driverName="driver?.user?.name ?? ''"
     @close="showAssignBinModal = false"
     @submit="handleAssignBin"
   />
@@ -580,4 +582,6 @@ function stopBadge(status: string) {
     @close="showEditModal = false"
     @submit="handleEditDriver"
   />
+
+  </div>
 </template>

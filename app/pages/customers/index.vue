@@ -3,15 +3,15 @@ definePageMeta({ layout: 'dashboard' })
 
 const showModal = ref(false)
 const showSuspendModal = ref(false)
-const selectedCustomer = ref<typeof allCustomers[0] | null>(null)
+const selectedCustomer = ref<any | null>(null)
 
-function openSuspend(c: typeof allCustomers[0]) {
+function openSuspend(c: any) {
   selectedCustomer.value = c
   showSuspendModal.value = true
 }
 
 function handleSuspend(reason: string) {
-  console.log('Suspend', selectedCustomer.value?.name, 'reason:', reason)
+  console.log('Suspend', selectedCustomer.value?.user?.name, 'reason:', reason)
   showSuspendModal.value = false
   selectedCustomer.value = null
 }
@@ -20,29 +20,32 @@ const search = ref('')
 const statusFilter = ref('all')
 const planFilter = ref('all')
 
-const allCustomers = [
-  { name: 'Sarah Johnson',  phone: '(555) 123-4567', address: '123 Oak Street, Downtown',    plan: 'subscription',   lastPickup: '2026-03-01', balance: 0,   status: 'active' },
-  { name: 'Michael Chen',   phone: '(555) 234-5678', address: '456 Maple Ave, Westside',     plan: 'pay-as-you-go',  lastPickup: '2026-02-28', balance: 45,  status: 'active' },
-  { name: 'Emma Williams',  phone: '(555) 345-6789', address: '789 Pine Road, Eastside',     plan: 'subscription',   lastPickup: '2026-03-02', balance: 0,   status: 'active' },
-  { name: 'James Martinez', phone: '(555) 456-7890', address: '321 Birch Lane, Northside',   plan: 'pay-as-you-go',  lastPickup: '2026-02-25', balance: 120, status: 'overdue' },
-  { name: 'Olivia Brown',   phone: '(555) 567-8901', address: '654 Cedar Court, Southside',  plan: 'subscription',   lastPickup: '2026-03-01', balance: 0,   status: 'active' },
-  { name: 'Robert Garcia',  phone: '(555) 678-9012', address: '987 Elm Street, Downtown',    plan: 'subscription',   lastPickup: '2026-01-15', balance: 0,   status: 'inactive' },
-]
-
-const filtered = computed(() => {
-  return allCustomers.filter(c => {
-    const matchSearch = !search.value || c.name.toLowerCase().includes(search.value.toLowerCase()) || c.phone.includes(search.value)
-    const matchStatus = statusFilter.value === 'all' || c.status === statusFilter.value
-    const matchPlan   = planFilter.value === 'all' || c.plan === planFilter.value
-    return matchSearch && matchStatus && matchPlan
-  })
-})
-
+const customers = ref<any[]>([])
+const total = ref(0)
+const loading = ref(false)
 const page = ref(1)
-const perPage = 6
-const paginated = computed(() => filtered.value.slice((page.value - 1) * perPage, page.value * perPage))
+const perPage = 20
 
-watch([search, statusFilter, planFilter], () => { page.value = 1 })
+async function fetchCustomers() {
+  loading.value = true
+  const params = new URLSearchParams()
+  params.set('page', String(page.value))
+  params.set('limit', String(perPage))
+  if (search.value) params.set('search', search.value)
+  if (statusFilter.value !== 'all') params.set('status', statusFilter.value)
+
+  const api = useApi()
+  const data = await api.get<{ data: any[]; pagination: any }>(`/customer/admin/list?${params}`)
+  if (data) {
+    customers.value = data.data
+    total.value = data.pagination.total
+  }
+  loading.value = false
+}
+
+watch([search, statusFilter, planFilter], () => { page.value = 1; fetchCustomers() })
+watch(page, fetchCustomers)
+onMounted(fetchCustomers)
 
 function handleAddCustomer(data: Record<string, unknown>) {
   // TODO: call API to create customer
@@ -50,9 +53,11 @@ function handleAddCustomer(data: Record<string, unknown>) {
   showModal.value = false
 }
 
-function planBadge(plan: string) {
-  if (plan === 'subscription') return { bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)', color: '#3b82f6', label: 'Subscription' }
-  return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: 'Pay-as-you-go' }
+function planBadge(plan: string | undefined) {
+  if (!plan) return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: '—' }
+  const lower = plan.toLowerCase()
+  if (lower.includes('subscription')) return { bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)', color: '#3b82f6', label: plan }
+  return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: plan }
 }
 
 function statusBadge(status: string) {
@@ -148,23 +153,23 @@ function statusBadge(status: string) {
         </thead>
         <tbody>
           <tr
-            v-for="(c, i) in paginated"
-            :key="i"
+            v-for="c in customers"
+            :key="c.id"
             style="border-bottom:1px solid #e5e7eb"
             @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
           >
-            <td style="padding:16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ c.name }}</td>
-            <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ c.phone }}</td>
+            <td style="padding:16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ c.user?.name }}</td>
+            <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ c.phoneNumber }}</td>
             <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ c.address }}</td>
             <td style="padding:16px">
-              <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;color:${planBadge(c.plan).color};background:${planBadge(c.plan).bg};border:1px solid ${planBadge(c.plan).border};border-radius:14px;padding:3px 10px;white-space:nowrap`">
-                {{ planBadge(c.plan).label }}
+              <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;color:${planBadge(c.customerType?.name).color};background:${planBadge(c.customerType?.name).bg};border:1px solid ${planBadge(c.customerType?.name).border};border-radius:14px;padding:3px 10px;white-space:nowrap`">
+                {{ planBadge(c.customerType?.name).label }}
               </span>
             </td>
             <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ c.lastPickup }}</td>
             <td style="padding:16px;font-size:14px;font-family:'Manrope',sans-serif;white-space:nowrap" :style="c.balance > 0 ? 'color:#ef4444;font-weight:500' : 'color:#1a1a1a'">
-              GHS {{ c.balance }}
+              GHS {{ c.balance ?? 0 }}
             </td>
             <td style="padding:16px">
               <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;color:${statusBadge(c.status).color};background:${statusBadge(c.status).bg};border:1px solid ${statusBadge(c.status).border};border-radius:14px;padding:3px 10px;white-space:nowrap`">
@@ -173,7 +178,7 @@ function statusBadge(status: string) {
             </td>
             <td style="padding:16px">
               <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px">
-                <NuxtLink :to="`/customers/${i + 1}`" style="text-decoration:none">
+                <NuxtLink :to="`/customers/${c.id}`" style="text-decoration:none">
                   <button
                     style="width:32px;height:32px;border-radius:20px;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center"
                     title="View"
@@ -195,7 +200,7 @@ function statusBadge(status: string) {
               </div>
             </td>
           </tr>
-          <tr v-if="paginated.length === 0">
+          <tr v-if="customers.length === 0">
             <td colspan="8" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No customers found</td>
           </tr>
         </tbody>
@@ -203,7 +208,7 @@ function statusBadge(status: string) {
     </div>
 
     <!-- Pagination -->
-    <AppPagination :page="page" :total="filtered.length" :per-page="perPage" @update:page="page = $event" />
+    <AppPagination :page="page" :total="total" :per-page="perPage" @update:page="page = $event" />
   </div>
 
   <!-- Add Customer Modal -->
@@ -212,7 +217,7 @@ function statusBadge(status: string) {
   <!-- Suspend Modal -->
   <SuspendModal
     v-if="showSuspendModal && selectedCustomer"
-    :customer-name="selectedCustomer.name"
+    :customer-name="selectedCustomer.user?.name ?? selectedCustomer.name"
     @close="showSuspendModal = false"
     @confirm="handleSuspend"
   />
