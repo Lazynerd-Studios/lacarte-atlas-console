@@ -12,7 +12,7 @@ const loading = ref(false)
 async function fetchDrivers() {
   loading.value = true
   const api = useApi()
-  const data = await api.get<{ data: any[] }>('/api/drivers/admin/')
+  const data = await api.get<{ data: any[] }>('/drivers/admin/')
   if (data) drivers.value = data.data
   loading.value = false
 }
@@ -31,9 +31,11 @@ function handleAssignPickup(data: Record<string, unknown>) {
 }
 
 async function handleAddDriver(payload: Record<string, any>) {
+  console.log('[handleAddDriver] payload:', JSON.stringify(payload, null, 2))
   const api = useApi()
-  const result = await api.post('/api/drivers/admin/', payload, 'Failed to create driver')
-  if (result) {
+  const result = await api.post('/drivers/admin/', payload, 'Failed to create driver')
+  console.log('[handleAddDriver] result:', result)
+  if (result !== null) {
     showAddDriverModal.value = false
     await fetchDrivers()
   }

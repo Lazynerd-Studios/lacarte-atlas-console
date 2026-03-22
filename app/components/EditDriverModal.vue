@@ -1,13 +1,6 @@
 <script setup lang="ts">
 const props = defineProps<{
-  driver: {
-    firstName: string
-    lastName: string
-    email: string
-    phone: string
-    truck: string
-    zone: string
-  }
+  driver: Record<string, any>
 }>()
 
 const emit = defineEmits<{
@@ -15,27 +8,60 @@ const emit = defineEmits<{
   (e: 'submit', data: Record<string, unknown>): void
 }>()
 
-const form = reactive({ ...props.driver })
+const zones = ref<{ id: string; name: string }[]>([])
+const trucks = ref<{ id: string; truckId: string; plateNumber: string }[]>([])
+
+// Split name into first/last
+const nameParts = (props.driver?.user?.name ?? '').trim().split(' ')
+const form = reactive({
+  firstName:     nameParts[0] ?? '',
+  lastName:      nameParts.slice(1).join(' ') ?? '',
+  email:         props.driver?.user?.email ?? '',
+  phoneNumber:   props.driver?.phoneNumber ?? '',
+  licenseNumber: props.driver?.licenseNumber ?? '',
+  licenseExpiry: props.driver?.licenseExpiry ?? '',
+  zoneId:        props.driver?.zone?.id ?? '',
+  truckId:       props.driver?.assignedTruck?.id ?? '',
+  status:        props.driver?.status ?? 'active',
+})
+
+onMounted(async () => {
+  const api = useApi()
+  const [zoneData, truckData] = await Promise.all([
+    api.get<any>('/zone/public/list'),
+    api.get<any>('/trucks/admin/'),
+  ])
+  if (zoneData) zones.value = Array.isArray(zoneData) ? zoneData : (zoneData.data ?? [])
+  if (truckData) trucks.value = Array.isArray(truckData) ? truckData : (truckData.data ?? [])
+})
+
 const errors = reactive<Record<string, string>>({})
-
-const { zones, trucks } = useMockData()
-
-const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
 
 function validate() {
   Object.keys(errors).forEach(k => delete errors[k])
-  if (!form.firstName.trim()) errors.firstName = 'Required'
-  if (!form.lastName.trim())  errors.lastName = 'Required'
-  if (!form.email.trim())     errors.email = 'Required'
+  if (!form.firstName.trim())   errors.firstName = 'Required'
+  if (!form.lastName.trim())    errors.lastName = 'Required'
+  if (!form.email.trim())       errors.email = 'Required'
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = 'Invalid email'
-  if (!form.phone.trim())     errors.phone = 'Required'
+  if (!form.phoneNumber.trim()) errors.phoneNumber = 'Required'
   return Object.keys(errors).length === 0
 }
 
 function submit() {
   if (!validate()) return
-  emit('submit', { ...form })
+  emit('submit', {
+    name:          `${form.firstName.trim()} ${form.lastName.trim()}`,
+    email:         form.email,
+    phoneNumber:   form.phoneNumber,
+    licenseNumber: form.licenseNumber || undefined,
+    licenseExpiry: form.licenseExpiry || undefined,
+    zoneId:        form.zoneId || undefined,
+    truckId:       form.truckId || undefined,
+    status:        form.status,
+  })
 }
+
+const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
 
 function inputStyle(field: string) {
   return `width:100%;height:39px;padding:0 12px;background:white;border:1px solid ${errors[field] ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box`
@@ -68,8 +94,7 @@ function onBlur(e: Event, field: string) {
         @mouseover="($event.currentTarget as HTMLElement).style.background='#f3f4f6'"
         @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
       >
-        <UIcon name="i-lucide-x" style="width:16px;height:16px;color:#111" />
-      </button>
+        <Icon name="lucide:x" style="width:16px;height:16px;color:#111" />      </button>
 
       <!-- Body -->
       <div style="flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:16px">
@@ -101,9 +126,23 @@ function onBlur(e: Event, field: string) {
         <!-- Phone -->
         <div style="display:flex;flex-direction:column;gap:6px">
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Phone</label>
-          <input v-model="form.phone" type="tel" :style="inputStyle('phone')"
-            @focus="onFocus($event, 'phone')" @blur="onBlur($event, 'phone')" />
-          <span v-if="errors.phone" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.phone }}</span>
+          <input v-model="form.phoneNumber" type="tel" :style="inputStyle('phoneNumber')"
+            @focus="onFocus($event, 'phoneNumber')" @blur="onBlur($event, 'phoneNumber')" />
+          <span v-if="errors.phoneNumber" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.phoneNumber }}</span>
+        </div>
+
+        <!-- License / Expiry -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">License Number</label>
+            <input v-model="form.licenseNumber" type="text" :style="inputStyle('licenseNumber')"
+              @focus="onFocus($event, 'licenseNumber')" @blur="onBlur($event, 'licenseNumber')" />
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">License Expiry</label>
+            <input v-model="form.licenseExpiry" type="date" :style="inputStyle('licenseExpiry')"
+              @focus="onFocus($event, 'licenseExpiry')" @blur="onBlur($event, 'licenseExpiry')" />
+          </div>
         </div>
 
         <!-- Truck / Zone -->
@@ -111,24 +150,24 @@ function onBlur(e: Event, field: string) {
           <div style="display:flex;flex-direction:column;gap:6px">
             <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Assigned Truck</label>
             <select
-              v-model="form.truck"
-              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:${form.truck ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+              v-model="form.truckId"
+              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:${form.truckId ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
               @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
               @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
             >
-              <option value="" disabled>Select truck</option>
-              <option v-for="t in trucks" :key="t.id" :value="t.id">{{ t.label }}</option>
+              <option value="">Unassigned</option>
+              <option v-for="t in trucks" :key="t.id" :value="t.id">{{ t.truckId }} — {{ t.plateNumber }}</option>
             </select>
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
             <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Zone</label>
             <select
-              v-model="form.zone"
+              v-model="form.zoneId"
               :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
               @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
               @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
             >
-              <option value="" disabled>Select a zone</option>
+              <option value="">No Zone</option>
               <option v-for="z in zones" :key="z.id" :value="z.id">{{ z.name }}</option>
             </select>
           </div>

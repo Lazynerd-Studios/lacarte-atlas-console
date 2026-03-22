@@ -22,8 +22,8 @@ const trucks = ref<{ id: string; truckId: string; plateNumber: string }[]>([])
 onMounted(async () => {
   const api = useApi()
   const [zoneData, truckData] = await Promise.all([
-    api.get<{ id: string; name: string; color: string }[]>('/api/zone/public/list'),
-    api.get<{ data: any[] }>('/api/trucks/admin/'),
+    api.get<{ id: string; name: string; color: string }[]>('/zone/public/list'),
+    api.get<{ data: any[] }>('/trucks/admin/'),
   ])
   if (zoneData) zones.value = zoneData
   if (truckData) trucks.value = truckData.data

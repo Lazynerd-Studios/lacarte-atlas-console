@@ -31,7 +31,8 @@ export function useApi() {
       throw new Error(detail ?? `Request failed (${res.status})`)
     }
 
-    return res.json()
+    const text = await res.text()
+    return text ? JSON.parse(text) : (null as unknown as T)
   }
 
   // Wrapped versions auto-show error toasts on failure and return null
@@ -42,6 +43,8 @@ export function useApi() {
       run(() => request<T>(path, { method: 'POST', body: JSON.stringify(body) }), title ?? 'Request failed'),
     put:  <T>(path: string, body: unknown, title?: string) =>
       run(() => request<T>(path, { method: 'PUT',  body: JSON.stringify(body) }), title ?? 'Update failed'),
+    patch: <T>(path: string, body: unknown, title?: string) =>
+      run(() => request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }), title ?? 'Update failed'),
     del:  <T>(path: string, title?: string) =>
       run(() => request<T>(path, { method: 'DELETE' }), title ?? 'Delete failed'),
     // Raw request for cases where the caller wants to handle errors themselves

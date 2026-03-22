@@ -8,7 +8,7 @@ const notFound = ref(false)
 
 onMounted(async () => {
   const api = useApi()
-  const data = await api.get<any>(`/api/trucks/admin/${route.params.id}`)
+  const data = await api.get<any>(`/trucks/admin/${route.params.id}`)
   if (data) {
     truck.value = data
   } else {

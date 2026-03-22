@@ -8,7 +8,7 @@ const notFound = ref(false)
 
 onMounted(async () => {
   const api = useApi()
-  const data = await api.get<any>(`/api/drivers/admin/${route.params.id}`)
+  const data = await api.get<any>(`/drivers/admin/${route.params.id}`)
   if (data) {
     driver.value = data
   } else {
@@ -147,9 +147,16 @@ const assignedBins = ref([
 const showAssignBinModal = ref(false)
 const showEditModal = ref(false)
 
-function handleEditDriver(data: Record<string, unknown>) {
-  console.log('Updated driver:', data)
-  showEditModal.value = false
+async function handleEditDriver(data: Record<string, unknown>) {
+  const api = useApi()
+  console.log('[handleEditDriver] payload:', data)
+  const result = await api.patch(`/drivers/admin/${route.params.id}`, data, 'Failed to update driver')
+  console.log('[handleEditDriver] result:', result)
+  if (result !== null) {
+    showEditModal.value = false
+    const updated = await api.get<any>(`/drivers/admin/${route.params.id}`)
+    if (updated) driver.value = updated
+  }
 }
 
 function handleAssignBin(data: { binType: string; quantity: number; zone: string; date: string; notes: string }) {

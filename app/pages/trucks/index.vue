@@ -8,15 +8,17 @@ const loading = ref(false)
 async function fetchTrucks() {
   loading.value = true
   const api = useApi()
-  const data = await api.get<{ data: any[] }>('/api/trucks/admin/')
+  const data = await api.get<{ data: any[] }>('/trucks/admin/')
   if (data) trucks.value = data.data
   loading.value = false
 }
 
 async function handleAddTruck(formData: Record<string, any>) {
+  console.log('[handleAddTruck] payload:', JSON.stringify(formData, null, 2))
   const api = useApi()
-  const result = await api.post('/api/trucks/admin/', formData, 'Failed to create truck')
-  if (result) {
+  const result = await api.post('/trucks/admin/', formData, 'Failed to create truck')
+  console.log('[handleAddTruck] result:', result)
+  if (result !== null) {
     showAddTruckModal.value = false
     await fetchTrucks()
   }
