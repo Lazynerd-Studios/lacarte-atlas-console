@@ -1,4 +1,4 @@
-<script setup lang="ts">
+hb<script setup lang="ts">
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'submit', data: { name: string; description: string; color: string; areas: string[]; isActive: boolean }): void

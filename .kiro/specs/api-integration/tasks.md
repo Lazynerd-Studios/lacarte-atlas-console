@@ -76,7 +76,7 @@ Replace all hardcoded mock data in the LaCarte admin dashboard with real API cal
   - [x] 10.2 Update all template bindings to use API field names: `driver.user?.name` (split for initials), `driver.user?.email`, `driver.phoneNumber`, `driver.zone?.name`, `driver.assignedTruck?.truckId`, `driver.status`, `driver.licenseNumber`, `driver.licenseExpiry`, `driver.totalTrips`
     - _Requirements: 9.2_
 
-- [~] 11. Wire customers list page to the API
+- [ ] 11. Wire customers list page to the API
   - [x] 11.1 Replace the hardcoded `allCustomers` array in `app/pages/customers/index.vue` with `ref<any[]>([])` and a `total` ref; add `fetchCustomers()` that calls `GET /api/customer/admin/list` with query params `page`, `limit`, `search`, `status`
     - Call `fetchCustomers()` in `onMounted`; update `watch` on filters to reset page and re-fetch
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_

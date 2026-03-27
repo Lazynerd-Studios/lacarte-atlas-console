@@ -1,6 +1,13 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'dashboard' })
 
+const showAddRoleModal = ref(false)
+
+function handleAddRole(data: Record<string, unknown>) {
+  console.log('Add role:', data)
+  showAddRoleModal.value = false
+}
+
 const stats = [
   { iconBg: '#fff9e6', icon: 'i-lucide-users',       iconColor: '#ffb400', label: 'Total Members',  value: '5' },
   { iconBg: '#f0fdf4', icon: 'i-lucide-user-check',  iconColor: '#22c55e', label: 'Active Members', value: '4' },
@@ -31,15 +38,26 @@ function statusStyle(s: string) {
         <h1 style="font-size:32px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;line-height:1.3;margin:0">Team Management</h1>
         <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:8px;margin-bottom:0">Manage team members, roles, and permissions</p>
       </div>
-      <button
-        style="height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
-        @mouseover="($event.currentTarget as HTMLElement).style.background='#e6a200'"
-        @mouseleave="($event.currentTarget as HTMLElement).style.background='#ffb400'"
-        @click="$router.push('/team/add')"
-      >
-        <UIcon name="i-lucide-plus" style="width:16px;height:16px" />
-        Add Team Member
-      </button>
+      <div style="display:flex;gap:12px">
+        <button
+          style="height:40px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
+          @click="showAddRoleModal = true"
+          @mouseover="($event.currentTarget as HTMLElement).style.background='#e6a200'"
+          @mouseleave="($event.currentTarget as HTMLElement).style.background='#ffb400'"
+        >
+          <UIcon name="i-lucide-shield" style="width:16px;height:16px" />
+          Add Role
+        </button>
+        <button
+          style="height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
+          @mouseover="($event.currentTarget as HTMLElement).style.background='#e6a200'"
+          @mouseleave="($event.currentTarget as HTMLElement).style.background='#ffb400'"
+          @click="$router.push('/team/add')"
+        >
+          <UIcon name="i-lucide-plus" style="width:16px;height:16px" />
+          Add Team Member
+        </button>
+      </div>
     </div>
 
     <!-- Stat cards -->
@@ -125,4 +143,10 @@ function statusStyle(s: string) {
     </div>
 
   </div>
+
+  <AddRoleModal
+    v-if="showAddRoleModal"
+    @close="showAddRoleModal = false"
+    @submit="handleAddRole"
+  />
 </template>

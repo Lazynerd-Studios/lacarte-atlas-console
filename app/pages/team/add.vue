@@ -10,16 +10,6 @@ const form = reactive({
   status: 'active',
 })
 
-const permissions = reactive([
-  { key: 'customers',  label: 'Manage Customers', desc: 'View, create, edit, and delete customers',         checked: false },
-  { key: 'drivers',    label: 'Manage Drivers',   desc: 'View, create, edit, and delete drivers',           checked: false },
-  { key: 'routes',     label: 'Manage Routes',    desc: 'Create and manage pickup routes',                  checked: false },
-  { key: 'billing',    label: 'View Billing',     desc: 'Access billing and payment information',           checked: false },
-  { key: 'shop',       label: 'Manage Shop',      desc: 'Manage products, orders, and inventory',          checked: false },
-  { key: 'reports',    label: 'View Reports',     desc: 'Access analytics and reports',                    checked: false },
-  { key: 'team',       label: 'Manage Team',      desc: 'Add and manage team members (Admin only)',        checked: false },
-])
-
 const roles = [
   { value: 'super_admin',         label: 'Super Admin' },
   { value: 'operations_manager',  label: 'Operations Manager' },
@@ -121,29 +111,6 @@ function inputStyle(focused = false) {
                 <UIcon name="i-lucide-chevron-down" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:18px;height:18px;color:#6b7280;pointer-events:none" />
               </div>
             </div>
-          </div>
-        </div>
-
-        <!-- Permissions -->
-        <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-          <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0 0 24px">Permissions</p>
-          <div style="display:flex;flex-direction:column;gap:4px">
-            <label
-              v-for="p in permissions" :key="p.key"
-              style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;cursor:pointer"
-              @mouseover="($event.currentTarget as HTMLElement).style.background='#f8f9fa'"
-              @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
-            >
-              <input
-                v-model="p.checked"
-                type="checkbox"
-                style="width:16px;height:16px;accent-color:#ffb400;cursor:pointer;flex-shrink:0"
-              />
-              <div>
-                <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin:0 0 2px">{{ p.label }}</p>
-                <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">{{ p.desc }}</p>
-              </div>
-            </label>
           </div>
         </div>
 
