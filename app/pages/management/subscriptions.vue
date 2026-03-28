@@ -5,7 +5,7 @@ type BillingType = 'prepaid' | 'postpaid'
 type BillingCycle = 'monthly' | 'quarterly' | 'yearly'
 
 interface Plan {
-  id: number
+  id: string
   name: string
   description: string
   billingType: BillingType
@@ -17,25 +17,232 @@ interface Plan {
   isActive: boolean
 }
 
+// API response interface
+interface ApiPlan {
+  id: string
+  name: string
+  description: string
+  type: BillingType
+  pickups: number
+  bins: number
+  billingCycle: BillingCycle
+  price: number
+  badgeColor: string
+  subscriberCount: number
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+// Form data interface for add/edit operations
+interface FormData {
+  name: string
+  description: string
+  billingCycle: BillingCycle
+  pickupCount: string
+  binCount: string
+  color: string
+  isActive: boolean
+}
+
+// ── Data Transformation Utilities ──
+
+/**
+ * Convert API response to UI Plan format
+ * Maps API field names to UI field names:
+ * - type → billingType
+ * - pickups → pickupCount
+ * - bins → binCount
+ * - badgeColor → color
+ */
+function apiToPlan(apiPlan: ApiPlan): Plan {
+  return {
+    id: apiPlan.id,
+    name: apiPlan.name,
+    description: apiPlan.description,
+    billingType: apiPlan.type,
+    billingCycle: apiPlan.billingCycle,
+    pickupCount: apiPlan.pickups,
+    binCount: apiPlan.bins,
+    color: apiPlan.badgeColor,
+    subscriberCount: apiPlan.subscriberCount,
+    isActive: apiPlan.isActive,
+  }
+}
+
+/**
+ * Validate form data for add/edit operations
+ * Returns array of validation error messages
+ */
+function validateForm(form: FormData): string[] {
+  const errors: string[] = []
+  
+  // Validate plan name is non-empty
+  if (!form.name.trim()) {
+    errors.push('Plan name is required.')
+  }
+  
+  // Validate pickup count is positive integer
+  const pickupCount = Number(form.pickupCount)
+  if (!form.pickupCount || isNaN(pickupCount) || pickupCount <= 0 || !Number.isInteger(pickupCount)) {
+    errors.push('Valid pickup count is required.')
+  }
+  
+  // Validate bin count is positive integer
+  const binCount = Number(form.binCount)
+  if (!form.binCount || isNaN(binCount) || binCount <= 0 || !Number.isInteger(binCount)) {
+    errors.push('Valid BIN count is required.')
+  }
+  
+  return errors
+}
+
+/**
+ * Convert UI form data to API request payload
+ * Maps UI field names to API field names:
+ * - billingType → type
+ * - pickupCount → pickups
+ * - binCount → bins
+ * - color → badgeColor
+ */
+function formToApiPayload(form: FormData, billingType: BillingType) {
+  return {
+    name: form.name.trim(),
+    description: form.description.trim(),
+    type: billingType,
+    pickups: Number(form.pickupCount),
+    bins: Number(form.binCount),
+    billingCycle: form.billingCycle,
+    price: 0, // TODO: Add price field to form
+    badgeColor: form.color,
+    isActive: form.isActive,
+  }
+}
+
 const { format } = useCurrency()
 
 const activeTab = ref<BillingType>('prepaid')
 
-const plans = ref<Plan[]>([
-  { id: 1, name: 'Basic', description: 'Standard residential pickup plan.', billingType: 'prepaid', billingCycle: 'monthly', pickupCount: 8, binCount: 1, color: '#6b7280', subscriberCount: 142, isActive: true },
-  { id: 2, name: 'Standard', description: 'More frequent pickups for busy households.', billingType: 'prepaid', billingCycle: 'monthly', pickupCount: 16, binCount: 1, color: '#3b82f6', subscriberCount: 58, isActive: true },
-  { id: 3, name: 'Premium', description: 'Full-service plan with daily pickups.', billingType: 'prepaid', billingCycle: 'monthly', pickupCount: 30, binCount: 2, color: '#8b5cf6', subscriberCount: 23, isActive: true },
-  { id: 4, name: 'Business', description: 'Commercial postpaid plan billed at end of cycle.', billingType: 'postpaid', billingCycle: 'monthly', pickupCount: 20, binCount: 3, color: '#f97316', subscriberCount: 34, isActive: true },
-  { id: 5, name: 'Enterprise', description: 'Large-scale postpaid plan for industrial clients.', billingType: 'postpaid', billingCycle: 'monthly', pickupCount: 60, binCount: 5, color: '#ef4444', subscriberCount: 11, isActive: false },
-])
+// State management
+const plans = ref<Plan[]>([])
+const loading = ref(false)
+
+const stats = ref({
+  totalPlans: 0,
+  activePlans: 0,
+  totalSubscribers: 0,
+  estimatedRevenue: 0,
+})
+const statsLoading = ref(false)
 
 const visiblePlans = computed(() => plans.value.filter(p => p.billingType === activeTab.value))
 
-const totalSubscribers = computed(() => visiblePlans.value.reduce((s, p) => s + p.subscriberCount, 0))
-const activePlans = computed(() => visiblePlans.value.filter(p => p.isActive).length)
-const totalRevenue = computed(() => visiblePlans.value.reduce((s, p) => s + p.subscriberCount, 0))
+const totalSubscribers = computed(() => stats.value.totalSubscribers)
+const activePlans = computed(() => stats.value.activePlans)
+const totalRevenue = computed(() => stats.value.estimatedRevenue)
+
+// ── API Integration ──
+
+/**
+ * Fetch subscription plans from API
+ * Filters by current billing type and transforms API response to UI format
+ * 
+ * Error Handling:
+ * - 401: Automatic redirect to login (handled by useApi)
+ * - 403, 404, 500: Automatic error toast (handled by useErrorHandler)
+ * - Network errors: Automatic error toast (handled by useErrorHandler)
+ */
+async function fetchPlans() {
+  console.log('[fetchPlans] Fetching plans for billing type:', activeTab.value)
+  loading.value = true
+  const api = useApi()
+  
+  const response = await api.get<{ data?: ApiPlan[]; plans?: ApiPlan[] } | ApiPlan[]>(
+    `/subscription/admin/plans?type=${activeTab.value}`,
+    'Failed to load plans'
+  )
+  
+  if (response) {
+    console.log('[fetchPlans] Raw response:', response)
+    
+    // Handle multiple response formats: { plans: [...] }, { data: [...] }, or [...]
+    const plansData = Array.isArray(response) 
+      ? response 
+      : (response.plans || response.data || [])
+    
+    plans.value = plansData.map(apiToPlan)
+    console.log('[fetchPlans] Loaded', plans.value.length, 'plans')
+  } else {
+    console.log('[fetchPlans] No response received')
+  }
+  
+  loading.value = false
+}
+
+/**
+ * Fetch subscription statistics from API
+ * Filters by current billing type
+ * 
+ * Error Handling:
+ * - 401: Automatic redirect to login (handled by useApi)
+ * - 403, 404, 500: Automatic error toast (handled by useErrorHandler)
+ * - Network errors: Automatic error toast (handled by useErrorHandler)
+ */
+async function fetchStats() {
+  console.log('[fetchStats] Fetching stats for billing type:', activeTab.value)
+  statsLoading.value = true
+  const api = useApi()
+  
+  const response = await api.get<{
+    totalPlans?: number
+    total_plans?: number
+    activePlans?: number
+    active_plans?: number
+    totalSubscribers?: number
+    total_subscribers?: number
+    subscribers?: number
+    estimatedRevenue?: number | string
+    estimated_revenue?: number | string
+    revenue?: number | string
+  }>(
+    `/subscription/admin/stats?type=${activeTab.value}`,
+    'Failed to load statistics'
+  )
+  
+  if (response) {
+    console.log('[fetchStats] Raw response:', response)
+    
+    // Map response to stats, handling different possible field names
+    stats.value = {
+      totalPlans: response.totalPlans ?? response.total_plans ?? 0,
+      activePlans: response.activePlans ?? response.active_plans ?? 0,
+      totalSubscribers: response.totalSubscribers ?? response.total_subscribers ?? response.subscribers ?? 0,
+      estimatedRevenue: Number(response.estimatedRevenue ?? response.estimated_revenue ?? response.revenue ?? 0),
+    }
+    
+    console.log('[fetchStats] Stats mapped:', stats.value)
+  } else {
+    console.log('[fetchStats] No response received')
+  }
+  
+  statsLoading.value = false
+}
 
 const cycleLabel = (c: BillingCycle) => ({ monthly: 'Monthly', quarterly: 'Quarterly', yearly: 'Yearly' }[c])
+
+// ── Lifecycle Hooks ──
+
+// Fetch data on mount
+onMounted(async () => {
+  console.log('[onMounted] Initializing subscription page')
+  await Promise.all([fetchPlans(), fetchStats()])
+})
+
+// Watch for tab changes and refresh data
+watch(activeTab, async (newTab, oldTab) => {
+  console.log('[watch:activeTab] Tab changed from', oldTab, 'to', newTab)
+  await Promise.all([fetchPlans(), fetchStats()])
+})
 
 // ── shared form factory ──
 function blankForm() {
@@ -51,135 +258,370 @@ function blankForm() {
 const showAddModal = ref(false)
 const addForm = ref(blankForm())
 const addError = ref('')
+const submitting = ref(false)
 
 function openAdd() {
+  console.log('[openAdd] Opening add plan modal for billing type:', activeTab.value)
   addForm.value = blankForm()
   addError.value = ''
   showAddModal.value = true
 }
 
-function handleAdd() {
-  if (!addForm.value.name.trim()) { addError.value = 'Plan name is required.'; return }
-  if (!addForm.value.pickupCount || isNaN(Number(addForm.value.pickupCount))) { addError.value = 'Valid pickup count is required.'; return }
-  if (!addForm.value.binCount || isNaN(Number(addForm.value.binCount))) { addError.value = 'Valid BIN count is required.'; return }
-  plans.value.push({
-    id: Date.now(),
-    name: addForm.value.name.trim(),
-    description: addForm.value.description.trim(),
-    billingType: activeTab.value,
-    billingCycle: addForm.value.billingCycle,
-    pickupCount: Number(addForm.value.pickupCount),
-    binCount: Number(addForm.value.binCount),
-    color: addForm.value.color,
-    subscriberCount: 0,
-    isActive: addForm.value.isActive,
-  })
-  showAddModal.value = false
+/**
+ * Handle add plan form submission
+ * 
+ * Error Handling Strategy:
+ * - Client-side validation errors: Display in modal (addError)
+ * - 400 validation errors (duplicate name, invalid fields): Display in modal (addError)
+ * - 401 unauthorized: Automatic redirect to login (handled by useApi)
+ * - 403, 404, 500: Display error toast (manual handling)
+ * - Network errors: Display error toast (manual handling)
+ */
+async function handleAdd() {
+  console.log('[handleAdd] Submitting add plan form:', addForm.value)
+  
+  // Client-side validation
+  const errors = validateForm(addForm.value)
+  if (errors.length > 0) {
+    console.log('[handleAdd] Validation failed:', errors)
+    addError.value = errors[0] || 'Validation error'
+    return
+  }
+  
+  submitting.value = true
+  addError.value = ''
+  
+  try {
+    const api = useApi()
+    const toast = useAppToast()
+    const payload = formToApiPayload(addForm.value, activeTab.value)
+    console.log('[handleAdd] API payload:', payload)
+    
+    // Use raw request to handle 400 validation errors in modal
+    const result = await api.request<ApiPlan>(
+      '/subscription/admin/plans',
+      { method: 'POST', body: JSON.stringify(payload) }
+    )
+    
+    console.log('[handleAdd] Plan created successfully:', result)
+    
+    // Success flow: show toast, close modal, refresh data
+    toast.success('Plan created successfully')
+    showAddModal.value = false
+    await Promise.all([fetchPlans(), fetchStats()])
+  } catch (err: any) {
+    console.error('[handleAdd] Error creating plan:', err)
+    
+    // Handle 400 validation errors in modal (e.g., duplicate plan name)
+    // 401 errors are handled by useApi (redirect to login)
+    // Other errors (403, 404, 500, network) should show as toast
+    const errorMessage = err?.message || 'Failed to create plan'
+    
+    // Check if this is a validation error (400) that should display in modal
+    if (errorMessage.toLowerCase().includes('duplicate') || 
+        errorMessage.toLowerCase().includes('already exists') ||
+        errorMessage.toLowerCase().includes('invalid')) {
+      addError.value = errorMessage
+      console.log('[handleAdd] Validation error displayed in modal:', errorMessage)
+    } else {
+      // For non-validation errors, show toast
+      const toast = useAppToast()
+      toast.error('Failed to create plan', errorMessage)
+      console.log('[handleAdd] Error toast displayed:', errorMessage)
+    }
+  } finally {
+    submitting.value = false
+  }
 }
 
 // ── Edit modal ──
 const showEditModal = ref(false)
 const editForm = ref<Plan & { pickupStr: string; binStr: string }>({
-  id: 0, name: '', description: '', billingType: 'prepaid', billingCycle: 'monthly',
+  id: '', name: '', description: '', billingType: 'prepaid', billingCycle: 'monthly',
   pickupCount: 0, binCount: 0, color: '#3b82f6', subscriberCount: 0, isActive: true,
   pickupStr: '', binStr: '',
 })
 const editError = ref('')
 
 function openEdit(p: Plan) {
+  console.log('[openEdit] Opening edit modal for plan:', p.id, p.name)
   editForm.value = { ...p, pickupStr: String(p.pickupCount), binStr: String(p.binCount) }
   editError.value = ''
   showEditModal.value = true
 }
 
-function handleEdit() {
-  if (!editForm.value.name.trim()) { editError.value = 'Plan name is required.'; return }
-  if (!editForm.value.pickupStr || isNaN(Number(editForm.value.pickupStr))) { editError.value = 'Valid pickup amount is required.'; return }
-  if (!editForm.value.binStr || isNaN(Number(editForm.value.binStr))) { editError.value = 'Valid BIN amount is required.'; return }
-  const idx = plans.value.findIndex(p => p.id === editForm.value.id)
-  if (idx !== -1) {
-    plans.value[idx] = {
-      ...plans.value[idx]!,
-      name: editForm.value.name.trim(),
-      description: editForm.value.description.trim(),
-      billingCycle: editForm.value.billingCycle,
-      pickupCount: Number(editForm.value.pickupStr),
-      binCount: Number(editForm.value.binStr),
-      color: editForm.value.color,
-      isActive: editForm.value.isActive,
-    }
+/**
+ * Handle edit plan form submission
+ * 
+ * Error Handling Strategy:
+ * - Client-side validation errors: Display in modal (editError)
+ * - 400 validation errors (duplicate name, invalid fields): Display in modal (editError)
+ * - 401 unauthorized: Automatic redirect to login (handled by useApi)
+ * - 403, 404, 500: Display error toast (manual handling)
+ * - Network errors: Display error toast (manual handling)
+ */
+async function handleEdit() {
+  console.log('[handleEdit] Submitting edit plan form for plan:', editForm.value.id)
+  
+  // Convert string inputs to FormData format for validation
+  const formData: FormData = {
+    name: editForm.value.name,
+    description: editForm.value.description,
+    billingCycle: editForm.value.billingCycle,
+    pickupCount: editForm.value.pickupStr,
+    binCount: editForm.value.binStr,
+    color: editForm.value.color,
+    isActive: editForm.value.isActive,
   }
-  showEditModal.value = false
+  
+  // Client-side validation
+  const errors = validateForm(formData)
+  if (errors.length > 0) {
+    console.log('[handleEdit] Validation failed:', errors)
+    editError.value = errors[0] || 'Validation error'
+    return
+  }
+  
+  submitting.value = true
+  editError.value = ''
+  
+  try {
+    const api = useApi()
+    const toast = useAppToast()
+    
+    // Transform form data to API payload (partial update)
+    const payload = {
+      name: formData.name.trim(),
+      description: formData.description.trim(),
+      pickups: Number(formData.pickupCount),
+      bins: Number(formData.binCount),
+      billingCycle: formData.billingCycle,
+      badgeColor: formData.color,
+      isActive: formData.isActive,
+    }
+    console.log('[handleEdit] API payload:', payload)
+    
+    // Use raw request to handle 400 validation errors in modal
+    const result = await api.request<ApiPlan>(
+      `/subscription/admin/plans/${editForm.value.id}`,
+      { method: 'PATCH', body: JSON.stringify(payload) }
+    )
+    
+    console.log('[handleEdit] Plan updated successfully:', result)
+    
+    // Success flow: show toast, close modal, refresh data
+    toast.success('Plan updated successfully')
+    showEditModal.value = false
+    await Promise.all([fetchPlans(), fetchStats()])
+  } catch (err: any) {
+    console.error('[handleEdit] Error updating plan:', err)
+    
+    // Handle 400 validation errors in modal (e.g., duplicate plan name)
+    // 401 errors are handled by useApi (redirect to login)
+    // Other errors (403, 404, 500, network) should show as toast
+    const errorMessage = err?.message || 'Failed to update plan'
+    
+    // Check if this is a validation error (400) that should display in modal
+    if (errorMessage.toLowerCase().includes('duplicate') || 
+        errorMessage.toLowerCase().includes('already exists') ||
+        errorMessage.toLowerCase().includes('invalid')) {
+      editError.value = errorMessage
+      console.log('[handleEdit] Validation error displayed in modal:', errorMessage)
+    } else {
+      // For non-validation errors, show toast
+      const toast = useAppToast()
+      toast.error('Failed to update plan', errorMessage)
+      console.log('[handleEdit] Error toast displayed:', errorMessage)
+    }
+  } finally {
+    submitting.value = false
+  }
 }
 
 // ── Delete modal ──
 const showDeleteModal = ref(false)
 const deleteTarget = ref<Plan | null>(null)
+const deleting = ref(false)
 
-function openDelete(p: Plan) { deleteTarget.value = p; showDeleteModal.value = true }
-function handleDelete() {
-  if (deleteTarget.value) plans.value = plans.value.filter(p => p.id !== deleteTarget.value!.id)
-  showDeleteModal.value = false; deleteTarget.value = null
+// ── Toggle active status ──
+const toggling = ref<string | null>(null)
+
+function openDelete(p: Plan) { 
+  console.log('[openDelete] Opening delete modal for plan:', p.id, p.name, 'subscribers:', p.subscriberCount)
+  deleteTarget.value = p
+  showDeleteModal.value = true
 }
 
-function toggleActive(p: Plan) {
-  const idx = plans.value.findIndex(x => x.id === p.id)
-  if (idx !== -1) plans.value[idx]!.isActive = !plans.value[idx]!.isActive
+/**
+ * Handle delete plan confirmation
+ * 
+ * Error Handling Strategy:
+ * - 400 errors (plan has subscribers): Automatic error toast (handled by useErrorHandler)
+ * - 401 unauthorized: Automatic redirect to login (handled by useApi)
+ * - 403, 404, 500: Automatic error toast (handled by useErrorHandler)
+ * - Network errors: Automatic error toast (handled by useErrorHandler)
+ */
+async function handleDelete() {
+  if (!deleteTarget.value) return
+  
+  console.log('[handleDelete] Deleting plan:', deleteTarget.value.id, deleteTarget.value.name)
+  deleting.value = true
+  
+  const api = useApi()
+  const toast = useAppToast()
+  
+  // Use wrapped del method for automatic error handling
+  // 401 errors are handled by useApi (redirect to login)
+  // 403, 404, 500, network errors are handled by useErrorHandler (toast)
+  const result = await api.del(
+    `/subscription/admin/plans/${deleteTarget.value.id}`,
+    'Failed to delete plan'
+  )
+  
+  if (result) {
+    console.log('[handleDelete] Plan deleted successfully:', result)
+    
+    // Success flow: show toast, close modal, refresh data
+    toast.success('Plan deleted successfully')
+    showDeleteModal.value = false
+    deleteTarget.value = null
+    await Promise.all([fetchPlans(), fetchStats()])
+  } else {
+    console.log('[handleDelete] Delete operation failed or was cancelled')
+  }
+  
+  deleting.value = false
+}
+
+/**
+ * Toggle plan active status
+ * 
+ * Error Handling Strategy:
+ * - 401 unauthorized: Automatic redirect to login (handled by useApi)
+ * - 403, 404, 500: Automatic error toast (handled by useErrorHandler)
+ * - Network errors: Automatic error toast (handled by useErrorHandler)
+ */
+async function toggleActive(plan: Plan) {
+  console.log('[toggleActive] Toggling plan:', plan.id, plan.name, 'current status:', plan.isActive)
+  toggling.value = plan.id
+  
+  const api = useApi()
+  const toast = useAppToast()
+  
+  // Use wrapped patch method for automatic error handling
+  // 401 errors are handled by useApi (redirect to login)
+  // 403, 404, 500, network errors are handled by useErrorHandler (toast)
+  const result = await api.patch<{ id: string; isActive: boolean; message: string }>(
+    `/subscription/admin/plans/${plan.id}/toggle`,
+    {},
+    'Failed to toggle plan status'
+  )
+  
+  if (result) {
+    console.log('[toggleActive] Plan toggled successfully:', result)
+    
+    // Show success toast
+    toast.success(`Plan ${result.isActive ? 'activated' : 'deactivated'} successfully`)
+    
+    // Update local plan state with new active status
+    const idx = plans.value.findIndex(p => p.id === plan.id)
+    if (idx !== -1 && plans.value[idx]) {
+      plans.value[idx].isActive = result.isActive
+      console.log('[toggleActive] Local state updated for plan:', plan.id)
+    }
+  } else {
+    console.log('[toggleActive] Toggle operation failed or was cancelled')
+  }
+  
+  toggling.value = null
 }
 
 const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444','#ffb400','#ec4899','#14b8a6']
 </script>
 
+<style scoped>
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: pulse 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+</style>
+
 <template>
   <div style="display:flex;flex-direction:column;gap:32px;font-family:'Manrope',sans-serif">
 
-    <!-- Header -->
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
-      <div>
-        <h1 style="font-size:28px;font-weight:700;color:#111;margin:0;line-height:1.3">Subscription Plans</h1>
-        <p style="font-size:14px;color:#6b7280;margin:6px 0 0">Manage subscription tiers and pricing</p>
-      </div>
-      <button @click="openAdd" style="display:flex;align-items:center;gap:8px;background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">
-        <Icon name="lucide:plus" style="width:16px;height:16px" />
-        Add Plan
-      </button>
-    </div>
+    <!-- Show PageSkeleton during initial load -->
+    <PageSkeleton v-if="loading && plans.length === 0" type="card-grid" :cards="3" />
 
-    <!-- Tabs -->
-    <div style="display:flex;gap:4px;background:#f3f4f6;border-radius:12px;padding:4px;width:fit-content">
-      <button @click="activeTab='prepaid'"
-        :style="`padding:8px 24px;border:none;border-radius:9px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer;transition:all 0.15s;${activeTab==='prepaid' ? 'background:#fff;color:#1a1a1a;box-shadow:0 1px 4px rgba(0,0,0,0.1)' : 'background:transparent;color:#6b7280'}`">
-        Prepaid
-      </button>
-      <button @click="activeTab='postpaid'"
-        :style="`padding:8px 24px;border:none;border-radius:9px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer;transition:all 0.15s;${activeTab==='postpaid' ? 'background:#fff;color:#1a1a1a;box-shadow:0 1px 4px rgba(0,0,0,0.1)' : 'background:transparent;color:#6b7280'}`">
-        Postpaid
-      </button>
-    </div>
+    <!-- Main content (shown after initial load) -->
+    <template v-else>
+      <!-- Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+          <h1 style="font-size:28px;font-weight:700;color:#111;margin:0;line-height:1.3">Subscription Plans</h1>
+          <p style="font-size:14px;color:#6b7280;margin:6px 0 0">Manage subscription tiers and pricing</p>
+        </div>
+        <button @click="openAdd" style="display:flex;align-items:center;gap:8px;background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">
+          <Icon name="lucide:plus" style="width:16px;height:16px" />
+          Add Plan
+        </button>
+      </div>
 
-    <!-- Stats -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px">
-      <div style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
-        <p style="font-size:12px;color:#6b7280;margin:0 0 6px;font-weight:500">Total Plans</p>
-        <p style="font-size:28px;font-weight:700;color:#1a1a1a;margin:0">{{ visiblePlans.length }}</p>
-        <p style="font-size:11px;color:#9ca3af;margin:4px 0 0">{{ activePlans }} active</p>
+      <!-- Tabs -->
+      <div style="display:flex;gap:4px;background:#f3f4f6;border-radius:12px;padding:4px;width:fit-content">
+        <button @click="activeTab='prepaid'"
+          :style="`padding:8px 24px;border:none;border-radius:9px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer;transition:all 0.15s;${activeTab==='prepaid' ? 'background:#fff;color:#1a1a1a;box-shadow:0 1px 4px rgba(0,0,0,0.1)' : 'background:transparent;color:#6b7280'}`">
+          Prepaid
+        </button>
+        <button @click="activeTab='postpaid'"
+          :style="`padding:8px 24px;border:none;border-radius:9px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer;transition:all 0.15s;${activeTab==='postpaid' ? 'background:#fff;color:#1a1a1a;box-shadow:0 1px 4px rgba(0,0,0,0.1)' : 'background:transparent;color:#6b7280'}`">
+          Postpaid
+        </button>
       </div>
-      <div style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
-        <p style="font-size:12px;color:#6b7280;margin:0 0 6px;font-weight:500">Subscribers</p>
-        <p style="font-size:28px;font-weight:700;color:#1a1a1a;margin:0">{{ totalSubscribers }}</p>
-        <p style="font-size:11px;color:#9ca3af;margin:4px 0 0">on {{ activeTab }} plans</p>
-      </div>
-      <div style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
-        <p style="font-size:12px;color:#6b7280;margin:0 0 6px;font-weight:500">Est. Revenue</p>
-        <p style="font-size:28px;font-weight:700;color:#1a1a1a;margin:0">{{ format(totalRevenue) }}</p>
-        <p style="font-size:11px;color:#9ca3af;margin:4px 0 0">monthly</p>
-      </div>
-    </div>
 
-    <!-- Plans list -->
-    <div style="display:flex;flex-direction:column;gap:16px">
-      <div v-for="plan in visiblePlans" :key="plan.id"
-        style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;padding:24px;display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap">
+      <!-- Stats -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px">
+        <!-- Show loading placeholders when statsLoading is true -->
+        <template v-if="statsLoading">
+          <div v-for="i in 3" :key="i" style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
+            <div class="skeleton" style="height:12px;width:80px;margin-bottom:10px"></div>
+            <div class="skeleton" style="height:28px;width:60px;margin-bottom:8px"></div>
+            <div class="skeleton" style="height:11px;width:100px"></div>
+          </div>
+        </template>
+        <!-- Show actual stats when loaded -->
+        <template v-else>
+          <div style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
+            <p style="font-size:12px;color:#6b7280;margin:0 0 6px;font-weight:500">Total Plans</p>
+            <p style="font-size:28px;font-weight:700;color:#1a1a1a;margin:0">{{ visiblePlans.length }}</p>
+            <p style="font-size:11px;color:#9ca3af;margin:4px 0 0">{{ activePlans }} active</p>
+          </div>
+          <div style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
+            <p style="font-size:12px;color:#6b7280;margin:0 0 6px;font-weight:500">Subscribers</p>
+            <p style="font-size:28px;font-weight:700;color:#1a1a1a;margin:0">{{ totalSubscribers }}</p>
+            <p style="font-size:11px;color:#9ca3af;margin:4px 0 0">on {{ activeTab }} plans</p>
+          </div>
+          <div style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
+            <p style="font-size:12px;color:#6b7280;margin:0 0 6px;font-weight:500">Est. Revenue</p>
+            <p style="font-size:28px;font-weight:700;color:#1a1a1a;margin:0">{{ format(totalRevenue) }}</p>
+            <p style="font-size:11px;color:#9ca3af;margin:4px 0 0">monthly</p>
+          </div>
+        </template>
+      </div>
+
+      <!-- Plans list -->
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div v-for="plan in visiblePlans" :key="plan.id"
+          style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;padding:24px;display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap">
 
         <!-- Left: icon + info -->
         <div style="display:flex;align-items:flex-start;gap:16px;flex:1;min-width:220px">
@@ -219,10 +661,11 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
 
         <!-- Right: actions -->
         <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
-          <button @click="toggleActive(plan)"
-            :style="`display:flex;align-items:center;gap:6px;background:${plan.isActive ? '#fef2f2' : '#dcfce7'};color:${plan.isActive ? '#ef4444' : '#16a34a'};border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer`">
-            <Icon :name="plan.isActive ? 'lucide:pause-circle' : 'lucide:play-circle'" style="width:14px;height:14px" />
-            {{ plan.isActive ? 'Deactivate' : 'Activate' }}
+          <button @click="toggleActive(plan)" :disabled="toggling === plan.id"
+            :style="`display:flex;align-items:center;gap:6px;background:${plan.isActive ? '#fef2f2' : '#dcfce7'};color:${plan.isActive ? '#ef4444' : '#16a34a'};border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${toggling === plan.id ? 'not-allowed' : 'pointer'};opacity:${toggling === plan.id ? '0.6' : '1'}`">
+            <Icon v-if="toggling === plan.id" name="lucide:loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
+            <Icon v-else :name="plan.isActive ? 'lucide:pause-circle' : 'lucide:play-circle'" style="width:14px;height:14px" />
+            {{ toggling === plan.id ? 'Processing...' : (plan.isActive ? 'Deactivate' : 'Activate') }}
           </button>
           <button @click="openEdit(plan)" style="display:flex;align-items:center;gap:6px;background:#ececec;color:#1a1a1a;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">
             <Icon name="lucide:pencil" style="width:14px;height:14px" />
@@ -315,8 +758,11 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
           </div>
         </div>
         <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px;position:sticky;bottom:0;background:#fff">
-          <button @click="showAddModal=false" style="background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Cancel</button>
-          <button @click="handleAdd" style="background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Add Plan</button>
+          <button @click="showAddModal=false" :disabled="submitting" :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.6' : '1'}`">Cancel</button>
+          <button @click="handleAdd" :disabled="submitting" :style="`display:flex;align-items:center;gap:8px;background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.8' : '1'}`">
+            <Icon v-if="submitting" name="lucide:loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
+            {{ submitting ? 'Creating...' : 'Add Plan' }}
+          </button>
         </div>
       </div>
     </div>
@@ -391,8 +837,11 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
           </div>
         </div>
         <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px;position:sticky;bottom:0;background:#fff">
-          <button @click="showEditModal=false" style="background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Cancel</button>
-          <button @click="handleEdit" style="background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Save Changes</button>
+          <button @click="showEditModal=false" :disabled="submitting" :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.6' : '1'}`">Cancel</button>
+          <button @click="handleEdit" :disabled="submitting" :style="`display:flex;align-items:center;gap:8px;background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.8' : '1'}`">
+            <Icon v-if="submitting" name="lucide:loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
+            {{ submitting ? 'Saving...' : 'Save Changes' }}
+          </button>
         </div>
       </div>
     </div>
@@ -414,11 +863,15 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
           <p style="font-size:13px;color:#6b7280;margin:0">This action cannot be undone. The plan will be permanently removed.</p>
         </div>
         <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px">
-          <button @click="showDeleteModal=false" style="background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Cancel</button>
-          <button @click="handleDelete" style="background:#ef4444;color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Delete</button>
+          <button @click="showDeleteModal=false" :disabled="deleting" :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${deleting ? 'not-allowed' : 'pointer'};opacity:${deleting ? '0.6' : '1'}`">Cancel</button>
+          <button @click="handleDelete" :disabled="deleting" :style="`display:flex;align-items:center;gap:8px;background:#ef4444;color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${deleting ? 'not-allowed' : 'pointer'};opacity:${deleting ? '0.8' : '1'}`">
+            <Icon v-if="deleting" name="lucide:loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
+            {{ deleting ? 'Deleting...' : 'Delete' }}
+          </button>
         </div>
       </div>
     </div>
 
+    </template>
   </div>
 </template>
