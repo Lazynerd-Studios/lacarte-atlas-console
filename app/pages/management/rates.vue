@@ -2,43 +2,151 @@
 definePageMeta({ layout: 'dashboard' })
 
 interface CustomerType {
-  id: number
+  id: string                     // UUID instead of number
   name: string
-  color: string
+  color?: string                 // Optional color (hex color)
 }
 
 interface Rate {
-  id: number
-  customerTypeId: number
-  pickupRate: number
+  id: string                     // UUID instead of number
+  customerTypeId: string         // UUID
+  customerType?: {               // Nested customer type object
+    id: string
+    name: string
+  }
+  rate: number                   // Changed from pickupRate
   effectiveDate: string
   note: string
   isActive: boolean
+  status?: string                // API includes status
   createdAt: string
+  updatedAt?: string             // API includes updatedAt
 }
 
 const { format } = useCurrency()
 
-const customerTypes = ref<CustomerType[]>([
-  { id: 1, name: 'Regular',    color: '#6b7280' },
-  { id: 2, name: 'Commercial', color: '#3b82f6' },
-  { id: 3, name: 'Estate',     color: '#8b5cf6' },
-  { id: 4, name: 'Industrial', color: '#f97316' },
-])
+// State management
+const customerTypes = ref<CustomerType[]>([])
+const rates = ref<Rate[]>([])
+const loading = ref(false)
 
-const rates = ref<Rate[]>([
-  { id: 1, customerTypeId: 1, pickupRate: 25,  effectiveDate: '2026-01-01', note: 'Standard residential rate.',         isActive: true,  createdAt: '2025-12-20' },
-  { id: 2, customerTypeId: 2, pickupRate: 45,  effectiveDate: '2026-01-01', note: 'Commercial rate for Q1 2026.',       isActive: true,  createdAt: '2025-12-20' },
-  { id: 3, customerTypeId: 3, pickupRate: 60,  effectiveDate: '2026-01-01', note: 'Estate bulk service rate.',          isActive: true,  createdAt: '2025-12-20' },
-  { id: 4, customerTypeId: 4, pickupRate: 120, effectiveDate: '2026-01-01', note: 'Industrial specialized handling.',   isActive: true,  createdAt: '2025-12-20' },
-  { id: 5, customerTypeId: 1, pickupRate: 28,  effectiveDate: '2026-04-01', note: 'Q2 rate adjustment for Regular.',   isActive: false, createdAt: '2026-02-10' },
-  { id: 6, customerTypeId: 2, pickupRate: 50,  effectiveDate: '2026-04-01', note: 'Q2 rate adjustment for Commercial.', isActive: false, createdAt: '2026-02-10' },
-])
+const stats = ref({
+  totalRates: 0,
+  activeRates: 0,
+  upcomingRates: 0,
+  customerTypes: 0,
+})
+const statsLoading = ref(false)
 
-const filterType = ref<number | 'all'>('all')
+const filterType = ref<string | 'all'>('all')
 const filterStatus = ref<'all' | 'active' | 'upcoming' | 'inactive'>('all')
 
 const today = new Date().toISOString().split('T')[0]!
+
+// ── API Integration ──
+
+/**
+ * Fetch pay-as-you-go rates from API
+ * 
+ * Error Handling:
+ * - 401: Automatic redirect to login (handled by useApi)
+ * - 403, 404, 500: Automatic error toast (handled by useErrorHandler)
+ * - Network errors: Automatic error toast (handled by useErrorHandler)
+ */
+async function fetchRates() {
+  loading.value = true
+  const api = useApi()
+  
+  console.log('[Rates] Fetching rates from /rates/admin')
+  const response = await api.get<{ rates: Rate[], total: number }>(
+    '/rates/admin',
+    'Failed to load rates'
+  )
+  
+  if (response) {
+    console.log('[Rates] Received rates:', response)
+    rates.value = response.rates || []
+  } else {
+    console.error('[Rates] Failed to fetch rates')
+  }
+  
+  loading.value = false
+}
+
+/**
+ * Fetch rate dashboard statistics from API
+ * 
+ * Error Handling:
+ * - 401: Automatic redirect to login (handled by useApi)
+ * - 403, 404, 500: Automatic error toast (handled by useErrorHandler)
+ * - Network errors: Automatic error toast (handled by useErrorHandler)
+ */
+async function fetchStats() {
+  statsLoading.value = true
+  const api = useApi()
+  
+  console.log('[Rates] Fetching stats from /rates/admin/stats')
+  const response = await api.get<{
+    totalRates: number
+    activeRates: number
+    upcomingRates: number
+    customerTypes: number
+  }>(
+    '/rates/admin/stats',
+    'Failed to load statistics'
+  )
+  
+  if (response) {
+    console.log('[Rates] Received stats:', response)
+    stats.value = {
+      totalRates: response.totalRates ?? 0,
+      activeRates: response.activeRates ?? 0,
+      upcomingRates: response.upcomingRates ?? 0,
+      customerTypes: response.customerTypes ?? 0,
+    }
+  } else {
+    console.error('[Rates] Failed to fetch stats')
+  }
+  
+  statsLoading.value = false
+}
+
+/**
+ * Fetch customer types from API
+ * 
+ * Error Handling:
+ * - 401: Automatic redirect to login (handled by useApi)
+ * - 403, 404, 500: Automatic error toast (handled by useErrorHandler)
+ * - Network errors: Automatic error toast (handled by useErrorHandler)
+ */
+async function fetchCustomerTypes() {
+  const api = useApi()
+  
+  console.log('[Rates] Fetching customer types from /customer/types')
+  const response = await api.get<{ data: CustomerType[] }>(
+    '/customer/types',
+    'Failed to load customer types'
+  )
+  
+  console.log('[Rates] Raw customer types response:', response)
+  
+  if (response) {
+    // Check if response has a data property or if it's the array directly
+    if (Array.isArray(response)) {
+      console.log('[Rates] Response is array directly, using it')
+      customerTypes.value = response
+    } else if (response.data && Array.isArray(response.data)) {
+      console.log('[Rates] Response has data property, using response.data')
+      customerTypes.value = response.data
+    } else {
+      console.warn('[Rates] Unexpected response format:', response)
+      customerTypes.value = []
+    }
+    console.log('[Rates] Customer types set to:', customerTypes.value)
+  } else {
+    console.error('[Rates] Failed to fetch customer types')
+  }
+}
 
 function rateStatus(r: Rate) {
   if (!r.isActive) return 'inactive'
@@ -52,8 +160,13 @@ const filtered = computed(() => rates.value.filter(r => {
   return matchType && matchStatus
 }))
 
-function getType(id: number) {
-  return customerTypes.value.find(t => t.id === id)!
+function getType(rate: Rate): CustomerType {
+  // If rate has nested customerType, use it
+  if (rate.customerType) {
+    return rate.customerType as CustomerType
+  }
+  // Otherwise, look it up from customerTypes array
+  return customerTypes.value.find(t => t.id === rate.customerTypeId) || { id: '', name: 'Unknown', color: undefined }
 }
 
 function statusStyle(r: Rate) {
@@ -67,6 +180,7 @@ function statusStyle(r: Rate) {
 const showAddModal = ref(false)
 const addForm = ref({ customerTypeId: '', pickupRate: '', effectiveDate: '', note: '', isActive: true })
 const addError = ref('')
+const submitting = ref(false)
 
 function openAdd() {
   addForm.value = { customerTypeId: '', pickupRate: '', effectiveDate: '', note: '', isActive: true }
@@ -74,93 +188,300 @@ function openAdd() {
   showAddModal.value = true
 }
 
-function handleAdd() {
-  if (!addForm.value.customerTypeId) { addError.value = 'Customer type is required.'; return }
-  if (!addForm.value.pickupRate || isNaN(Number(addForm.value.pickupRate))) { addError.value = 'Valid pickup rate is required.'; return }
-  if (!addForm.value.effectiveDate) { addError.value = 'Effective date is required.'; return }
-  rates.value.push({
-    id: Date.now(),
-    customerTypeId: Number(addForm.value.customerTypeId),
-    pickupRate: Number(addForm.value.pickupRate),
-    effectiveDate: addForm.value.effectiveDate,
-    note: addForm.value.note.trim(),
-    isActive: addForm.value.isActive,
-    createdAt: today,
-  })
-  showAddModal.value = false
+/**
+ * Handle add rate form submission with API integration
+ * 
+ * Flow:
+ * 1. Client-side validation using validateForm()
+ * 2. Transform form data to API payload using formToApiPayload()
+ * 3. Send POST request to /api/rates/admin/payg
+ * 4. Handle 400 validation errors in modal
+ * 5. Success flow: show toast, close modal, refresh data
+ * 
+ * Error Handling:
+ * - Validation errors: Display in modal using addError ref
+ * - 400 API errors: Display in modal using addError ref
+ * - Other errors: Automatic error toast (handled by useErrorHandler)
+ */
+async function handleAdd() {
+  // Client-side validation
+  const { validateForm, formToApiPayload } = await import('~/utils/rateValidation')
+  const errors = validateForm(addForm.value, false)
+  
+  if (errors.length > 0) {
+    addError.value = errors[0] || 'Validation error'
+    console.warn('[Rates] Add validation failed:', errors)
+    return
+  }
+
+  submitting.value = true
+  addError.value = ''
+
+  try {
+    const api = useApi()
+    const toast = useAppToast()
+    const payload = formToApiPayload(addForm.value)
+    
+    console.log('[Rates] Creating rate with payload:', payload)
+    
+    // Use raw request to handle 400 validation errors in modal
+    const response = await api.request<Rate>(
+      '/rates/admin',
+      { method: 'POST', body: JSON.stringify(payload) }
+    )
+
+    console.log('[Rates] Rate created successfully:', response)
+    
+    // Success flow: toast + close modal + refresh data
+    toast.success('Rate created successfully')
+    showAddModal.value = false
+    await Promise.all([fetchRates(), fetchStats()])
+  } catch (err: any) {
+    console.error('[Rates] Failed to create rate:', err)
+    
+    // Handle 400 validation errors in modal
+    const errorMessage = err?.message || 'Failed to create rate'
+    
+    if (errorMessage.toLowerCase().includes('invalid') || 
+        errorMessage.toLowerCase().includes('required') ||
+        errorMessage.toLowerCase().includes('validation')) {
+      addError.value = errorMessage
+    } else {
+      // Other errors show as toast
+      const toast = useAppToast()
+      toast.error('Failed to create rate', errorMessage)
+    }
+  } finally {
+    submitting.value = false
+  }
 }
 
 // ── Edit modal ──
 const showEditModal = ref(false)
 const editForm = ref<Rate & { pickupStr: string }>({
-  id: 0, customerTypeId: 0, pickupRate: 0, effectiveDate: '', note: '', isActive: true, createdAt: '', pickupStr: '',
+  id: '', customerTypeId: '', rate: 0, effectiveDate: '', note: '', isActive: true, createdAt: '', pickupStr: '',
 })
 const editError = ref('')
 
 function openEdit(r: Rate) {
-  editForm.value = { ...r, pickupStr: String(r.pickupRate) }
+  editForm.value = { ...r, pickupStr: String(r.rate) }
   editError.value = ''
   showEditModal.value = true
 }
 
-function handleEdit() {
-  if (!editForm.value.pickupStr || isNaN(Number(editForm.value.pickupStr))) { editError.value = 'Valid pickup rate is required.'; return }
-  if (!editForm.value.effectiveDate) { editError.value = 'Effective date is required.'; return }
-  const idx = rates.value.findIndex(r => r.id === editForm.value.id)
-  if (idx !== -1) {
-    rates.value[idx] = { ...rates.value[idx]!, pickupRate: Number(editForm.value.pickupStr), effectiveDate: editForm.value.effectiveDate, note: editForm.value.note.trim(), isActive: editForm.value.isActive }
+/**
+ * Handle edit rate form submission with API integration
+ * 
+ * Flow:
+ * 1. Client-side validation using validateForm()
+ * 2. Transform form data to API payload
+ * 3. Send PATCH request to /api/rates/admin/payg/{id}
+ * 4. Handle 400 validation errors in modal
+ * 5. Success flow: show toast, close modal, refresh data
+ * 
+ * Error Handling:
+ * - Validation errors: Display in modal using editError ref
+ * - 400 API errors: Display in modal using editError ref
+ * - Other errors: Automatic error toast (handled by useErrorHandler)
+ */
+async function handleEdit() {
+  // Client-side validation
+  const { validateForm } = await import('~/utils/rateValidation')
+  
+  // Create form data compatible with validateForm (using pickupStr as pickupRate)
+  const formData = {
+    customerTypeId: String(editForm.value.customerTypeId),
+    pickupRate: editForm.value.pickupStr,
+    effectiveDate: editForm.value.effectiveDate,
+    note: editForm.value.note,
+    isActive: editForm.value.isActive,
   }
-  showEditModal.value = false
+  
+  const errors = validateForm(formData, true) // isEdit = true (customer type not required)
+  
+  if (errors.length > 0) {
+    editError.value = errors[0] || 'Validation error'
+    console.warn('[Rates] Edit validation failed:', errors)
+    return
+  }
+
+  submitting.value = true
+  editError.value = ''
+
+  try {
+    const api = useApi()
+    const toast = useAppToast()
+    
+    // Transform form data to API payload
+    const payload = {
+      rate: Number(editForm.value.pickupStr),        // API uses 'rate' field
+      effectiveDate: editForm.value.effectiveDate,
+      note: editForm.value.note.trim(),
+      isActive: editForm.value.isActive,
+    }
+    
+    console.log('[Rates] Updating rate', editForm.value.id, 'with payload:', payload)
+    
+    // Send PATCH request to update rate
+    const response = await api.patch<Rate>(
+      `/rates/admin/${editForm.value.id}`,
+      payload,
+      'Failed to update rate'
+    )
+
+    if (response) {
+      console.log('[Rates] Rate updated successfully:', response)
+      
+      // Success flow: toast + close modal + refresh data
+      toast.success('Rate updated successfully')
+      showEditModal.value = false
+      await fetchRates()
+    }
+  } catch (err: any) {
+    console.error('[Rates] Failed to update rate:', err)
+    
+    // Handle 400 validation errors in modal
+    const errorMessage = err?.message || 'Failed to update rate'
+    
+    if (errorMessage.toLowerCase().includes('invalid') || 
+        errorMessage.toLowerCase().includes('required') ||
+        errorMessage.toLowerCase().includes('validation')) {
+      editError.value = errorMessage
+    } else {
+      // Other errors show as toast (handled by useErrorHandler)
+      const toast = useAppToast()
+      toast.error('Failed to update rate', errorMessage)
+    }
+  } finally {
+    submitting.value = false
+  }
 }
 
 // ── Delete modal ──
 const showDeleteModal = ref(false)
 const deleteTarget = ref<Rate | null>(null)
+const deleting = ref(false)
 
 function openDelete(r: Rate) { deleteTarget.value = r; showDeleteModal.value = true }
-function handleDelete() {
-  if (deleteTarget.value) rates.value = rates.value.filter(r => r.id !== deleteTarget.value!.id)
-  showDeleteModal.value = false; deleteTarget.value = null
+
+/**
+ * Handle delete rate operation with API integration
+ * 
+ * Flow:
+ * 1. Send DELETE request to /api/rates/admin/payg/{id}
+ * 2. Success flow: show toast, close modal, refresh data
+ * 
+ * Error Handling:
+ * - All errors: Automatic error toast (handled by useErrorHandler)
+ */
+async function handleDelete() {
+  if (!deleteTarget.value) return
+  
+  deleting.value = true
+  const api = useApi()
+  const toast = useAppToast()
+  
+  console.log('[Rates] Deleting rate:', deleteTarget.value.id)
+  
+  const response = await api.del<{ message: string }>(
+    `/rates/admin/${deleteTarget.value.id}`,
+    'Failed to delete rate'
+  )
+  
+  if (response) {
+    console.log('[Rates] Rate deleted successfully:', response)
+    
+    // Success flow: toast + close modal + refresh data
+    toast.success('Rate deleted successfully')
+    showDeleteModal.value = false
+    deleteTarget.value = null
+    await Promise.all([fetchRates(), fetchStats()])
+  } else {
+    console.error('[Rates] Failed to delete rate')
+  }
+  
+  deleting.value = false
 }
 
 const activeCount  = computed(() => rates.value.filter(r => rateStatus(r) === 'active').length)
 const upcomingCount = computed(() => rates.value.filter(r => rateStatus(r) === 'upcoming').length)
+
+// ── Lifecycle Hooks ──
+
+// Fetch data on mount
+onMounted(async () => {
+  await Promise.all([fetchRates(), fetchStats(), fetchCustomerTypes()])
+})
+
 </script>
+
+<style scoped>
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: pulse 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+</style>
 
 <template>
   <div style="display:flex;flex-direction:column;gap:32px;font-family:'Manrope',sans-serif">
 
-    <!-- Header -->
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
-      <div>
-        <h1 style="font-size:28px;font-weight:700;color:#111;margin:0;line-height:1.3">Rate Management</h1>
-        <p style="font-size:14px;color:#6b7280;margin:6px 0 0">Pay-as-you-go pickup rates by customer type</p>
-      </div>
-      <button @click="openAdd" style="display:flex;align-items:center;gap:8px;background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">
-        <Icon name="lucide:plus" style="width:16px;height:16px" />
-        Add Rate
-      </button>
-    </div>
+    <!-- Show PageSkeleton during initial load -->
+    <PageSkeleton v-if="loading && rates.length === 0" type="card-grid" :cards="3" />
 
-    <!-- Stats -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px">
-      <div style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
-        <p style="font-size:12px;color:#6b7280;margin:0 0 6px;font-weight:500">Total Rates</p>
-        <p style="font-size:28px;font-weight:700;color:#1a1a1a;margin:0">{{ rates.length }}</p>
+    <!-- Main content (shown after initial load) -->
+    <template v-else>
+      <!-- Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+          <h1 style="font-size:28px;font-weight:700;color:#111;margin:0;line-height:1.3">Rate Management</h1>
+          <p style="font-size:14px;color:#6b7280;margin:6px 0 0">Pay-as-you-go pickup rates by customer type</p>
+        </div>
+        <button @click="openAdd" :disabled="submitting || deleting"
+          :style="`display:flex;align-items:center;gap:8px;background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting || deleting ? 'not-allowed' : 'pointer'};opacity:${submitting || deleting ? '0.5' : '1'}`">
+          <Icon name="lucide:plus" style="width:16px;height:16px" />
+          Add Rate
+        </button>
       </div>
-      <div style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
-        <p style="font-size:12px;color:#6b7280;margin:0 0 6px;font-weight:500">Active</p>
-        <p style="font-size:28px;font-weight:700;color:#16a34a;margin:0">{{ activeCount }}</p>
+
+      <!-- Stats -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px">
+        <!-- Show loading placeholders when statsLoading is true -->
+        <template v-if="statsLoading">
+          <div v-for="i in 4" :key="i" style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
+            <div class="skeleton" style="height:12px;width:80px;margin-bottom:10px"></div>
+            <div class="skeleton" style="height:28px;width:60px"></div>
+          </div>
+        </template>
+        <!-- Show actual stats when loaded -->
+        <template v-else>
+          <div style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
+            <p style="font-size:12px;color:#6b7280;margin:0 0 6px;font-weight:500">Total Rates</p>
+            <p style="font-size:28px;font-weight:700;color:#1a1a1a;margin:0">{{ stats.totalRates }}</p>
+          </div>
+          <div style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
+            <p style="font-size:12px;color:#6b7280;margin:0 0 6px;font-weight:500">Active</p>
+            <p style="font-size:28px;font-weight:700;color:#16a34a;margin:0">{{ stats.activeRates }}</p>
+          </div>
+          <div style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
+            <p style="font-size:12px;color:#6b7280;margin:0 0 6px;font-weight:500">Upcoming</p>
+            <p style="font-size:28px;font-weight:700;color:#ca8a04;margin:0">{{ stats.upcomingRates }}</p>
+          </div>
+          <div style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
+            <p style="font-size:12px;color:#6b7280;margin:0 0 6px;font-weight:500">Customer Types</p>
+            <p style="font-size:28px;font-weight:700;color:#1a1a1a;margin:0">{{ stats.customerTypes }}</p>
+          </div>
+        </template>
       </div>
-      <div style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
-        <p style="font-size:12px;color:#6b7280;margin:0 0 6px;font-weight:500">Upcoming</p>
-        <p style="font-size:28px;font-weight:700;color:#ca8a04;margin:0">{{ upcomingCount }}</p>
-      </div>
-      <div style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
-        <p style="font-size:12px;color:#6b7280;margin:0 0 6px;font-weight:500">Customer Types</p>
-        <p style="font-size:28px;font-weight:700;color:#1a1a1a;margin:0">{{ customerTypes.length }}</p>
-      </div>
-    </div>
 
     <!-- Filters -->
     <div style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;padding:20px 24px;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
@@ -206,13 +527,13 @@ const upcomingCount = computed(() => rates.value.filter(r => rateStatus(r) === '
             <!-- Customer type -->
             <td style="padding:16px 20px">
               <div style="display:flex;align-items:center;gap:10px">
-                <span :style="`width:10px;height:10px;border-radius:50%;background:${getType(r.customerTypeId).color};flex-shrink:0;display:inline-block`"></span>
-                <span style="font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ getType(r.customerTypeId).name }}</span>
+                <span :style="`width:10px;height:10px;border-radius:50%;background:${getType(r).color || '#ccc'};flex-shrink:0;display:inline-block`"></span>
+                <span style="font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ getType(r).name }}</span>
               </div>
             </td>
             <!-- Rate -->
             <td style="padding:16px 20px">
-              <span style="font-size:15px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ format(r.pickupRate) }}</span>
+              <span style="font-size:15px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ format(r.rate) }}</span>
               <span style="font-size:12px;color:#9ca3af;font-family:'Manrope',sans-serif;margin-left:4px">/ pickup</span>
             </td>
             <!-- Effective date -->
@@ -239,13 +560,13 @@ const upcomingCount = computed(() => rates.value.filter(r => rateStatus(r) === '
             <!-- Actions -->
             <td style="padding:16px 20px">
               <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px">
-                <button @click="openEdit(r)"
-                  style="display:flex;align-items:center;gap:5px;background:#ececec;color:#1a1a1a;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">
+                <button @click="openEdit(r)" :disabled="submitting || deleting"
+                  :style="`display:flex;align-items:center;gap:5px;background:#ececec;color:#1a1a1a;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting || deleting ? 'not-allowed' : 'pointer'};opacity:${submitting || deleting ? '0.5' : '1'}`">
                   <Icon name="lucide:pencil" style="width:13px;height:13px" />
                   Edit
                 </button>
-                <button @click="openDelete(r)"
-                  style="display:flex;align-items:center;gap:5px;background:#fef2f2;color:#ef4444;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">
+                <button @click="openDelete(r)" :disabled="submitting || deleting"
+                  :style="`display:flex;align-items:center;gap:5px;background:#fef2f2;color:#ef4444;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting || deleting ? 'not-allowed' : 'pointer'};opacity:${submitting || deleting ? '0.5' : '1'}`">
                   <Icon name="lucide:trash-2" style="width:13px;height:13px" />
                   Delete
                 </button>
@@ -311,8 +632,13 @@ const upcomingCount = computed(() => rates.value.filter(r => rateStatus(r) === '
           </div>
         </div>
         <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px">
-          <button @click="showAddModal=false" style="background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Cancel</button>
-          <button @click="handleAdd" style="background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Add Rate</button>
+          <button @click="showAddModal=false" :disabled="submitting" 
+            :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.5' : '1'}`">Cancel</button>
+          <button @click="handleAdd" :disabled="submitting" 
+            :style="`background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px;opacity:${submitting ? '0.8' : '1'}`">
+            <Icon v-if="submitting" name="lucide:loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
+            {{ submitting ? 'Creating...' : 'Add Rate' }}
+          </button>
         </div>
       </div>
     </div>
@@ -324,8 +650,8 @@ const upcomingCount = computed(() => rates.value.filter(r => rateStatus(r) === '
           <div>
             <h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0">Edit Rate</h2>
             <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
-              <span :style="`width:8px;height:8px;border-radius:50%;background:${getType(editForm.customerTypeId).color};display:inline-block`"></span>
-              <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ getType(editForm.customerTypeId).name }}</span>
+              <span :style="`width:8px;height:8px;border-radius:50%;background:${getType(editForm).color || '#ccc'};display:inline-block`"></span>
+              <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ getType(editForm).name }}</span>
             </div>
           </div>
           <button @click="showEditModal=false" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px">
@@ -360,8 +686,13 @@ const upcomingCount = computed(() => rates.value.filter(r => rateStatus(r) === '
           </div>
         </div>
         <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px">
-          <button @click="showEditModal=false" style="background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Cancel</button>
-          <button @click="handleEdit" style="background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Save Changes</button>
+          <button @click="showEditModal=false" :disabled="submitting" 
+            :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.5' : '1'}`">Cancel</button>
+          <button @click="handleEdit" :disabled="submitting" 
+            :style="`background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px;opacity:${submitting ? '0.8' : '1'}`">
+            <Icon v-if="submitting" name="lucide:loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
+            {{ submitting ? 'Saving...' : 'Save Changes' }}
+          </button>
         </div>
       </div>
     </div>
@@ -380,16 +711,22 @@ const upcomingCount = computed(() => rates.value.filter(r => rateStatus(r) === '
             <Icon name="lucide:trash-2" style="width:24px;height:24px;color:#ef4444" />
           </div>
           <p style="font-size:15px;font-weight:600;color:#1a1a1a;margin:0 0 8px">
-            Delete {{ deleteTarget ? getType(deleteTarget.customerTypeId).name : '' }} rate?
+            Delete {{ deleteTarget ? getType(deleteTarget).name : '' }} rate?
           </p>
           <p style="font-size:13px;color:#6b7280;margin:0">This action cannot be undone.</p>
         </div>
         <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px">
-          <button @click="showDeleteModal=false" style="background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Cancel</button>
-          <button @click="handleDelete" style="background:#ef4444;color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Delete</button>
+          <button @click="showDeleteModal=false" :disabled="deleting" 
+            :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${deleting ? 'not-allowed' : 'pointer'};opacity:${deleting ? '0.5' : '1'}`">Cancel</button>
+          <button @click="handleDelete" :disabled="deleting" 
+            :style="`background:#ef4444;color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${deleting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px;opacity:${deleting ? '0.8' : '1'}`">
+            <Icon v-if="deleting" name="lucide:loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
+            {{ deleting ? 'Deleting...' : 'Delete' }}
+          </button>
         </div>
       </div>
     </div>
 
+    </template>
   </div>
 </template>
