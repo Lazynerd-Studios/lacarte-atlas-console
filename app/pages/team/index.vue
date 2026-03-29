@@ -1,32 +1,173 @@
 <script setup lang="ts">
+import type { TeamMember, CreateRolePayload } from '~/types/team'
+
+interface TeamStats {
+  totalMembers: number
+  activeMembers: number
+  superAdmins: number
+  onlineNow: number
+}
+
 definePageMeta({ layout: 'dashboard' })
 
 const showAddRoleModal = ref(false)
+const showDeleteModal = ref(false)
+const memberToDelete = ref<TeamMember | null>(null)
+const deleting = ref(false)
+const submitting = ref(false)
+const members = ref<TeamMember[]>([])
+const loading = ref(false)
+const stats = ref<TeamStats>({
+  totalMembers: 0,
+  activeMembers: 0,
+  superAdmins: 0,
+  onlineNow: 0,
+})
+const statsLoading = ref(false)
 
-function handleAddRole(data: Record<string, unknown>) {
-  console.log('Add role:', data)
-  showAddRoleModal.value = false
+/**
+ * Handles role creation from AddRoleModal
+ * 
+ * Error Handling Strategy:
+ * - Client-side validation: Handled in modal component
+ * - 400 validation errors (duplicate name, invalid fields): Handled in modal component
+ * - 401 unauthorized: Automatic redirect to login (handled by useApi)
+ * - 403, 404, 500: Automatic error toast (handled by useErrorHandler)
+ * - Network errors: Automatic error toast (handled by useErrorHandler)
+ */
+async function handleAddRole(data: CreateRolePayload) {
+  submitting.value = true
+  const api = useApi()
+  const toast = useAppToast()
+  
+  // Send POST request to create role
+  // api.post() automatically handles errors via useErrorHandler and returns null on failure
+  const response = await api.post('/api/team/admin/roles', data)
+  
+  if (response) {
+    // Success flow: show toast, close modal
+    toast.success('Role created successfully')
+    showAddRoleModal.value = false
+    // Note: In a real implementation, we would refresh the roles list here
+    // For now, we just close the modal
+  }
+  
+  submitting.value = false
 }
 
-const stats = [
-  { iconBg: '#fff9e6', icon: 'i-lucide-users',       iconColor: '#ffb400', label: 'Total Members',  value: '5' },
-  { iconBg: '#f0fdf4', icon: 'i-lucide-user-check',  iconColor: '#22c55e', label: 'Active Members', value: '4' },
-  { iconBg: '#fef2f2', icon: 'i-lucide-shield',      iconColor: '#ef4444', label: 'Super Admins',   value: '1' },
-  { iconBg: '#eff6ff', icon: 'i-lucide-wifi',        iconColor: '#3b82f6', label: 'Online Now',     value: '3' },
-]
+/**
+ * Opens the delete confirmation modal for a team member
+ */
+function openDeleteModal(member: TeamMember) {
+  memberToDelete.value = member
+  showDeleteModal.value = true
+}
 
-const members = [
-  { initials: 'JA', name: 'John Admin',      email: 'john.admin@lacarte.com',     role: 'Super Admin',        roleColor: '#dc2626', roleBg: '#fef2f2', status: 'active',   lastLogin: '2 hours ago' },
-  { initials: 'SO', name: 'Sarah Operations',email: 'sarah.ops@lacarte.com',      role: 'Operations Manager', roleColor: '#ffb400', roleBg: '#fff9e6', status: 'active',   lastLogin: '5 minutes ago' },
-  { initials: 'MF', name: 'Mike Finance',    email: 'mike.finance@lacarte.com',   role: 'Finance',            roleColor: '#3b82f6', roleBg: '#eff6ff', status: 'active',   lastLogin: '1 day ago' },
-  { initials: 'LS', name: 'Lisa Support',    email: 'lisa.support@lacarte.com',   role: 'Support',            roleColor: '#22c55e', roleBg: '#f0fdf4', status: 'active',   lastLogin: '30 minutes ago' },
-  { initials: 'DM', name: 'David Manager',   email: 'david.manager@lacarte.com',  role: 'Operations Manager', roleColor: '#ffb400', roleBg: '#fff9e6', status: 'inactive', lastLogin: '2 weeks ago' },
-]
+/**
+ * Handles team member deletion
+ * 
+ * Error Handling:
+ * - 401: Automatic redirect to login (handled by useApi)
+ * - 403, 404, 500: Automatic error toast (handled by useErrorHandler)
+ * - Network errors: Automatic error toast (handled by useErrorHandler)
+ */
+async function handleDelete() {
+  if (!memberToDelete.value) return
+  
+  deleting.value = true
+  const api = useApi()
+  const toast = useAppToast()
+  
+  const response = await api.del(`/api/team/admin/members/${memberToDelete.value.id}`)
+  
+  if (response) {
+    toast.success('Team member deleted successfully')
+    showDeleteModal.value = false
+    memberToDelete.value = null
+    await fetchMembers() // Refresh the member list
+  }
+  
+  deleting.value = false
+}
+
+/**
+ * Fetches team members from the API
+ * 
+ * Error Handling:
+ * - 401: Automatic redirect to login (handled by useApi)
+ * - 403, 404, 500: Automatic error toast (handled by useErrorHandler)
+ * - Network errors: Automatic error toast (handled by useErrorHandler)
+ */
+async function fetchMembers() {
+  loading.value = true
+  const api = useApi()
+  
+  const response = await api.get<{ members: TeamMember[] }>('/api/team/admin/members')
+  if (response) {
+    members.value = response.members
+  }
+  
+  loading.value = false
+}
+
+/**
+ * Fetches team statistics from the API
+ * 
+ * Error Handling:
+ * - 401: Automatic redirect to login (handled by useApi)
+ * - 403, 404, 500: Automatic error toast (handled by useErrorHandler)
+ * - Network errors: Automatic error toast (handled by useErrorHandler)
+ */
+async function fetchStats() {
+  statsLoading.value = true
+  const api = useApi()
+  
+  const response = await api.get<TeamStats>('/api/team/admin/stats')
+  if (response) {
+    stats.value = response
+  }
+  
+  statsLoading.value = false
+}
+
+const statsDisplay = computed(() => [
+  { iconBg: '#fff9e6', icon: 'i-lucide-users',       iconColor: '#ffb400', label: 'Total Members',  value: stats.value.totalMembers.toString() },
+  { iconBg: '#f0fdf4', icon: 'i-lucide-user-check',  iconColor: '#22c55e', label: 'Active Members', value: stats.value.activeMembers.toString() },
+  { iconBg: '#fef2f2', icon: 'i-lucide-shield',      iconColor: '#ef4444', label: 'Super Admins',   value: stats.value.superAdmins.toString() },
+  { iconBg: '#eff6ff', icon: 'i-lucide-wifi',        iconColor: '#3b82f6', label: 'Online Now',     value: stats.value.onlineNow.toString() },
+])
 
 function statusStyle(s: string) {
   if (s === 'active') return 'color:#22c55e;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2)'
   return 'color:#6b7280;background:#e5e7eb;border:1px solid #e5e7eb'
 }
+
+function getInitials(member: TeamMember): string {
+  return `${member.firstName.charAt(0)}${member.lastName.charAt(0)}`.toUpperCase()
+}
+
+function getFullName(member: TeamMember): string {
+  return `${member.firstName} ${member.lastName}`
+}
+
+function getRoleDisplay(member: TeamMember): { name: string; color: string; bg: string } {
+  // Use roleDetails if available, otherwise use role string
+  const roleName = member.roleDetails?.name || member.role
+  const roleColor = member.roleDetails?.color || '#6b7280'
+  
+  // Generate background color from role color (lighter version)
+  const bg = roleColor + '20' // Add alpha for lighter background
+  
+  return { name: roleName, color: roleColor, bg }
+}
+
+// Fetch data on mount
+onMounted(async () => {
+  await Promise.all([
+    fetchMembers(),
+    fetchStats(),
+  ])
+})
 </script>
 
 <template>
@@ -62,13 +203,28 @@ function statusStyle(s: string) {
 
     <!-- Stat cards -->
     <div class="grid-cols-4" style="gap:20px">
-      <div v-for="s in stats" :key="s.label" style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-        <div :style="`width:40px;height:40px;background:${s.iconBg};border-radius:20px;display:flex;align-items:center;justify-content:center;margin-bottom:16px`">
-          <UIcon :name="s.icon" :style="`width:20px;height:20px;color:${s.iconColor}`" />
+      <!-- Loading placeholders -->
+      <template v-if="statsLoading">
+        <div
+          v-for="i in 4"
+          :key="`skeleton-${i}`"
+          style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1);display:flex;flex-direction:column;gap:12px"
+        >
+          <div class="skeleton" style="width:40px;height:40px;border-radius:20px" />
+          <div class="skeleton" style="height:14px;width:120px" />
+          <div class="skeleton" style="height:28px;width:80px" />
         </div>
-        <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0 0 4px">{{ s.label }}</p>
-        <p style="font-size:24px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ s.value }}</p>
-      </div>
+      </template>
+      <!-- Actual stat cards -->
+      <template v-else>
+        <div v-for="s in statsDisplay" :key="s.label" style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+          <div :style="`width:40px;height:40px;background:${s.iconBg};border-radius:20px;display:flex;align-items:center;justify-content:center;margin-bottom:16px`">
+            <UIcon :name="s.icon" :style="`width:20px;height:20px;color:${s.iconColor}`" />
+          </div>
+          <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0 0 4px">{{ s.label }}</p>
+          <p style="font-size:24px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ s.value }}</p>
+        </div>
+      </template>
     </div>
 
     <!-- Members table -->
@@ -86,7 +242,7 @@ function statusStyle(s: string) {
         </thead>
         <tbody>
           <tr
-            v-for="(m, i) in members" :key="m.email"
+            v-for="(m, i) in members" :key="m.id"
             :style="`border-bottom:${i < members.length - 1 ? '1px solid #e5e7eb' : 'none'}`"
             @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
@@ -95,16 +251,16 @@ function statusStyle(s: string) {
             <td style="padding:16px">
               <div style="display:flex;align-items:center;gap:12px">
                 <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(180deg,#ffb400,#ffc83d);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                  <span style="font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif">{{ m.initials }}</span>
+                  <span style="font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif">{{ getInitials(m) }}</span>
                 </div>
-                <span style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">{{ m.name }}</span>
+                <span style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">{{ getFullName(m) }}</span>
               </div>
             </td>
             <!-- Email -->
             <td style="padding:16px;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ m.email }}</td>
             <!-- Role -->
             <td style="padding:16px">
-              <span :style="`font-size:12px;font-weight:500;border-radius:16px;padding:4px 10px;font-family:'Manrope',sans-serif;color:${m.roleColor};background:${m.roleBg}`">{{ m.role }}</span>
+              <span :style="`font-size:12px;font-weight:500;border-radius:16px;padding:4px 10px;font-family:'Manrope',sans-serif;color:${getRoleDisplay(m).color};background:${getRoleDisplay(m).bg}`">{{ getRoleDisplay(m).name }}</span>
             </td>
             <!-- Status -->
             <td style="padding:16px">
@@ -124,7 +280,7 @@ function statusStyle(s: string) {
                   style="width:32px;height:32px;border-radius:20px;border:1px solid #ececec;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center"
                   @mouseover="($event.currentTarget as HTMLElement).style.background='#f8f9fa'"
                   @mouseleave="($event.currentTarget as HTMLElement).style.background='white'"
-                  @click="$router.push(`/team/${i + 1}/edit`)"
+                  @click="$router.push(`/team/${m.id}/edit`)"
                 >
                   <UIcon name="i-lucide-pencil" style="width:15px;height:15px;color:#6b7280" />
                 </button>
@@ -132,10 +288,17 @@ function statusStyle(s: string) {
                   style="width:32px;height:32px;border-radius:20px;border:1px solid #fecaca;background:#fef2f2;cursor:pointer;display:flex;align-items:center;justify-content:center"
                   @mouseover="($event.currentTarget as HTMLElement).style.background='#fee2e2'"
                   @mouseleave="($event.currentTarget as HTMLElement).style.background='#fef2f2'"
+                  @click="openDeleteModal(m)"
                 >
                   <UIcon name="i-lucide-trash-2" style="width:15px;height:15px;color:#ef4444" />
                 </button>
               </div>
+            </td>
+          </tr>
+          <!-- Empty state -->
+          <tr v-if="members.length === 0 && !loading">
+            <td colspan="6" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">
+              No team members found
             </td>
           </tr>
         </tbody>
@@ -146,7 +309,64 @@ function statusStyle(s: string) {
 
   <AddRoleModal
     v-if="showAddRoleModal"
+    :submitting="submitting"
     @close="showAddRoleModal = false"
     @submit="handleAddRole"
   />
+
+  <!-- Delete Confirmation Modal -->
+  <div
+    v-if="showDeleteModal && memberToDelete"
+    style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:50;display:flex;align-items:center;justify-content:center;padding:24px"
+    @click.self="showDeleteModal = false"
+  >
+    <div style="background:white;border-radius:16px;width:420px;padding:32px;display:flex;flex-direction:column;gap:20px;box-shadow:0 10px 15px rgba(0,0,0,0.1);position:relative">
+
+      <!-- Close -->
+      <button
+        style="position:absolute;top:16px;right:16px;width:28px;height:28px;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px;opacity:0.7"
+        :disabled="deleting"
+        @click="showDeleteModal = false"
+        @mouseover="($event.currentTarget as HTMLElement).style.background='#f3f4f6'"
+        @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
+      >
+        <UIcon name="i-lucide-x" style="width:16px;height:16px;color:#111" />
+      </button>
+
+      <!-- Icon + text -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center">
+        <div style="width:56px;height:56px;border-radius:9999px;background:rgba(239,68,68,0.1);display:flex;align-items:center;justify-content:center">
+          <UIcon name="i-lucide-trash-2" style="width:24px;height:24px;color:#ef4444" />
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <p style="font-size:20px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Delete Team Member</p>
+          <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;line-height:1.6">
+            Are you sure you want to delete <span style="font-weight:600;color:#1a1a1a">{{ getFullName(memberToDelete) }}</span>?
+            This action cannot be undone.
+          </p>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div style="display:flex;justify-content:center;gap:8px">
+        <button
+          style="height:40px;padding:0 20px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
+          :disabled="deleting"
+          @click="showDeleteModal = false"
+          @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
+          @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
+        >Cancel</button>
+        <button
+          style="height:40px;padding:0 20px;background:#ef4444;border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px"
+          :disabled="deleting"
+          @click="handleDelete"
+          @mouseover="!deleting && (($event.currentTarget as HTMLElement).style.opacity='0.9')"
+          @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
+        >
+          <UIcon v-if="deleting" name="i-lucide-loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
+          {{ deleting ? 'Deleting...' : 'Delete' }}
+        </button>
+      </div>
+    </div>
+  </div>
 </template>

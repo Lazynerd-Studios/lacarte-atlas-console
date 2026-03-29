@@ -1,7 +1,13 @@
 <script setup lang="ts">
+import type { CreateRolePayload } from '~/types/team'
+
+const props = defineProps<{
+  submitting?: boolean
+}>()
+
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'submit', data: Record<string, unknown>): void
+  (e: 'submit', data: CreateRolePayload): void
 }>()
 
 const form = reactive({
@@ -149,7 +155,7 @@ function onBlur(e: Event, field: string) {
 <template>
   <div
     style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:50;display:flex;align-items:center;justify-content:center;padding:24px"
-    @click.self="emit('close')"
+    @click.self="!submitting && emit('close')"
   >
     <div style="background:white;border:1px solid #e5e7eb;border-radius:16px;width:560px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 10px 15px rgba(0,0,0,0.1),0 4px 6px rgba(0,0,0,0.1);position:relative">
 
@@ -161,8 +167,9 @@ function onBlur(e: Event, field: string) {
       <!-- Close -->
       <button
         style="position:absolute;top:16px;right:16px;width:28px;height:28px;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px;opacity:0.7"
+        :disabled="submitting"
         @click="emit('close')"
-        @mouseover="($event.currentTarget as HTMLElement).style.background='#f3f4f6'"
+        @mouseover="!submitting && (($event.currentTarget as HTMLElement).style.background='#f3f4f6')"
         @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
       >
         <UIcon name="i-lucide-x" style="width:16px;height:16px;color:#111" />
@@ -237,12 +244,18 @@ function onBlur(e: Event, field: string) {
       <div style="padding:17px 24px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:8px;flex-shrink:0">
         <button
           style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
+          :disabled="submitting"
           @click="emit('close')"
         >Cancel</button>
         <button
-          style="height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
+          style="height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2);display:flex;align-items:center;gap:8px"
+          :disabled="submitting"
+          :style="submitting ? 'opacity:0.6;cursor:not-allowed' : ''"
           @click="submit"
-        >Create Role</button>
+        >
+          <UIcon v-if="submitting" name="i-lucide-loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
+          {{ submitting ? 'Creating...' : 'Create Role' }}
+        </button>
       </div>
     </div>
   </div>

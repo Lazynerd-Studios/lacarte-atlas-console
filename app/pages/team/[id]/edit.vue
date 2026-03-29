@@ -1,44 +1,243 @@
 <script setup lang="ts">
+import type { TeamMember, Role, Permission } from '~/types/team'
+import { validateTeamMemberForm } from '~/utils/teamValidation'
+import { formToUpdateMemberPayload } from '~/utils/teamTransform'
+
 definePageMeta({ layout: 'dashboard' })
 
 const route = useRoute()
-
-// Mock member lookup by id — replace with real API call
-const mockMembers: Record<string, { firstName: string; lastName: string; email: string; phone: string; role: string; status: string; permissions: string[] }> = {
-  '1': { firstName: 'John',  lastName: 'Admin',      email: 'john.admin@lacarte.com',    phone: '+1 (555) 000-0001', role: 'super_admin',        status: 'active',   permissions: ['customers','drivers','routes','billing','shop','reports','team'] },
-  '2': { firstName: 'Sarah', lastName: 'Operations', email: 'sarah.ops@lacarte.com',     phone: '+1 (555) 000-0002', role: 'operations_manager', status: 'active',   permissions: ['customers','drivers','routes'] },
-  '3': { firstName: 'Mike',  lastName: 'Finance',    email: 'mike.finance@lacarte.com',  phone: '+1 (555) 000-0003', role: 'finance',            status: 'active',   permissions: ['billing','reports'] },
-  '4': { firstName: 'Lisa',  lastName: 'Support',    email: 'lisa.support@lacarte.com',  phone: '+1 (555) 000-0004', role: 'support',            status: 'active',   permissions: ['customers'] },
-  '5': { firstName: 'David', lastName: 'Manager',    email: 'david.manager@lacarte.com', phone: '+1 (555) 000-0005', role: 'operations_manager', status: 'inactive', permissions: ['drivers','routes'] },
-}
-
-const member = mockMembers[route.params.id as string] ?? mockMembers['1']!
+const router = useRouter()
+const toast = useAppToast()
 
 const form = reactive({
-  firstName: member.firstName,
-  lastName:  member.lastName,
-  email:     member.email,
-  phone:     member.phone,
-  role:      member.role,
-  status:    member.status,
+  firstName: '',
+  lastName: '',
+  email: '',
+  phone: '',
+  role: '',
+  status: 'active' as 'active' | 'inactive',
 })
 
-const permissions = reactive([
-  { key: 'customers', label: 'Manage Customers', desc: 'View, create, edit, and delete customers',        checked: member.permissions.includes('customers') },
-  { key: 'drivers',   label: 'Manage Drivers',   desc: 'View, create, edit, and delete drivers',          checked: member.permissions.includes('drivers') },
-  { key: 'routes',    label: 'Manage Routes',    desc: 'Create and manage pickup routes',                 checked: member.permissions.includes('routes') },
-  { key: 'billing',   label: 'View Billing',     desc: 'Access billing and payment information',          checked: member.permissions.includes('billing') },
-  { key: 'shop',      label: 'Manage Shop',      desc: 'Manage products, orders, and inventory',         checked: member.permissions.includes('shop') },
-  { key: 'reports',   label: 'View Reports',     desc: 'Access analytics and reports',                   checked: member.permissions.includes('reports') },
-  { key: 'team',      label: 'Manage Team',      desc: 'Add and manage team members (Admin only)',       checked: member.permissions.includes('team') },
-])
+const errors = reactive<Record<string, string>>({})
+const roles = ref<Role[]>([])
+const allPermissions = ref<Permission[]>([])
+const selectedPermissions = ref<string[]>([])
+const loading = ref(false)
+const submitting = ref(false)
 
-const roles = [
-  { value: 'super_admin',        label: 'Super Admin' },
-  { value: 'operations_manager', label: 'Operations Manager' },
-  { value: 'finance',            label: 'Finance' },
-  { value: 'support',            label: 'Support' },
-]
+// Group permissions by module
+const permissionGroups = computed(() => {
+  const groups: Record<string, Permission[]> = {}
+  
+  allPermissions.value.forEach(permission => {
+    if (!groups[permission.module]) {
+      groups[permission.module] = []
+    }
+    groups[permission.module]!.push(permission)
+  })
+  
+  return groups
+})
+
+/**
+ * Loads team member data from the API
+ * 
+ * Error Handling:
+ * - 401: Automatic redirect to login (handled by useApi)
+ * - 404: Display error toast and redirect to team list
+ * - 403, 500: Automatic error toast (handled by useErrorHandler)
+ * - Network errors: Automatic error toast (handled by useErrorHandler)
+ */
+async function loadMember() {
+  loading.value = true
+  const api = useApi()
+  
+  try {
+    const memberId = route.params.id as string
+    const response = await api.get<TeamMember>(`/api/team/admin/members/${memberId}`)
+    
+    if (response) {
+      // Populate form with member data
+      form.firstName = response.firstName
+      form.lastName = response.lastName
+      form.email = response.email
+      form.phone = response.phone
+      form.role = response.role
+      form.status = response.status
+      selectedPermissions.value = [...response.permissions]
+    }
+  } catch (err: any) {
+    // Handle invalid member ID error
+    toast.error('Member not found', 'The requested team member could not be found')
+    router.push('/team')
+  } finally {
+    loading.value = false
+  }
+}
+
+/**
+ * Fetches available roles from the API
+ * 
+ * Error Handling:
+ * - 401: Automatic redirect to login (handled by useApi)
+ * - 403, 404, 500: Automatic error toast (handled by useErrorHandler)
+ * - Network errors: Automatic error toast (handled by useErrorHandler)
+ */
+async function fetchRoles() {
+  const api = useApi()
+  
+  const response = await api.get<{ roles: Role[] }>('/api/team/admin/roles')
+  if (response) {
+    roles.value = response.roles
+  }
+}
+
+/**
+ * Fetches available permissions from the API
+ * 
+ * Error Handling:
+ * - 401: Automatic redirect to login (handled by useApi)
+ * - 403, 404, 500: Automatic error toast (handled by useErrorHandler)
+ * - Network errors: Automatic error toast (handled by useErrorHandler)
+ */
+async function fetchPermissions() {
+  const api = useApi()
+  
+  const response = await api.get<{ permissions: Permission[] }>('/api/team/admin/permissions')
+  if (response) {
+    allPermissions.value = response.permissions
+  }
+}
+
+/**
+ * Toggles individual permission selection
+ */
+function togglePermission(permissionId: string) {
+  const index = selectedPermissions.value.indexOf(permissionId)
+  if (index > -1) {
+    selectedPermissions.value.splice(index, 1)
+  } else {
+    selectedPermissions.value.push(permissionId)
+  }
+}
+
+/**
+ * Toggles all permissions in a group
+ */
+function toggleGroup(module: string) {
+  const groupPermissions = permissionGroups.value[module]
+  if (!groupPermissions) return
+  
+  const groupPermissionIds = groupPermissions.map(p => p.id)
+  
+  if (isGroupSelected(module)) {
+    // Deselect all in group
+    selectedPermissions.value = selectedPermissions.value.filter(
+      id => !groupPermissionIds.includes(id)
+    )
+  } else {
+    // Select all in group
+    groupPermissionIds.forEach(id => {
+      if (!selectedPermissions.value.includes(id)) {
+        selectedPermissions.value.push(id)
+      }
+    })
+  }
+}
+
+/**
+ * Checks if all permissions in a group are selected
+ */
+function isGroupSelected(module: string): boolean {
+  const groupPermissions = permissionGroups.value[module] || []
+  if (groupPermissions.length === 0) return false
+  
+  return groupPermissions.every(p => selectedPermissions.value.includes(p.id))
+}
+
+/**
+ * Checks if some (but not all) permissions in a group are selected
+ */
+function isGroupPartial(module: string): boolean {
+  const groupPermissions = permissionGroups.value[module]
+  if (!groupPermissions || groupPermissions.length === 0) return false
+  
+  const selectedCount = groupPermissions.filter(p => 
+    selectedPermissions.value.includes(p.id)
+  ).length
+  
+  return selectedCount > 0 && selectedCount < groupPermissions.length
+}
+
+/**
+ * Handles form submission for updating a team member
+ * 
+ * Validation:
+ * - Client-side validation using validation utilities
+ * - Display validation errors in form
+ * 
+ * API Call:
+ * - PATCH /api/team/admin/members/:id with UpdateTeamMemberPayload
+ * 
+ * Error Handling:
+ * - 400 validation errors: Display in form
+ * - 404: Display error toast (invalid member ID)
+ * - 401: Automatic redirect to login (handled by useApi)
+ * - 403, 500: Display error toast (manual handling)
+ * - Network errors: Display error toast (manual handling)
+ * 
+ * Success Flow:
+ * - Show success toast
+ * - Navigate to team list page
+ */
+async function handleSubmit() {
+  // Clear previous errors
+  Object.keys(errors).forEach(key => delete errors[key])
+  
+  // Client-side validation
+  const validationErrors = validateTeamMemberForm(form, true)
+  if (Object.keys(validationErrors).length > 0) {
+    Object.assign(errors, validationErrors)
+    return
+  }
+  
+  // Set submitting state
+  submitting.value = true
+  
+  try {
+    const api = useApi()
+    const payload = formToUpdateMemberPayload({
+      ...form,
+      permissions: selectedPermissions.value,
+    })
+    
+    const memberId = route.params.id as string
+    
+    // Use raw request to handle 400 validation errors in form
+    await api.request(`/api/team/admin/members/${memberId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    })
+    
+    submitting.value = false
+    
+    // Success flow
+    toast.success('Team member updated successfully')
+    router.push('/team')
+  } catch (err: any) {
+    submitting.value = false
+    
+    // Handle 400 validation errors or 404 not found
+    if (err?.message?.toLowerCase().includes('not found')) {
+      toast.error('Member not found', 'The requested team member could not be found')
+      router.push('/team')
+    } else {
+      // Other errors (403, 500, network) show as toast
+      const errorMessage = err?.message || 'Failed to update team member'
+      toast.error('Failed to update team member', errorMessage)
+    }
+  }
+}
 
 const roleInfo = [
   { label: 'Super Admin',        desc: 'Full system access including team management',    color: '#dc2626', bg: '#fef2f2' },
@@ -52,10 +251,23 @@ const securityNotes = [
   'Two-factor authentication is required for all admins',
   'Sessions expire after 24 hours of inactivity',
 ]
+
+// Fetch data on mount
+onMounted(async () => {
+  await Promise.all([
+    loadMember(),
+    fetchRoles(),
+    fetchPermissions(),
+  ])
+})
 </script>
 
 <template>
-  <div style="display:flex;flex-direction:column;gap:28px">
+  <div v-if="loading" style="display:flex;flex-direction:column;gap:28px">
+    <PageSkeleton type="dashboard" />
+  </div>
+  
+  <div v-else style="display:flex;flex-direction:column;gap:28px">
 
     <!-- Back link -->
     <NuxtLink to="/team" style="display:inline-flex;align-items:center;gap:8px;text-decoration:none">
@@ -82,20 +294,24 @@ const securityNotes = [
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
               <div>
                 <label style="display:block;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin-bottom:8px">First Name</label>
-                <input v-model="form.firstName" placeholder="Enter first name" style="width:100%;height:40px;border:1px solid #e5e7eb;border-radius:12px;padding:0 12px;font-size:14px;font-family:'Manrope',sans-serif;color:#111;background:white;outline:none;box-sizing:border-box" @focus="($event.target as HTMLInputElement).style.borderColor='#ffb400'" @blur="($event.target as HTMLInputElement).style.borderColor='#e5e7eb'" />
+                <input v-model="form.firstName" placeholder="Enter first name" :disabled="submitting" style="width:100%;height:40px;border:1px solid #e5e7eb;border-radius:12px;padding:0 12px;font-size:14px;font-family:'Manrope',sans-serif;color:#111;background:white;outline:none;box-sizing:border-box" @focus="($event.target as HTMLInputElement).style.borderColor='#ffb400'" @blur="($event.target as HTMLInputElement).style.borderColor='#e5e7eb'" />
+                <p v-if="errors.firstName" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif;margin:6px 0 0">{{ errors.firstName }}</p>
               </div>
               <div>
                 <label style="display:block;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin-bottom:8px">Last Name</label>
-                <input v-model="form.lastName" placeholder="Enter last name" style="width:100%;height:40px;border:1px solid #e5e7eb;border-radius:12px;padding:0 12px;font-size:14px;font-family:'Manrope',sans-serif;color:#111;background:white;outline:none;box-sizing:border-box" @focus="($event.target as HTMLInputElement).style.borderColor='#ffb400'" @blur="($event.target as HTMLInputElement).style.borderColor='#e5e7eb'" />
+                <input v-model="form.lastName" placeholder="Enter last name" :disabled="submitting" style="width:100%;height:40px;border:1px solid #e5e7eb;border-radius:12px;padding:0 12px;font-size:14px;font-family:'Manrope',sans-serif;color:#111;background:white;outline:none;box-sizing:border-box" @focus="($event.target as HTMLInputElement).style.borderColor='#ffb400'" @blur="($event.target as HTMLInputElement).style.borderColor='#e5e7eb'" />
+                <p v-if="errors.lastName" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif;margin:6px 0 0">{{ errors.lastName }}</p>
               </div>
             </div>
             <div>
               <label style="display:block;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin-bottom:8px">Email Address</label>
-              <input v-model="form.email" type="email" placeholder="member@lacarte.com" style="width:100%;height:40px;border:1px solid #e5e7eb;border-radius:12px;padding:0 12px;font-size:14px;font-family:'Manrope',sans-serif;color:#111;background:white;outline:none;box-sizing:border-box" @focus="($event.target as HTMLInputElement).style.borderColor='#ffb400'" @blur="($event.target as HTMLInputElement).style.borderColor='#e5e7eb'" />
+              <input v-model="form.email" type="email" placeholder="member@lacarte.com" :disabled="submitting" style="width:100%;height:40px;border:1px solid #e5e7eb;border-radius:12px;padding:0 12px;font-size:14px;font-family:'Manrope',sans-serif;color:#111;background:white;outline:none;box-sizing:border-box" @focus="($event.target as HTMLInputElement).style.borderColor='#ffb400'" @blur="($event.target as HTMLInputElement).style.borderColor='#e5e7eb'" />
+              <p v-if="errors.email" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif;margin:6px 0 0">{{ errors.email }}</p>
             </div>
             <div>
               <label style="display:block;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin-bottom:8px">Phone Number</label>
-              <input v-model="form.phone" type="tel" placeholder="+1 (555) 000-0000" style="width:100%;height:40px;border:1px solid #e5e7eb;border-radius:12px;padding:0 12px;font-size:14px;font-family:'Manrope',sans-serif;color:#111;background:white;outline:none;box-sizing:border-box" @focus="($event.target as HTMLInputElement).style.borderColor='#ffb400'" @blur="($event.target as HTMLInputElement).style.borderColor='#e5e7eb'" />
+              <input v-model="form.phone" type="tel" placeholder="+1 (555) 000-0000" :disabled="submitting" style="width:100%;height:40px;border:1px solid #e5e7eb;border-radius:12px;padding:0 12px;font-size:14px;font-family:'Manrope',sans-serif;color:#111;background:white;outline:none;box-sizing:border-box" @focus="($event.target as HTMLInputElement).style.borderColor='#ffb400'" @blur="($event.target as HTMLInputElement).style.borderColor='#e5e7eb'" />
+              <p v-if="errors.phone" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif;margin:6px 0 0">{{ errors.phone }}</p>
             </div>
           </div>
         </div>
@@ -107,17 +323,19 @@ const securityNotes = [
             <div>
               <label style="display:block;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin-bottom:8px">Role</label>
               <div style="position:relative">
-                <select v-model="form.role" style="width:100%;height:42px;border:1px solid #e5e7eb;border-radius:12px;padding:0 36px 0 12px;font-size:14px;font-family:'Manrope',sans-serif;color:#111;background:white;outline:none;appearance:none;cursor:pointer;box-sizing:border-box" @focus="($event.target as HTMLSelectElement).style.borderColor='#ffb400'" @blur="($event.target as HTMLSelectElement).style.borderColor='#e5e7eb'">
-                  <option v-for="r in roles" :key="r.value" :value="r.value">{{ r.label }}</option>
+                <select v-model="form.role" :disabled="submitting" style="width:100%;height:42px;border:1px solid #e5e7eb;border-radius:12px;padding:0 36px 0 12px;font-size:14px;font-family:'Manrope',sans-serif;color:#111;background:white;outline:none;appearance:none;cursor:pointer;box-sizing:border-box" @focus="($event.target as HTMLSelectElement).style.borderColor='#ffb400'" @blur="($event.target as HTMLSelectElement).style.borderColor='#e5e7eb'">
+                  <option value="" disabled>Select a role</option>
+                  <option v-for="r in roles" :key="r.id" :value="r.id">{{ r.name }}</option>
                 </select>
                 <UIcon name="i-lucide-chevron-down" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:18px;height:18px;color:#6b7280;pointer-events:none" />
               </div>
-              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:6px 0 0">Role determines the access level and permissions</p>
+              <p v-if="errors.role" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif;margin:6px 0 0">{{ errors.role }}</p>
+              <p v-else style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:6px 0 0">Role determines the access level and permissions</p>
             </div>
             <div>
               <label style="display:block;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin-bottom:8px">Status</label>
               <div style="position:relative">
-                <select v-model="form.status" style="width:100%;height:42px;border:1px solid #e5e7eb;border-radius:12px;padding:0 36px 0 12px;font-size:14px;font-family:'Manrope',sans-serif;color:#111;background:white;outline:none;appearance:none;cursor:pointer;box-sizing:border-box" @focus="($event.target as HTMLSelectElement).style.borderColor='#ffb400'" @blur="($event.target as HTMLSelectElement).style.borderColor='#e5e7eb'">
+                <select v-model="form.status" :disabled="submitting" style="width:100%;height:42px;border:1px solid #e5e7eb;border-radius:12px;padding:0 36px 0 12px;font-size:14px;font-family:'Manrope',sans-serif;color:#111;background:white;outline:none;appearance:none;cursor:pointer;box-sizing:border-box" @focus="($event.target as HTMLSelectElement).style.borderColor='#ffb400'" @blur="($event.target as HTMLSelectElement).style.borderColor='#e5e7eb'">
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
                 </select>
@@ -130,36 +348,65 @@ const securityNotes = [
         <!-- Permissions -->
         <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
           <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0 0 24px">Permissions</p>
-          <div style="display:flex;flex-direction:column;gap:4px">
-            <label
-              v-for="p in permissions" :key="p.key"
-              style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;cursor:pointer"
-              @mouseover="($event.currentTarget as HTMLElement).style.background='#f8f9fa'"
-              @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
-            >
-              <input v-model="p.checked" type="checkbox" style="width:16px;height:16px;accent-color:#ffb400;cursor:pointer;flex-shrink:0" />
-              <div>
-                <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin:0 0 2px">{{ p.label }}</p>
-                <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">{{ p.desc }}</p>
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <!-- Permission groups -->
+            <div v-for="(permissions, module) in permissionGroups" :key="module" style="display:flex;flex-direction:column;gap:4px">
+              <!-- Group header -->
+              <div
+                style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;cursor:pointer;background:#f8f9fa"
+                @click="toggleGroup(module)"
+              >
+                <input
+                  type="checkbox"
+                  :checked="isGroupSelected(module)"
+                  :indeterminate="isGroupPartial(module)"
+                  :disabled="submitting"
+                  style="width:16px;height:16px;accent-color:#ffb400;cursor:pointer;flex-shrink:0"
+                  @click.stop="toggleGroup(module)"
+                />
+                <p style="font-size:14px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ module }}</p>
               </div>
-            </label>
+              <!-- Group permissions -->
+              <label
+                v-for="p in permissions" :key="p.id"
+                style="display:flex;align-items:center;gap:12px;padding:12px 12px 12px 40px;border-radius:12px;cursor:pointer"
+                @mouseover="($event.currentTarget as HTMLElement).style.background='#f8f9fa'"
+                @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
+              >
+                <input
+                  type="checkbox"
+                  :checked="selectedPermissions.includes(p.id)"
+                  :disabled="submitting"
+                  style="width:16px;height:16px;accent-color:#ffb400;cursor:pointer;flex-shrink:0"
+                  @change="togglePermission(p.id)"
+                />
+                <div>
+                  <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin:0 0 2px">{{ p.label }}</p>
+                  <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">{{ p.description }}</p>
+                </div>
+              </label>
+            </div>
           </div>
         </div>
 
         <!-- Action buttons -->
         <div style="display:flex;gap:12px">
           <button
-            style="flex:1;height:40px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
-            @mouseover="($event.currentTarget as HTMLElement).style.background='#e6a200'"
-            @mouseleave="($event.currentTarget as HTMLElement).style.background='#ffb400'"
+            :disabled="submitting"
+            style="flex:1;height:40px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2);display:flex;align-items:center;justify-content:center;gap:8px"
+            @click="handleSubmit"
+            @mouseover="!submitting && (($event.currentTarget as HTMLElement).style.background='#e6a200')"
+            @mouseleave="!submitting && (($event.currentTarget as HTMLElement).style.background='#ffb400')"
           >
-            Save Changes
+            <UIcon v-if="submitting" name="i-lucide-loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
+            <span>{{ submitting ? 'Saving...' : 'Save Changes' }}</span>
           </button>
           <NuxtLink to="/team" style="flex:1">
             <button
+              :disabled="submitting"
               style="width:100%;height:40px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"
-              @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
-              @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
+              @mouseover="!submitting && (($event.currentTarget as HTMLElement).style.background='#e0e0e0')"
+              @mouseleave="!submitting && (($event.currentTarget as HTMLElement).style.background='#ececec')"
             >
               <UIcon name="i-lucide-x" style="width:16px;height:16px" />
               Cancel
@@ -198,3 +445,14 @@ const securityNotes = [
 
   </div>
 </template>
+
+<style scoped>
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+</style>
