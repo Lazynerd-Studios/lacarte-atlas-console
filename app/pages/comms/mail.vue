@@ -3,19 +3,36 @@ definePageMeta({ layout: 'dashboard' })
 
 interface Customer { id: number; name: string; email: string }
 interface MailLog {
-  id: number
-  recipients: string[]
-  recipientType: string
+  id: string
   subject: string
-  body: string
-  sentAt: string
-  status: 'successful' | 'failed'
-  delivered: number
-  total: number
+  message: string
+  recipientType: string
+  zoneId: string | null
+  zoneName: string | null
+  customEmails: string[]
+  recipientCount: number
+  deliveredCount: number
+  failedCount: number
+  status: 'completed' | 'pending' | 'failed'
+  sentBy: string
+  senderName: string
+  createdAt: string
 }
 
+interface Zone {
+  id: string
+  name: string
+  description: string
+  color: string
+  areas: string[]
+  assignedDrivers: number
+  customerCount: number
+  isActive: boolean
+}
+
+const api = useApi()
 const activeTab = ref<'compose' | 'history'>('compose')
-const historyFilter = ref<'all' | 'successful' | 'failed'>('all')
+const historyFilter = ref<'all' | 'completed' | 'pending' | 'failed'>('all')
 
 const recipientType = ref<'all' | 'zone' | 'custom'>('all')
 const selectedZone = ref('')
@@ -24,27 +41,84 @@ const body = ref('')
 const sending = ref(false)
 const sent = ref(false)
 
-const zones = ['Zone A – Central', 'Zone B – Westside', 'Zone C – Eastside', 'Zone D – Northside', 'Zone E – Southside']
+watch(activeTab, (newTab) => {
+  console.log('[mail] Tab changed to:', newTab)
+})
 
-const allCustomers: Customer[] = [
-  { id: 1,  name: 'Kwame Mensah',    email: 'kwame@example.com' },
-  { id: 2,  name: 'Ama Owusu',       email: 'ama@example.com' },
-  { id: 3,  name: 'Kofi Asante',     email: 'kofi@example.com' },
-  { id: 4,  name: 'Abena Boateng',   email: 'abena@example.com' },
-  { id: 5,  name: 'Yaw Darko',       email: 'yaw@example.com' },
-  { id: 6,  name: 'Akosua Frimpong', email: 'akosua@example.com' },
-  { id: 7,  name: 'Kojo Appiah',     email: 'kojo@example.com' },
-  { id: 8,  name: 'Efua Mensah',     email: 'efua@example.com' },
-  { id: 9,  name: 'Nana Agyei',      email: 'nana@example.com' },
-  { id: 10, name: 'Adwoa Sarpong',   email: 'adwoa@example.com' },
-]
+watch(recipientType, (newType) => {
+  console.log('[mail] Recipient type changed to:', newType)
+})
 
+watch(historyFilter, (newFilter) => {
+  console.log('[mail] History filter changed to:', newFilter)
+})
+
+const zones = ref<Zone[]>([])
+
+async function fetchZones() {
+  console.log('[mail] Fetching zones list')
+  const data = await api.get<any>('/zone/admin/list')
+  console.log('[mail] Zones response:', data)
+  if (data) {
+    zones.value = Array.isArray(data) ? data : (data.data ?? data.zones ?? data.results ?? [])
+    console.log('[mail] Loaded zones:', zones.value.length)
+  }
+}
+
+onMounted(() => {
+  console.log('[mail] Component mounted, initializing data')
+  fetchZones()
+  fetchHistory()
+  fetchCustomers()
+})
+
+const allCustomers = ref<Customer[]>([])
 const customerSearch = ref('')
 const selectedCustomers = ref<Customer[]>([])
 const showDropdown = ref(false)
+const loadingCustomers = ref(false)
+
+async function fetchCustomers() {
+  console.log('[mail] Fetching customers list')
+  loadingCustomers.value = true
+  
+  let page = 1
+  let hasMore = true
+  const allFetchedCustomers: Customer[] = []
+  
+  while (hasMore && page <= 10) { // Limit to 10 pages (1000 customers max)
+    const data = await api.get<any>(`/customer/admin/list?page=${page}&limit=100`)
+    console.log(`[mail] Customers page ${page} response:`, data)
+    
+    if (data) {
+      const customers = Array.isArray(data) ? data : (data.data ?? data.customers ?? data.results ?? [])
+      const mapped = customers.map((c: any) => ({
+        id: c.id,
+        name: c.user?.name ?? c.name ?? 'Unknown',
+        email: c.user?.email ?? c.email ?? ''
+      }))
+      
+      allFetchedCustomers.push(...mapped)
+      
+      // Check if there are more pages
+      const pagination = data.pagination
+      if (pagination && pagination.page < pagination.totalPages) {
+        page++
+      } else {
+        hasMore = false
+      }
+    } else {
+      hasMore = false
+    }
+  }
+  
+  allCustomers.value = allFetchedCustomers
+  console.log('[mail] Loaded total customers:', allCustomers.value.length)
+  loadingCustomers.value = false
+}
 
 const filteredCustomers = computed(() =>
-  allCustomers
+  allCustomers.value
     .filter(c => !selectedCustomers.value.find(s => s.id === c.id))
     .filter(c => {
       const q = customerSearch.value.toLowerCase().trim()
@@ -53,13 +127,18 @@ const filteredCustomers = computed(() =>
 )
 
 function addCustomer(c: Customer) {
-  if (!selectedCustomers.value.find(s => s.id === c.id)) selectedCustomers.value.push(c)
+  if (!selectedCustomers.value.find(s => s.id === c.id)) {
+    selectedCustomers.value.push(c)
+    console.log('[mail] Added customer:', c.email, 'Total selected:', selectedCustomers.value.length)
+  }
   customerSearch.value = ''
   showDropdown.value = false
 }
 
 function removeCustomer(id: number) {
+  const customer = selectedCustomers.value.find(c => c.id === id)
   selectedCustomers.value = selectedCustomers.value.filter(c => c.id !== id)
+  console.log('[mail] Removed customer:', customer?.email, 'Remaining:', selectedCustomers.value.length)
 }
 
 function hideDropdown() { window.setTimeout(() => { showDropdown.value = false }, 150) }
@@ -70,9 +149,18 @@ const manualError = ref('')
 function addManualEmail() {
   const val = manualEmail.value.trim()
   if (!val) return
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) { manualError.value = 'Enter a valid email address'; return }
-  if (selectedCustomers.value.find(c => c.email === val)) { manualError.value = 'Email already added'; return }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) { 
+    console.log('[mail] Invalid email format:', val)
+    manualError.value = 'Enter a valid email address'
+    return 
+  }
+  if (selectedCustomers.value.find(c => c.email === val)) { 
+    console.log('[mail] Duplicate email:', val)
+    manualError.value = 'Email already added'
+    return 
+  }
   selectedCustomers.value.push({ id: Date.now(), name: val, email: val })
+  console.log('[mail] Added manual email:', val, 'Total selected:', selectedCustomers.value.length)
   manualEmail.value = ''
   manualError.value = ''
 }
@@ -89,13 +177,17 @@ const canSend = computed(() => {
 })
 
 // History
-const history = ref<MailLog[]>([
-  { id: 1, recipients: ['All Customers'], recipientType: 'all', subject: 'Pickup Reminder – This Week', body: 'Dear customer, this is a reminder that your scheduled pickup is coming up this week.', sentAt: '2026-03-12 09:20', status: 'successful', delivered: 334, total: 334 },
-  { id: 2, recipients: ['Zone B – Westside'], recipientType: 'zone', subject: 'Service Update for Zone B', body: 'We have updated our pickup schedule for Zone B. Please check the app for details.', sentAt: '2026-03-10 15:00', status: 'successful', delivered: 64, total: 64 },
-  { id: 3, recipients: ['kwame@example.com', 'ama@example.com'], recipientType: 'custom', subject: 'Welcome to LaCarte!', body: 'Your account has been activated. We are excited to have you on board.', sentAt: '2026-03-08 11:30', status: 'failed', delivered: 0, total: 2 },
-  { id: 4, recipients: ['All Customers'], recipientType: 'all', subject: 'New Subscription Plans Available', body: 'We have launched new subscription plans. Log in to explore and upgrade.', sentAt: '2026-03-05 09:00', status: 'successful', delivered: 334, total: 334 },
-  { id: 5, recipients: ['Zone D – Northside'], recipientType: 'zone', subject: 'Holiday Notice – No Pickups March 6', body: 'Please note there will be no pickups on March 6th due to the public holiday.', sentAt: '2026-03-04 16:30', status: 'failed', delivered: 30, total: 43 },
-])
+const history = ref<MailLog[]>([])
+
+async function fetchHistory() {
+  console.log('[mail] Fetching mail history')
+  const data = await api.get<any>('/quick-mail/admin/history')
+  console.log('[mail] History response:', data)
+  if (data) {
+    history.value = Array.isArray(data) ? data : (data.data ?? data.history ?? data.results ?? [])
+    console.log('[mail] Loaded history entries:', history.value.length)
+  }
+}
 
 const filteredHistory = computed(() =>
   historyFilter.value === 'all' ? history.value : history.value.filter(h => h.status === historyFilter.value)
@@ -103,44 +195,65 @@ const filteredHistory = computed(() =>
 
 function recipientLabel(log: MailLog) {
   if (log.recipientType === 'all') return 'All Customers'
-  if (log.recipientType === 'zone') return log.recipients[0] ?? ''
-  return `${log.recipients.length} custom email${log.recipients.length > 1 ? 's' : ''}`
+  if (log.recipientType === 'zone') {
+    return log.zoneName ?? 'Unknown Zone'
+  }
+  const count = log.customEmails?.length ?? 0
+  return `${count} custom email${count !== 1 ? 's' : ''}`
 }
 
 async function sendMail() {
-  if (!canSend.value) return
+  if (!canSend.value) {
+    console.log('[mail] Cannot send - validation failed')
+    return
+  }
+  
+  console.log('[mail] Preparing to send email')
   sending.value = true
-  await new Promise(r => window.setTimeout(r, 1200))
-  sending.value = false
-  sent.value = true
 
-  const recipientNames = recipientType.value === 'all'
-    ? ['All Customers']
-    : recipientType.value === 'zone'
-      ? [selectedZone.value]
-      : selectedCustomers.value.map(c => c.email)
-
-  history.value.unshift({
-    id: Date.now(),
-    recipients: recipientNames,
+  const payload: any = {
     recipientType: recipientType.value,
     subject: subject.value,
-    body: body.value,
-    sentAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
-    status: 'successful',
-    delivered: recipientNames.length,
-    total: recipientNames.length,
-  })
+    message: body.value
+  }
 
-  window.setTimeout(() => {
-    sent.value = false
-    subject.value = ''
-    body.value = ''
-    selectedCustomers.value = []
-    customerSearch.value = ''
-    manualEmail.value = ''
-    manualError.value = ''
-  }, 3000)
+  if (recipientType.value === 'zone') {
+    payload.zoneId = selectedZone.value
+    payload.emails = []
+    const zone = zones.value.find(z => z.id === selectedZone.value)
+    console.log('[mail] Sending to zone:', zone?.name, 'ID:', selectedZone.value)
+  } else if (recipientType.value === 'custom') {
+    payload.emails = selectedCustomers.value.map(c => c.email)
+    console.log('[mail] Sending to custom recipients:', payload.emails.length, 'emails')
+  } else {
+    payload.zoneId = null
+    payload.emails = []
+    console.log('[mail] Sending to all customers')
+  }
+
+  console.log('[mail] Send payload:', payload)
+  const result = await api.post('/quick-mail/admin/send', payload, 'Failed to send email')
+  sending.value = false
+
+  if (result !== null) {
+    console.log('[mail] Email sent successfully:', result)
+    sent.value = true
+    await fetchHistory()
+
+    window.setTimeout(() => {
+      console.log('[mail] Resetting form')
+      sent.value = false
+      subject.value = ''
+      body.value = ''
+      selectedCustomers.value = []
+      customerSearch.value = ''
+      manualEmail.value = ''
+      manualError.value = ''
+      selectedZone.value = ''
+    }, 3000)
+  } else {
+    console.error('[mail] Failed to send email')
+  }
 }
 </script>
 
@@ -181,7 +294,7 @@ async function sendMail() {
         <div style="position:relative;max-width:320px">
           <select v-model="selectedZone" style="width:100%;height:42px;padding:0 36px 0 12px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;color:#1a1a1a;outline:none;background:#fff;appearance:none;cursor:pointer">
             <option value="" disabled>Choose a zone…</option>
-            <option v-for="z in zones" :key="z" :value="z">{{ z }}</option>
+            <option v-for="z in zones" :key="z.id" :value="z.id">{{ z.name }} ({{ z.customerCount }} customers)</option>
           </select>
           <Icon name="lucide:chevron-down" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:#6b7280;pointer-events:none" />
         </div>
@@ -280,7 +393,7 @@ async function sendMail() {
     <!-- History -->
     <div v-if="activeTab === 'history'" style="display:flex;flex-direction:column;gap:16px">
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button v-for="f in [{ val: 'all', label: 'All' }, { val: 'successful', label: 'Successful' }, { val: 'failed', label: 'Failed' }]"
+        <button v-for="f in [{ val: 'all', label: 'All' }, { val: 'completed', label: 'Completed' }, { val: 'pending', label: 'Pending' }, { val: 'failed', label: 'Failed' }]"
           :key="f.val" @click="historyFilter = f.val as any"
           :style="`padding:7px 16px;border-radius:10px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer;border:1.5px solid ${historyFilter === f.val ? '#ffb400' : '#e5e7eb'};background:${historyFilter === f.val ? '#fff9e6' : '#fff'};color:${historyFilter === f.val ? '#111' : '#6b7280'}`">
           {{ f.label }}
@@ -299,21 +412,21 @@ async function sendMail() {
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
             <div style="flex:1;min-width:0">
               <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap">
-                <span :style="`display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;${log.status === 'successful' ? 'background:#f0fdf4;color:#16a34a' : 'background:#fef2f2;color:#ef4444'}`">
-                  <Icon :name="log.status === 'successful' ? 'lucide:check-circle' : 'lucide:alert-circle'" style="width:12px;height:12px" />
-                  {{ log.status === 'successful' ? 'Successful' : 'Failed' }}
+                <span :style="`display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;${log.status === 'completed' ? 'background:#f0fdf4;color:#16a34a' : log.status === 'pending' ? 'background:#fef3c7;color:#f59e0b' : 'background:#fef2f2;color:#ef4444'}`">
+                  <Icon :name="log.status === 'completed' ? 'lucide:check-circle' : log.status === 'pending' ? 'lucide:clock' : 'lucide:alert-circle'" style="width:12px;height:12px" />
+                  {{ log.status === 'completed' ? 'Completed' : log.status === 'pending' ? 'Pending' : 'Failed' }}
                 </span>
                 <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;background:#f3f4f6;color:#374151">
                   <Icon name="lucide:users" style="width:12px;height:12px" />
                   {{ recipientLabel(log) }}
                 </span>
-                <span style="font-size:12px;color:#9ca3af">{{ log.delivered }}/{{ log.total }} delivered</span>
+                <span style="font-size:12px;color:#9ca3af">{{ log.deliveredCount }}/{{ log.recipientCount }} delivered</span>
               </div>
               <p style="font-size:14px;font-weight:600;color:#111;margin:0 0 4px">{{ log.subject }}</p>
-              <p style="font-size:13px;color:#6b7280;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:520px">{{ log.body }}</p>
+              <p style="font-size:13px;color:#6b7280;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:520px">{{ log.message }}</p>
             </div>
             <div style="text-align:right;flex-shrink:0">
-              <p style="font-size:12px;color:#9ca3af;margin:0">{{ log.sentAt }}</p>
+              <p style="font-size:12px;color:#9ca3af;margin:0">{{ new Date(log.createdAt).toLocaleString() }}</p>
             </div>
           </div>
         </div>
