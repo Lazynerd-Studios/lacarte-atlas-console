@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TeamMember, Role, Permission } from '~/types/team'
+import type { Role, Permission } from '~/types/team'
 import { validateTeamMemberForm } from '~/utils/teamValidation'
 import { formToUpdateMemberPayload } from '~/utils/teamTransform'
 
@@ -24,20 +24,36 @@ const form = reactive({
 
 const errors = reactive<Record<string, string>>({})
 const roles = ref<Role[]>([])
-const allPermissions = ref<Permission[]>([])
 const selectedPermissions = ref<string[]>([])
 const loading = ref(true)
 const submitting = ref(false)
 
-// Group permissions by module
+// Group permissions by module for display
 const permissionGroups = computed(() => {
-  const groups: Record<string, Permission[]> = {}
+  const groups: Record<string, Array<{ id: string; label: string; description: string }>> = {}
   
-  allPermissions.value.forEach(permission => {
-    if (!groups[permission.module]) {
-      groups[permission.module] = []
+  // Group the permission IDs we have from the member data
+  // We'll display them as simple strings since we don't have full permission details
+  selectedPermissions.value.forEach(permissionKey => {
+    // Extract module from permission key (e.g., "billing.view" -> "billing")
+    const parts = permissionKey.split('.')
+    const module = parts[0] || 'Other'
+    
+    if (!groups[module]) {
+      groups[module] = []
     }
-    groups[permission.module]!.push(permission)
+    
+    // Create a display-friendly label from the permission key
+    const action = parts.slice(1).join(' ')
+    const label = action.split('_').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ')
+    
+    groups[module].push({
+      id: permissionKey,
+      label: label || permissionKey,
+      description: `${module}.${action}`
+    })
   })
   
   return groups
@@ -57,19 +73,32 @@ async function loadMember() {
   
   try {
     const memberId = route.params.id as string
-    const response = await api.get<TeamMember>(`/api/team/admin/members/${memberId}`)
+    console.log('[Team Edit] Fetching member data from /team/' + memberId)
+    
+    // Backend response structure: { id, user: { name, email }, role: { id, name, displayName }, permissions: [], phoneNumber, status, ... }
+    const response = await api.get<any>(`/team/${memberId}`)
     
     if (response) {
+      console.log('[Team Edit] Member data fetched successfully', { response })
+      
+      // Split user.name into firstName and lastName
+      const nameParts = (response.user?.name || '').split(' ')
+      const firstName = nameParts[0] || ''
+      const lastName = nameParts.slice(1).join(' ') || ''
+      
       // Populate form with member data
-      form.firstName = response.firstName
-      form.lastName = response.lastName
-      form.email = response.email
-      form.phone = response.phone
-      form.role = response.role
-      form.status = response.status
-      selectedPermissions.value = [...response.permissions]
+      form.firstName = firstName
+      form.lastName = lastName
+      form.email = response.user?.email || ''
+      form.phone = response.phoneNumber || ''
+      form.role = response.role?.id || ''
+      form.status = response.status || 'active'
+      selectedPermissions.value = [...(response.permissions || [])]
+      
+      console.log('[Team Edit] Form populated', { form, selectedPermissions: selectedPermissions.value })
     }
   } catch (err: any) {
+    console.error('[Team Edit] Failed to load member', { error: err })
     // Handle invalid member ID error
     toast.error('Member not found', 'The requested team member could not be found')
     router.push('/team')
@@ -87,62 +116,11 @@ async function loadMember() {
 async function fetchRoles() {
   const api = useApi()
   
-  const response = await api.get<{ roles: Role[] }>('/api/team/admin/roles')
+  console.log('[Team Edit] Fetching roles from /team/roles')
+  const response = await api.get<Role[]>('/team/roles')
   if (response) {
-    roles.value = response.roles
-  }
-}
-
-/**
- * Fetches available permissions from the API
- * 
- * Error Handling:
- * - 401: Automatic redirect to login (handled by useApi)
- * - 403, 404, 500: Automatic error toast (handled by useErrorHandler)
- * - Network errors: Automatic error toast (handled by useErrorHandler)
- */
-async function fetchPermissions() {
-  const api = useApi()
-  
-  const response = await api.get<{ permissions: Permission[] }>('/api/team/admin/permissions')
-  if (response) {
-    allPermissions.value = response.permissions
-  }
-}
-
-/**
- * Toggles individual permission selection
- */
-function togglePermission(permissionId: string) {
-  const index = selectedPermissions.value.indexOf(permissionId)
-  if (index > -1) {
-    selectedPermissions.value.splice(index, 1)
-  } else {
-    selectedPermissions.value.push(permissionId)
-  }
-}
-
-/**
- * Toggles all permissions in a group
- */
-function toggleGroup(module: string) {
-  const groupPermissions = permissionGroups.value[module]
-  if (!groupPermissions) return
-  
-  const groupPermissionIds = groupPermissions.map(p => p.id)
-  
-  if (isGroupSelected(module)) {
-    // Deselect all in group
-    selectedPermissions.value = selectedPermissions.value.filter(
-      id => !groupPermissionIds.includes(id)
-    )
-  } else {
-    // Select all in group
-    groupPermissionIds.forEach(id => {
-      if (!selectedPermissions.value.includes(id)) {
-        selectedPermissions.value.push(id)
-      }
-    })
+    console.log('[Team Edit] Roles fetched successfully', { count: response.length })
+    roles.value = response
   }
 }
 
@@ -203,7 +181,7 @@ function checkAuthorization(operationName: string): boolean {
  * - Display validation errors in form
  * 
  * API Call:
- * - PATCH /api/team/admin/members/:id with UpdateTeamMemberPayload
+ * - PATCH /team/admin/members/:id with UpdateTeamMemberPayload
  * 
  * Error Handling:
  * - 400 validation errors: Display in form
@@ -237,15 +215,15 @@ async function handleSubmit() {
   
   try {
     const api = useApi()
-    const payload = formToUpdateMemberPayload({
-      ...form,
-      permissions: selectedPermissions.value,
-    })
+    // Don't include permissions in update payload - they are determined by role
+    const payload = formToUpdateMemberPayload(form)
     
     const memberId = route.params.id as string
     
+    console.log('[Team Edit] Sending PATCH request to /team/' + memberId, { payload })
+    
     // Use raw request to handle 400 validation errors in form
-    await api.request(`/api/team/admin/members/${memberId}`, {
+    await api.request(`/team/${memberId}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
     })
@@ -295,7 +273,6 @@ onMounted(async () => {
   await Promise.all([
     loadMember(),
     fetchRoles(),
-    fetchPermissions(),
   ])
   loading.value = false
 })
@@ -384,46 +361,43 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- Permissions -->
+        <!-- Permissions (Read-only) -->
         <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-          <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0 0 24px">Permissions</p>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+            <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Permissions</p>
+            <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;background:#f3f4f6;padding:4px 12px;border-radius:12px">Read-only</span>
+          </div>
+          <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0 0 16px">These permissions are determined by the selected role and cannot be modified directly.</p>
           <div style="display:flex;flex-direction:column;gap:16px">
             <!-- Permission groups -->
             <div v-for="(permissions, module) in permissionGroups" :key="module" style="display:flex;flex-direction:column;gap:4px">
               <!-- Group header -->
-              <div
-                style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;cursor:pointer;background:#f8f9fa"
-                @click="toggleGroup(module)"
-              >
+              <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;background:#f8f9fa">
                 <input
                   type="checkbox"
                   :checked="isGroupSelected(module)"
                   :indeterminate="isGroupPartial(module)"
-                  :disabled="submitting"
-                  style="width:16px;height:16px;accent-color:#ffb400;cursor:pointer;flex-shrink:0"
-                  @click.stop="toggleGroup(module)"
+                  disabled
+                  style="width:16px;height:16px;accent-color:#ffb400;flex-shrink:0;opacity:0.6;cursor:not-allowed"
                 />
                 <p style="font-size:14px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ module }}</p>
               </div>
               <!-- Group permissions -->
-              <label
+              <div
                 v-for="p in permissions" :key="p.id"
-                style="display:flex;align-items:center;gap:12px;padding:12px 12px 12px 40px;border-radius:12px;cursor:pointer"
-                @mouseover="($event.currentTarget as HTMLElement).style.background='#f8f9fa'"
-                @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
+                style="display:flex;align-items:center;gap:12px;padding:12px 12px 12px 40px;border-radius:12px"
               >
                 <input
                   type="checkbox"
                   :checked="selectedPermissions.includes(p.id)"
-                  :disabled="submitting"
-                  style="width:16px;height:16px;accent-color:#ffb400;cursor:pointer;flex-shrink:0"
-                  @change="togglePermission(p.id)"
+                  disabled
+                  style="width:16px;height:16px;accent-color:#ffb400;flex-shrink:0;opacity:0.6;cursor:not-allowed"
                 />
                 <div>
                   <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin:0 0 2px">{{ p.label }}</p>
                   <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">{{ p.description }}</p>
                 </div>
-              </label>
+              </div>
             </div>
           </div>
         </div>

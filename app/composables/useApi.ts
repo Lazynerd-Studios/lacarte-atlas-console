@@ -14,12 +14,28 @@ export function useApi() {
       headers['Authorization'] = `Bearer ${authStore.token}`
     }
 
-    const res = await fetch(`${config.public.apiBase}${path}`, {
+    const fullUrl = `${config.public.apiBase}${path}`
+    console.log('[useApi] Making request', {
+      method: options.method || 'GET',
+      path,
+      fullUrl,
+      hasAuth: !!authStore.token,
+    })
+
+    const res = await fetch(fullUrl, {
       ...options,
       headers,
     })
 
+    console.log('[useApi] Response received', {
+      path,
+      status: res.status,
+      statusText: res.statusText,
+      ok: res.ok,
+    })
+
     if (res.status === 401) {
+      console.log('[useApi] 401 Unauthorized - logging out and redirecting to login')
       authStore.logout()
       await router.push('/login')
       throw new Error('Session expired. Please log in again.')
@@ -28,11 +44,21 @@ export function useApi() {
     if (!res.ok) {
       let detail: string | undefined
       try { detail = (await res.clone().json()).message } catch {}
+      console.error('[useApi] Request failed', {
+        path,
+        status: res.status,
+        detail,
+      })
       throw new Error(detail ?? `Request failed (${res.status})`)
     }
 
     const text = await res.text()
-    return text ? JSON.parse(text) : (null as unknown as T)
+    const result = text ? JSON.parse(text) : (null as unknown as T)
+    console.log('[useApi] Request successful', {
+      path,
+      hasData: !!result,
+    })
+    return result
   }
 
   // Wrapped versions auto-show error toasts on failure and return null

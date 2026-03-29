@@ -34,12 +34,17 @@ const toast = useAppToast()
  * - Network errors: Automatic error toast (handled by useErrorHandler)
  */
 async function fetchRoles() {
+  console.log('[Team Add] fetchRoles called')
   loading.value = true
   const api = useApi()
   
-  const response = await api.get<{ roles: Role[] }>('/api/team/admin/roles')
+  console.log('[Team Add] Sending GET request to /team/roles')
+  const response = await api.get<Role[]>('/team/roles')
   if (response) {
-    roles.value = response.roles
+    console.log('[Team Add] Roles fetched successfully', { count: response.length })
+    roles.value = response
+  } else {
+    console.log('[Team Add] Failed to fetch roles or returned null')
   }
   loading.value = false
 }
@@ -77,7 +82,7 @@ function checkAuthorization(operationName: string): boolean {
  * - Display validation errors in form
  * 
  * API Call:
- * - POST /api/team/admin/members with CreateTeamMemberPayload
+ * - POST /team/ with CreateTeamMemberPayload
  * 
  * Error Handling:
  * - 400 validation errors: Display in form
@@ -91,8 +96,11 @@ function checkAuthorization(operationName: string): boolean {
  * - Navigate to team list page
  */
 async function handleSubmit() {
+  console.log('[Team Add] handleSubmit called', { form })
+  
   // Check authorization before allowing operation
   if (!checkAuthorization('add team members')) {
+    console.log('[Team Add] Authorization check failed for add team members')
     return
   }
   
@@ -102,9 +110,12 @@ async function handleSubmit() {
   // Client-side validation
   const validationErrors = validateTeamMemberForm(form, false)
   if (Object.keys(validationErrors).length > 0) {
+    console.log('[Team Add] Validation failed', { validationErrors })
     Object.assign(errors, validationErrors)
     return
   }
+  
+  console.log('[Team Add] Validation passed, preparing payload')
   
   // Set submitting state
   submitting.value = true
@@ -112,20 +123,23 @@ async function handleSubmit() {
   try {
     const api = useApi()
     const payload = formToCreateMemberPayload(form)
+    console.log('[Team Add] Sending POST request to /team/', { payload })
     
     // Use raw request to handle 400 validation errors in form
-    await api.request('/api/team/admin/members', {
+    await api.request('/team/', {
       method: 'POST',
       body: JSON.stringify(payload),
     })
     
     submitting.value = false
     
+    console.log('[Team Add] Member added successfully')
     // Success flow
     toast.success('Team member added successfully')
     router.push('/team')
   } catch (err: any) {
     submitting.value = false
+    console.error('[Team Add] Failed to add member', { error: err })
     
     // Handle 400 validation errors in form
     if (err?.message?.includes('duplicate') || err?.message?.toLowerCase().includes('email')) {
@@ -140,8 +154,11 @@ async function handleSubmit() {
 
 // Fetch roles on mount
 onMounted(() => {
+  console.log('[Team Add] Component mounted')
+  
   // Check authorization before displaying content
   if (!checkAuthorization('access team management')) {
+    console.log('[Team Add] Authorization check failed, redirecting to /team')
     router.push('/team')
     return
   }

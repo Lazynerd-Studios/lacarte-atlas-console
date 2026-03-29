@@ -15,12 +15,13 @@ export function formToCreateMemberPayload(form: {
   role: string
   status: 'active' | 'inactive'
 }): CreateTeamMemberPayload {
+  // Backend expects: firstName, lastName, email, roleId, phoneNumber, status
   return {
     firstName: form.firstName.trim(),
     lastName: form.lastName.trim(),
     email: form.email.trim().toLowerCase(),
-    phone: form.phone.trim(),
-    role: form.role,
+    phoneNumber: form.phone.trim(),
+    roleId: form.role,
     status: form.status,
   }
 }
@@ -38,7 +39,6 @@ export function formToUpdateMemberPayload(form: {
   phone?: string
   role?: string
   status?: 'active' | 'inactive'
-  permissions?: string[]
 }): UpdateTeamMemberPayload {
   const payload: UpdateTeamMemberPayload = {}
   
@@ -55,19 +55,15 @@ export function formToUpdateMemberPayload(form: {
   }
   
   if (form.phone !== undefined) {
-    payload.phone = form.phone.trim()
+    payload.phoneNumber = form.phone.trim()
   }
   
   if (form.role !== undefined) {
-    payload.role = form.role
+    payload.roleId = form.role
   }
   
   if (form.status !== undefined) {
     payload.status = form.status
-  }
-  
-  if (form.permissions !== undefined) {
-    payload.permissions = form.permissions
   }
   
   return payload

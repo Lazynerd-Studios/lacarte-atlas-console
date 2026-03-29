@@ -41,8 +41,8 @@ export interface CreateTeamMemberPayload {
   firstName: string
   lastName: string
   email: string
-  phone: string
-  role: string
+  phoneNumber: string
+  roleId: string
   status: 'active' | 'inactive'
 }
 
@@ -50,14 +50,15 @@ export interface UpdateTeamMemberPayload {
   firstName?: string
   lastName?: string
   email?: string
-  phone?: string
-  role?: string
+  phoneNumber?: string
+  roleId?: string
   status?: 'active' | 'inactive'
-  permissions?: string[]
 }
 
 export interface CreateRolePayload {
   name: string
+  displayName?: string
   description: string
   permissions: string[]
+  permissionIds?: string[]
 }

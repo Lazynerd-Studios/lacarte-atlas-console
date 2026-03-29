@@ -44,8 +44,11 @@ const statsLoading = ref(false)
  * - Network errors: Automatic error toast (handled by useErrorHandler)
  */
 async function handleAddRole(data: CreateRolePayload) {
+  console.log('[Team Management] handleAddRole called', { data })
+  
   // Check authorization before allowing operation
   if (!checkAuthorization('create roles')) {
+    console.log('[Team Management] Authorization check failed for create roles')
     return
   }
   
@@ -53,16 +56,34 @@ async function handleAddRole(data: CreateRolePayload) {
   const api = useApi()
   const toast = useAppToast()
   
+  // Transform the role name to backend format (lowercase with underscores)
+  const roleName = data.name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_') // Replace non-alphanumeric chars with underscore
+    .replace(/^_+|_+$/g, '') // Remove leading/trailing underscores
+  
+  // Backend expects: name (internal), displayName (user-facing), permissionIds (array of IDs)
+  const payload = {
+    name: roleName,
+    displayName: data.name,
+    description: data.description || '',
+    permissionIds: data.permissions
+  }
+  
+  console.log('[Team Management] Sending POST request to /team/roles', { payload })
   // Send POST request to create role
   // api.post() automatically handles errors via useErrorHandler and returns null on failure
-  const response = await api.post('/api/team/admin/roles', data)
+  const response = await api.post('/team/roles', payload)
   
   if (response) {
+    console.log('[Team Management] Role created successfully', { response })
     // Success flow: show toast, close modal
     toast.success('Role created successfully')
     showAddRoleModal.value = false
     // Note: In a real implementation, we would refresh the roles list here
     // For now, we just close the modal
+  } else {
+    console.log('[Team Management] Role creation failed or returned null')
   }
   
   submitting.value = false
@@ -90,8 +111,11 @@ function openDeleteModal(member: TeamMember) {
 async function handleDelete() {
   if (!memberToDelete.value) return
   
+  console.log('[Team Management] handleDelete called', { memberId: memberToDelete.value.id })
+  
   // Check authorization before allowing operation
   if (!checkAuthorization('delete team members')) {
+    console.log('[Team Management] Authorization check failed for delete team members')
     showDeleteModal.value = false
     memberToDelete.value = null
     return
@@ -101,13 +125,17 @@ async function handleDelete() {
   const api = useApi()
   const toast = useAppToast()
   
-  const response = await api.del(`/api/team/admin/members/${memberToDelete.value.id}`)
+  console.log('[Team Management] Sending DELETE request to /team/' + memberToDelete.value.id)
+  const response = await api.del(`/team/${memberToDelete.value.id}`)
   
   if (response) {
+    console.log('[Team Management] Member deleted successfully')
     toast.success('Team member deleted successfully')
     showDeleteModal.value = false
     memberToDelete.value = null
     await fetchMembers() // Refresh the member list
+  } else {
+    console.log('[Team Management] Member deletion failed or returned null')
   }
   
   deleting.value = false
@@ -122,12 +150,41 @@ async function handleDelete() {
  * - Network errors: Automatic error toast (handled by useErrorHandler)
  */
 async function fetchMembers() {
+  console.log('[Team Management] fetchMembers called')
   loading.value = true
   const api = useApi()
   
-  const response = await api.get<{ members: TeamMember[] }>('/api/team/admin/members')
-  if (response) {
-    members.value = response.members
+  console.log('[Team Management] Sending GET request to /team/')
+  const response = await api.get<{ data: any[] }>('/team/')
+  if (response && response.data) {
+    console.log('[Team Management] Members fetched successfully', { 
+      count: response.data.length,
+      firstMember: response.data[0],
+      responseType: typeof response,
+      isArray: Array.isArray(response.data)
+    })
+    
+    // Transform backend response to match our TeamMember interface
+    members.value = response.data.map((item: any) => ({
+      id: item.id,
+      firstName: item.user?.name?.split(' ')[0] || '',
+      lastName: item.user?.name?.split(' ').slice(1).join(' ') || '',
+      email: item.user?.email || '',
+      phone: item.phoneNumber || '',
+      role: item.role?.name || '',
+      roleDetails: {
+        id: item.role?.id || '',
+        name: item.role?.displayName || item.role?.name || '',
+        color: '#6b7280'
+      },
+      status: item.status,
+      permissions: [],
+      lastLogin: item.lastLoginAt || '',
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt
+    }))
+  } else {
+    console.log('[Team Management] Failed to fetch members or returned null')
   }
   
   loading.value = false
@@ -142,12 +199,17 @@ async function fetchMembers() {
  * - Network errors: Automatic error toast (handled by useErrorHandler)
  */
 async function fetchStats() {
+  console.log('[Team Management] fetchStats called')
   statsLoading.value = true
   const api = useApi()
   
-  const response = await api.get<TeamStats>('/api/team/admin/stats')
+  console.log('[Team Management] Sending GET request to /team/stats')
+  const response = await api.get<TeamStats>('/team/stats')
   if (response) {
+    console.log('[Team Management] Stats fetched successfully', { stats: response })
     stats.value = response
+  } else {
+    console.log('[Team Management] Failed to fetch stats or returned null')
   }
   
   statsLoading.value = false
@@ -166,11 +228,13 @@ function statusStyle(s: string) {
 }
 
 function getInitials(member: TeamMember): string {
-  return `${member.firstName.charAt(0)}${member.lastName.charAt(0)}`.toUpperCase()
+  const firstInitial = member.firstName?.charAt(0) || '?'
+  const lastInitial = member.lastName?.charAt(0) || '?'
+  return `${firstInitial}${lastInitial}`.toUpperCase()
 }
 
 function getFullName(member: TeamMember): string {
-  return `${member.firstName} ${member.lastName}`
+  return `${member.firstName || 'Unknown'} ${member.lastName || 'User'}`
 }
 
 function getRoleDisplay(member: TeamMember): { name: string; color: string; bg: string } {
@@ -209,8 +273,11 @@ function checkAuthorization(operationName: string): boolean {
 
 // Fetch data on mount
 onMounted(async () => {
+  console.log('[Team Management] Component mounted, initializing...')
+  
   // Check authorization before displaying content
   if (!checkAuthorization('access team management')) {
+    console.log('[Team Management] Authorization check failed for access team management')
     return
   }
   
@@ -220,6 +287,7 @@ onMounted(async () => {
     fetchStats(),
   ])
   initialLoading.value = false
+  console.log('[Team Management] Initialization complete')
 })
 </script>
 

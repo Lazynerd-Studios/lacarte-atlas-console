@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CreateRolePayload } from '~/types/team'
+import type { CreateRolePayload, Permission } from '~/types/team'
 
 const props = defineProps<{
   submitting?: boolean
@@ -16,86 +16,81 @@ const form = reactive({
   permissions: [] as string[],
 })
 
-// Grouped permissions by module
-const permissionGroups = [
-  {
-    label: 'Customers',
-    permissions: [
-      { id: 'customers.view', label: 'View Customers' },
-      { id: 'customers.create', label: 'Create Customers' },
-      { id: 'customers.edit', label: 'Edit Customers' },
-      { id: 'customers.delete', label: 'Delete Customers' },
-    ],
-  },
-  {
-    label: 'Drivers & Trucks',
-    permissions: [
-      { id: 'drivers.view', label: 'View Drivers' },
-      { id: 'drivers.create', label: 'Create Drivers' },
-      { id: 'drivers.edit', label: 'Edit Drivers' },
-      { id: 'trucks.view', label: 'View Trucks' },
-      { id: 'trucks.manage', label: 'Manage Trucks' },
-    ],
-  },
-  {
-    label: 'Pickups & Tracking',
-    permissions: [
-      { id: 'pickups.view', label: 'View Pickups' },
-      { id: 'pickups.assign', label: 'Assign Pickups' },
-      { id: 'tracking.view', label: 'View Live Tracking' },
-    ],
-  },
-  {
-    label: 'Billing & Payments',
-    permissions: [
-      { id: 'billing.view', label: 'View Billing' },
-      { id: 'billing.approve', label: 'Approve Payments' },
-      { id: 'billing.decline', label: 'Decline Payments' },
-    ],
-  },
-  {
-    label: 'Shop & Inventory',
-    permissions: [
-      { id: 'shop.view', label: 'View Shop' },
-      { id: 'shop.manage', label: 'Manage Products' },
-      { id: 'inventory.view', label: 'View Inventory' },
-      { id: 'inventory.manage', label: 'Manage Inventory' },
-    ],
-  },
-  {
-    label: 'Reports',
-    permissions: [
-      { id: 'reports.view', label: 'View Reports' },
-      { id: 'reports.export', label: 'Export Reports' },
-    ],
-  },
-  {
-    label: 'Management',
-    permissions: [
-      { id: 'management.customer-types', label: 'Manage Customer Types' },
-      { id: 'management.subscriptions', label: 'Manage Subscriptions' },
-      { id: 'management.rates', label: 'Manage Rates' },
-      { id: 'management.zones', label: 'Manage Zones' },
-    ],
-  },
-  {
-    label: 'Communications',
-    permissions: [
-      { id: 'comms.sms', label: 'Send SMS' },
-      { id: 'comms.mail', label: 'Send Email' },
-      { id: 'comms.view', label: 'View Communications' },
-    ],
-  },
-  {
-    label: 'Team & Settings',
-    permissions: [
-      { id: 'team.view', label: 'View Team' },
-      { id: 'team.manage', label: 'Manage Team' },
-      { id: 'settings.view', label: 'View Settings' },
-      { id: 'settings.manage', label: 'Manage Settings' },
-    ],
-  },
-]
+const loading = ref(true)
+const loadError = ref(false)
+const allPermissions = ref<Permission[]>([])
+
+// Backend permission response structure
+interface BackendPermission {
+  id: string
+  key: string
+  displayName: string
+  description: string
+}
+
+// Group permissions by module
+const permissionGroups = computed(() => {
+  const groups: Record<string, Permission[]> = {}
+  
+  allPermissions.value.forEach(permission => {
+    const module = permission.module || 'Other'
+    if (!groups[module]) {
+      groups[module] = []
+    }
+    groups[module].push(permission)
+  })
+  
+  // Sort groups alphabetically and capitalize module names
+  return Object.entries(groups)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([label, permissions]) => ({
+      label: label.charAt(0).toUpperCase() + label.slice(1),
+      permissions: permissions.map(p => ({
+        id: p.id,
+        label: p.label
+      }))
+    }))
+})
+
+/**
+ * Fetches available permissions from the API
+ */
+async function fetchPermissions() {
+  loading.value = true
+  loadError.value = false
+  const api = useApi()
+  
+  try {
+    console.log('[AddRoleModal] Fetching permissions from /team/permissions')
+    const response = await api.get<BackendPermission[]>('/team/permissions')
+    if (response) {
+      console.log('[AddRoleModal] Permissions fetched successfully', { count: response.length, sample: response[0] })
+      
+      // Transform backend response to frontend Permission format
+      allPermissions.value = response.map(p => {
+        const keyParts = p.key.split('.')
+        const module: string = keyParts[0] || 'Other'
+        
+        return {
+          id: p.id,
+          label: p.displayName,
+          description: p.description,
+          module
+        } as Permission
+      })
+      
+      console.log('[AddRoleModal] Transformed permissions', { count: allPermissions.value.length, sample: allPermissions.value[0] })
+    } else {
+      console.log('[AddRoleModal] Failed to fetch permissions - no response')
+      loadError.value = true
+    }
+  } catch (error) {
+    console.error('[AddRoleModal] Error fetching permissions:', error)
+    loadError.value = true
+  } finally {
+    loading.value = false
+  }
+}
 
 const errors = reactive<Record<string, string>>({})
 
@@ -117,7 +112,7 @@ function togglePermission(id: string) {
   else form.permissions.push(id)
 }
 
-function toggleGroup(group: typeof permissionGroups[0]) {
+function toggleGroup(group: typeof permissionGroups.value[0]) {
   const allSelected = group.permissions.every(p => form.permissions.includes(p.id))
   if (allSelected) {
     group.permissions.forEach(p => {
@@ -131,11 +126,11 @@ function toggleGroup(group: typeof permissionGroups[0]) {
   }
 }
 
-function isGroupSelected(group: typeof permissionGroups[0]) {
+function isGroupSelected(group: typeof permissionGroups.value[0]) {
   return group.permissions.every(p => form.permissions.includes(p.id))
 }
 
-function isGroupPartial(group: typeof permissionGroups[0]) {
+function isGroupPartial(group: typeof permissionGroups.value[0]) {
   const selected = group.permissions.filter(p => form.permissions.includes(p.id)).length
   return selected > 0 && selected < group.permissions.length
 }
@@ -150,6 +145,11 @@ function onFocus(e: Event, field: string) {
 function onBlur(e: Event, field: string) {
   if (!errors[field]) (e.target as HTMLElement).style.borderColor = '#e5e7eb'
 }
+
+// Fetch permissions when modal opens
+onMounted(() => {
+  fetchPermissions()
+})
 </script>
 
 <template>
@@ -208,7 +208,26 @@ function onBlur(e: Event, field: string) {
           </div>
           <span v-if="errors.permissions" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.permissions }}</span>
 
-          <div style="display:flex;flex-direction:column;gap:16px">
+          <!-- Loading state -->
+          <div v-if="loading" style="display:flex;align-items:center;justify-content:center;padding:40px;gap:8px">
+            <UIcon name="i-lucide-loader-2" style="width:20px;height:20px;color:#ffb400;animation:spin 1s linear infinite" />
+            <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Loading permissions...</span>
+          </div>
+
+          <!-- Error state -->
+          <div v-else-if="loadError" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;gap:12px">
+            <UIcon name="i-lucide-alert-circle" style="width:32px;height:32px;color:#ef4444" />
+            <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;text-align:center">Failed to load permissions</span>
+            <button
+              style="height:36px;padding:0 16px;background:#ffb400;border:none;border-radius:18px;font-size:13px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer"
+              @click="fetchPermissions"
+              @mouseover="($event.currentTarget as HTMLElement).style.background='#f5a800'"
+              @mouseleave="($event.currentTarget as HTMLElement).style.background='#ffb400'"
+            >Retry</button>
+          </div>
+
+          <!-- Permissions list -->
+          <div v-else style="display:flex;flex-direction:column;gap:16px">
             <div v-for="group in permissionGroups" :key="group.label" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:16px">
               <!-- Group header with select all -->
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
