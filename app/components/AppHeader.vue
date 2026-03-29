@@ -62,9 +62,9 @@ async function logout() {
 
       <!-- User info -->
       <div style="display:flex;align-items:center;gap:12px">
-        <div class="header-user-text" style="display:flex;flex-direction:column;align-items:flex-end">
-          <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;white-space:nowrap">{{ userName }}</p>
-          <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;white-space:nowrap">Administrator</p>
+        <div class="header-user-text" style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+          <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;white-space:nowrap;margin:0">{{ userName }}</p>
+          <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;white-space:nowrap;margin:0">Administrator</p>
         </div>
 
         <!-- Avatar -->

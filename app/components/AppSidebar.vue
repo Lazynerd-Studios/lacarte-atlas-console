@@ -297,9 +297,9 @@ function toggleGroup(group: 'reports' | 'management' | 'comms') {
         <div style="width:32px;height:32px;border-radius:9999px;background:#ffb400;display:flex;align-items:center;justify-content:center;flex-shrink:0">
           <span style="font-size:16px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">{{ userInitial }}</span>
         </div>
-        <div v-if="!collapsed" style="flex:1;min-width:0;display:flex;flex-direction:column">
-          <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ userName }}</p>
-          <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ userEmail }}</p>
+        <div v-if="!collapsed" style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+          <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0">{{ userName }}</p>
+          <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0">{{ userEmail }}</p>
         </div>
       </div>
     </div>

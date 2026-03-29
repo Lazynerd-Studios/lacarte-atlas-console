@@ -36,7 +36,7 @@ export function useApi() {
 
     if (res.status === 401) {
       console.log('[useApi] 401 Unauthorized - logging out and redirecting to login')
-      authStore.logout()
+      await authStore.logout()
       await router.push('/login')
       throw new Error('Session expired. Please log in again.')
     }

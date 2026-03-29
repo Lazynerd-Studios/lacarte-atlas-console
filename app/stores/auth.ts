@@ -1,12 +1,14 @@
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<Record<string, any> | null>(null)
   const token = ref<string | null>(null)
+  let sessionCheckInterval: NodeJS.Timeout | null = null
 
   const isAuthenticated = computed(() => !!token.value)
 
   function setAuth(userData: Record<string, any>, authToken: string) {
     user.value = userData
     token.value = authToken
+    startSessionCheck()
   }
 
   async function checkSession() {
@@ -26,17 +28,44 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = data.user
         return true
       } else {
-        logout()
+        console.log('[auth] Session expired or invalid')
+        await logout()
         return false
       }
     } catch (error) {
       console.error('[auth] Session check failed:', error)
-      logout()
+      await logout()
       return false
     }
   }
 
+  function startSessionCheck() {
+    // Clear any existing interval
+    if (sessionCheckInterval) {
+      clearInterval(sessionCheckInterval)
+    }
+    
+    // Check session every 5 minutes
+    sessionCheckInterval = setInterval(async () => {
+      console.log('[auth] Periodic session check')
+      const isValid = await checkSession()
+      if (!isValid) {
+        const router = useRouter()
+        router.push('/login')
+      }
+    }, 5 * 60 * 1000) // 5 minutes
+  }
+
+  function stopSessionCheck() {
+    if (sessionCheckInterval) {
+      clearInterval(sessionCheckInterval)
+      sessionCheckInterval = null
+    }
+  }
+
   async function logout() {
+    stopSessionCheck()
+    
     if (token.value) {
       try {
         const config = useRuntimeConfig()
@@ -54,6 +83,11 @@ export const useAuthStore = defineStore('auth', () => {
     
     user.value = null
     token.value = null
+  }
+
+  // Initialize session check if already authenticated
+  if (token.value) {
+    startSessionCheck()
   }
 
   return { user, token, isAuthenticated, setAuth, checkSession, logout }
