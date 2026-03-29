@@ -14,8 +14,8 @@ const userName = computed(() => authStore.user?.name || 'Admin User')
 const showNotifications = ref(false)
 const search = ref('')
 
-function logout() {
-  authStore.logout()
+async function logout() {
+  await authStore.logout()
   router.push('/login')
 }
 </script>

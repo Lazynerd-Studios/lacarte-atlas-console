@@ -8,7 +8,7 @@ paths:
     get:
       tags:
         - Health
-      summary: Health check
+      summary: Health check (Public)
       description: Check API health status
       responses:
         "200":
@@ -33,7 +33,7 @@ paths:
     get:
       tags:
         - Health
-      summary: API information
+      summary: API information (Public)
       description: Get general API information
       responses:
         "200":
@@ -60,7 +60,7 @@ paths:
     get:
       tags:
         - Auth
-      summary: Get current session
+      summary: Get current session (Protected)
       description: Retrieve current user session information
       security:
         - bearerAuth: []
@@ -97,7 +97,7 @@ paths:
     post:
       tags:
         - Auth
-      summary: Sign out
+      summary: Sign out (Protected)
       description: Clear user session
       responses:
         "200":
@@ -116,7 +116,7 @@ paths:
     get:
       tags:
         - User
-      summary: Get user profile
+      summary: Get user profile (Protected)
       description: Retrieve authenticated user profile information
       responses:
         "200":
@@ -197,7 +197,7 @@ paths:
     patch:
       tags:
         - User
-      summary: Update user profile
+      summary: Update user profile (Protected)
       description: Update authenticated user profile information
       requestBody:
         required: true
@@ -318,7 +318,7 @@ paths:
     post:
       tags:
         - Customer
-      summary: Register customer
+      summary: Register customer (Public)
       description: Register a new customer with Better Auth integration and create
         customer profile
       requestBody:
@@ -552,7 +552,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "500":
           description: Response for status 500
           content:
@@ -565,13 +564,12 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: postApiCustomerSign-up
   /api/customer/types:
     get:
       tags:
         - Customer
-      summary: List customer types
+      summary: List customer types (Public)
       description: Get all available customer types for registration form
       responses:
         "200":
@@ -615,8 +613,8 @@ paths:
     get:
       tags:
         - Customer
-        - admin
-      summary: List all customers (Admin only)
+        - Admin
+      summary: List all customers (Admin)
       description: Get paginated list of all customers with filters and search.
         Requires admin role.
       parameters:
@@ -964,8 +962,8 @@ paths:
                         type: boolean
                       hasPreviousPage:
                         type: boolean
+                    $id: "#/components/schemas/PaginationMeta"
                 $id: "#/components/schemas/AdminCustomersListResponse"
-                additionalProperties: false
         "401":
           description: Response for status 401
           content:
@@ -978,7 +976,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "403":
           description: Response for status 403
           content:
@@ -991,7 +988,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "500":
           description: Response for status 500
           content:
@@ -1004,13 +1000,484 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: getApiCustomerAdminList
+  /api/customer/admin/types/:
+    get:
+      tags:
+        - Customer
+        - Admin
+      summary: List customer types (Admin)
+      description: Get all customer types. Requires management.customer_types permission.
+      responses:
+        "200":
+          description: Response for status 200
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - id
+                    - name
+                    - createdAt
+                    - updatedAt
+                  properties:
+                    id:
+                      format: uuid
+                      type: string
+                    name:
+                      type: string
+                    createdAt:
+                      anyOf:
+                        - type: Date
+                        - format: date-time
+                          type: string
+                        - format: date
+                          type: string
+                        - type: number
+                    updatedAt:
+                      anyOf:
+                        - type: Date
+                        - format: date-time
+                          type: string
+                        - format: date
+                          type: string
+                        - type: number
+                  $id: "#/components/schemas/CustomerTypeItem"
+        "401":
+          description: Response for status 401
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Response for status 403
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+      operationId: getApiCustomerAdminTypes
+    post:
+      tags:
+        - Customer
+        - Admin
+      summary: Create customer type (Admin)
+      description: Create a new customer type. Requires management.customer_types
+        permission.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  minLength: 1
+                  maxLength: 100
+                  type: string
+              $id: "#/components/schemas/CustomerTypeCreateRequest"
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  minLength: 1
+                  maxLength: 100
+                  type: string
+              $id: "#/components/schemas/CustomerTypeCreateRequest"
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  minLength: 1
+                  maxLength: 100
+                  type: string
+              $id: "#/components/schemas/CustomerTypeCreateRequest"
+      responses:
+        "201":
+          description: Response for status 201
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - id
+                  - name
+                  - createdAt
+                  - updatedAt
+                properties:
+                  id:
+                    format: uuid
+                    type: string
+                  name:
+                    type: string
+                  createdAt:
+                    anyOf:
+                      - type: Date
+                      - format: date-time
+                        type: string
+                      - format: date
+                        type: string
+                      - type: number
+                  updatedAt:
+                    anyOf:
+                      - type: Date
+                      - format: date-time
+                        type: string
+                      - format: date
+                        type: string
+                      - type: number
+                $id: "#/components/schemas/CustomerTypeItem"
+        "401":
+          description: Response for status 401
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Response for status 403
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Response for status 409
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+      operationId: postApiCustomerAdminTypes
+  /api/customer/admin/types/{id}:
+    get:
+      tags:
+        - Customer
+        - Admin
+      summary: Get customer type by ID (Admin)
+      description: Retrieve a single customer type. Requires management.customer_types
+        permission.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        "200":
+          description: Response for status 200
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - id
+                  - name
+                  - createdAt
+                  - updatedAt
+                properties:
+                  id:
+                    format: uuid
+                    type: string
+                  name:
+                    type: string
+                  createdAt:
+                    anyOf:
+                      - type: Date
+                      - format: date-time
+                        type: string
+                      - format: date
+                        type: string
+                      - type: number
+                  updatedAt:
+                    anyOf:
+                      - type: Date
+                      - format: date-time
+                        type: string
+                      - format: date
+                        type: string
+                      - type: number
+                $id: "#/components/schemas/CustomerTypeItem"
+        "401":
+          description: Response for status 401
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Response for status 403
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Response for status 404
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+      operationId: getApiCustomerAdminTypesById
+    patch:
+      tags:
+        - Customer
+        - Admin
+      summary: Update customer type (Admin)
+      description: Rename a customer type. Requires management.customer_types permission.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            format: uuid
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  minLength: 1
+                  maxLength: 100
+                  type: string
+              $id: "#/components/schemas/CustomerTypeUpdateRequest"
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  minLength: 1
+                  maxLength: 100
+                  type: string
+              $id: "#/components/schemas/CustomerTypeUpdateRequest"
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  minLength: 1
+                  maxLength: 100
+                  type: string
+              $id: "#/components/schemas/CustomerTypeUpdateRequest"
+      responses:
+        "200":
+          description: Response for status 200
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - id
+                  - name
+                  - createdAt
+                  - updatedAt
+                properties:
+                  id:
+                    format: uuid
+                    type: string
+                  name:
+                    type: string
+                  createdAt:
+                    anyOf:
+                      - type: Date
+                      - format: date-time
+                        type: string
+                      - format: date
+                        type: string
+                      - type: number
+                  updatedAt:
+                    anyOf:
+                      - type: Date
+                      - format: date-time
+                        type: string
+                      - format: date
+                        type: string
+                      - type: number
+                $id: "#/components/schemas/CustomerTypeItem"
+        "401":
+          description: Response for status 401
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Response for status 403
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Response for status 404
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Response for status 409
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+      operationId: patchApiCustomerAdminTypesById
+    delete:
+      tags:
+        - Customer
+        - Admin
+      summary: Delete customer type (Admin)
+      description: Delete a customer type. Blocked if any customers are still assigned
+        to it. Requires management.customer_types permission.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        "204":
+          description: Response for status 204
+          content:
+            type: "null"
+        "401":
+          description: Response for status 401
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Response for status 403
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Response for status 404
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Response for status 409
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+      operationId: deleteApiCustomerAdminTypesById
   /api/location/:
     get:
       tags:
         - Location
-      summary: Get customer location
+      summary: Get customer location (Protected)
       description: Retrieve the authenticated customer's waste pickup location.
         Location data is strictly private and only accessible to the customer,
         assigned drivers, and administrators.
@@ -1110,12 +1577,11 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: getApiLocation
     post:
       tags:
         - Location
-      summary: Save customer location
+      summary: Save customer location (Protected)
       description: Add or update the authenticated customer's waste pickup location.
         Accepts address data with coordinates from the map provider (Mapbox).
         Both address and city are required fields. Coordinates must be within
@@ -1376,7 +1842,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "401":
           description: Response for status 401
           content:
@@ -1400,12 +1865,11 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: postApiLocation
     delete:
       tags:
         - Location
-      summary: Delete customer location
+      summary: Delete customer location (Protected)
       description: Remove the authenticated customer's waste pickup location. This
         action cannot be undone.
       responses:
@@ -1439,13 +1903,12 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: deleteApiLocation
   /api/location/validate:
     post:
       tags:
         - Location
-      summary: Validate address
+      summary: Validate address (Protected)
       description: Search and validate Ghana addresses using the configured geocoding
         provider (Mapbox by default). Returns coordinates and formatted
         addresses for user selection on a map. Useful for address autocomplete
@@ -1552,7 +2015,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "500":
           description: Response for status 500
           content:
@@ -1565,11 +2027,10 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: postApiLocationValidate
   /api/disposable/item-types/active:
     get:
-      summary: List active disposable item types
+      summary: List active disposable item types (Public)
       description: Retrieve all active disposable item types available for customer
         selection (max 4). Public endpoint.
       tags:
@@ -1639,7 +2100,7 @@ paths:
       operationId: getApiDisposableItem-typesActive
   /api/disposable/quantities/active:
     get:
-      summary: List active estimated quantities
+      summary: List active estimated quantities (Public)
       description: Retrieve all active estimated quantity options for customer
         selection. Public endpoint.
       tags:
@@ -1703,12 +2164,12 @@ paths:
       operationId: getApiDisposableQuantitiesActive
   /api/disposable/item-types:
     post:
-      summary: Create disposable item type
+      summary: Create disposable item type (Admin)
       description: Create a new disposable item type. Maximum of 4 active types
         allowed. Admin only.
       tags:
         - Disposable
-        - admin
+        - Admin
       requestBody:
         required: true
         content:
@@ -1904,14 +2365,13 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: postApiDisposableItem-types
     get:
-      summary: List all disposable item types
+      summary: List all disposable item types (Admin)
       description: Retrieve all disposable item types (active and inactive). Admin only.
       tags:
         - Disposable
-        - admin
+        - Admin
       responses:
         "200":
           description: Response for status 200
@@ -1977,11 +2437,11 @@ paths:
       operationId: getApiDisposableItem-types
   /api/disposable/item-types/{id}:
     get:
-      summary: Get disposable item type by ID
+      summary: Get disposable item type by ID (Admin)
       description: Retrieve a single disposable item type. Admin only.
       tags:
         - Disposable
-        - admin
+        - Admin
       parameters:
         - name: id
           in: path
@@ -2061,15 +2521,14 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: getApiDisposableItem-typesById
     patch:
-      summary: Update disposable item type
+      summary: Update disposable item type (Admin)
       description: Update an existing disposable item type. Admin only. Maximum of 4
         active types enforced.
       tags:
         - Disposable
-        - admin
+        - Admin
       parameters:
         - name: id
           in: path
@@ -2239,7 +2698,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "404":
           description: Response for status 404
           content:
@@ -2252,14 +2710,13 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: patchApiDisposableItem-typesById
     delete:
-      summary: Delete (deactivate) disposable item type
+      summary: Delete (deactivate) disposable item type (Admin)
       description: Soft delete a disposable item type by deactivating it. Admin only.
       tags:
         - Disposable
-        - admin
+        - Admin
       parameters:
         - name: id
           in: path
@@ -2284,15 +2741,14 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: deleteApiDisposableItem-typesById
   /api/disposable/quantities:
     post:
-      summary: Create estimated quantity
+      summary: Create estimated quantity (Admin)
       description: Create a new estimated quantity option. Admin only.
       tags:
         - Disposable
-        - admin
+        - Admin
       requestBody:
         required: true
         content:
@@ -2451,11 +2907,11 @@ paths:
                 $id: "#/components/schemas/QuantityResponse"
       operationId: postApiDisposableQuantities
     get:
-      summary: List all estimated quantities
+      summary: List all estimated quantities (Admin)
       description: Retrieve all estimated quantities (active and inactive). Admin only.
       tags:
         - Disposable
-        - admin
+        - Admin
       responses:
         "200":
           description: Response for status 200
@@ -2515,11 +2971,11 @@ paths:
       operationId: getApiDisposableQuantities
   /api/disposable/quantities/{id}:
     get:
-      summary: Get estimated quantity by ID
+      summary: Get estimated quantity by ID (Admin)
       description: Retrieve a single estimated quantity. Admin only.
       tags:
         - Disposable
-        - admin
+        - Admin
       parameters:
         - name: id
           in: path
@@ -2593,14 +3049,13 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: getApiDisposableQuantitiesById
     patch:
-      summary: Update estimated quantity
+      summary: Update estimated quantity (Admin)
       description: Update an existing estimated quantity. Admin only.
       tags:
         - Disposable
-        - admin
+        - Admin
       parameters:
         - name: id
           in: path
@@ -2746,14 +3201,13 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: patchApiDisposableQuantitiesById
     delete:
-      summary: Delete (deactivate) estimated quantity
+      summary: Delete (deactivate) estimated quantity (Admin)
       description: Soft delete an estimated quantity by deactivating it. Admin only.
       tags:
         - Disposable
-        - admin
+        - Admin
       parameters:
         - name: id
           in: path
@@ -2778,11 +3232,10 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: deleteApiDisposableQuantitiesById
   /api/pickup-requests/:
     post:
-      summary: Create pickup request
+      summary: Create pickup request (Customer)
       description: Create a new pickup request for waste disposal. Date must be 1-30
         days in the future. Customer authentication required.
       tags:
@@ -2994,7 +3447,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "404":
           description: Response for status 404
           content:
@@ -3007,10 +3459,9 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: postApiPickup-requests
     get:
-      summary: List customer pickup requests
+      summary: List customer pickup requests (Customer)
       description: Retrieve all pickup requests for the authenticated customer.
         Customer authentication required.
       tags:
@@ -3134,7 +3585,7 @@ paths:
       operationId: getApiPickup-requests
   /api/pickup-requests/{id}:
     get:
-      summary: Get pickup request by ID
+      summary: Get pickup request by ID (Customer)
       description: Retrieve a single pickup request. Only accessible by the request
         owner. Customer authentication required.
       tags:
@@ -3272,10 +3723,9 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: getApiPickup-requestsById
     patch:
-      summary: Update pickup request
+      summary: Update pickup request (Customer)
       description: Update a pickup request. Only allowed if status is 'pending'
         (before truck dispatch). Customer authentication required.
       tags:
@@ -3467,7 +3917,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "404":
           description: Response for status 404
           content:
@@ -3480,10 +3929,9 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: patchApiPickup-requestsById
     delete:
-      summary: Cancel pickup request
+      summary: Cancel pickup request (Customer)
       description: Cancel a pickup request. Only allowed if status is 'pending'
         (before truck dispatch). Customer authentication required.
       tags:
@@ -3512,7 +3960,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "404":
           description: Response for status 404
           content:
@@ -3525,7 +3972,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: deleteApiPickup-requestsById
   /api/pickup-requests/admin/list:
     get:
@@ -3762,6 +4208,7 @@ paths:
                         type: boolean
                       hasPreviousPage:
                         type: boolean
+                    $id: "#/components/schemas/PaginationMeta"
                 $id: "#/components/schemas/AdminListResponse"
       operationId: getApiPickup-requestsAdminList
   /api/pickup-requests/admin/{id}:
@@ -3943,7 +4390,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: getApiPickup-requestsAdminById
   /api/pickup-requests/admin/{id}/status:
     patch:
@@ -4185,7 +4631,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "404":
           description: Response for status 404
           content:
@@ -4198,13 +4643,12 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: patchApiPickup-requestsAdminByIdStatus
   /api/trucks/my-truck:
     get:
       tags:
         - Truck
-      summary: Get driver's assigned truck
+      summary: Get driver's assigned truck (Driver)
       description: Retrieve the truck assigned to the authenticated driver
       responses:
         "200":
@@ -4394,14 +4838,199 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: getApiTrucksMy-truck
   /api/trucks/admin/:
+    get:
+      tags:
+        - Truck
+        - Admin
+      summary: List trucks (Admin)
+      description: Get paginated list of trucks with filters (Admin only)
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            minimum: 1
+            default: 1
+            anyOf:
+              - format: integer
+                default: 0
+                type: string
+              - minimum: 1
+                default: 1
+                type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            minimum: 1
+            maximum: 100
+            default: 20
+            anyOf:
+              - format: integer
+                default: 0
+                type: string
+              - minimum: 1
+                maximum: 100
+                default: 20
+                type: integer
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - active
+              - maintenance
+              - inactive
+        - name: assignedDriverId
+          in: query
+          required: false
+          schema:
+            format: uuid
+            type: string
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Response for status 200
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - pagination
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - id
+                        - truckId
+                        - plateNumber
+                        - make
+                        - model
+                        - capacity
+                        - status
+                        - assignedDriver
+                        - lastGpsUpdate
+                        - currentLocation
+                        - totalPickups
+                      properties:
+                        id:
+                          format: uuid
+                          type: string
+                        truckId:
+                          type: string
+                        plateNumber:
+                          type: string
+                        make:
+                          type: string
+                        model:
+                          type: string
+                        capacity:
+                          type: string
+                        status:
+                          type: string
+                          enum:
+                            - active
+                            - maintenance
+                            - inactive
+                        assignedDriver:
+                          nullable: true
+                          anyOf:
+                            - type: object
+                              required:
+                                - id
+                                - name
+                              properties:
+                                id:
+                                  type: string
+                                name:
+                                  type: string
+                            - type: "null"
+                        lastGpsUpdate:
+                          nullable: true
+                          anyOf:
+                            - anyOf:
+                                - type: Date
+                                - format: date-time
+                                  type: string
+                                - format: date
+                                  type: string
+                                - type: number
+                            - type: "null"
+                        currentLocation:
+                          nullable: true
+                          anyOf:
+                            - type: string
+                            - type: "null"
+                        totalPickups:
+                          anyOf:
+                            - format: integer
+                              default: 0
+                              type: string
+                            - type: integer
+                  pagination:
+                    type: object
+                    required:
+                      - page
+                      - limit
+                      - total
+                      - totalPages
+                      - hasNextPage
+                      - hasPreviousPage
+                    properties:
+                      page:
+                        minimum: 1
+                        anyOf:
+                          - format: integer
+                            default: 0
+                            type: string
+                          - minimum: 1
+                            type: integer
+                      limit:
+                        minimum: 1
+                        anyOf:
+                          - format: integer
+                            default: 0
+                            type: string
+                          - minimum: 1
+                            type: integer
+                      total:
+                        minimum: 0
+                        anyOf:
+                          - format: integer
+                            default: 0
+                            type: string
+                          - minimum: 0
+                            type: integer
+                      totalPages:
+                        minimum: 0
+                        anyOf:
+                          - format: integer
+                            default: 0
+                            type: string
+                          - minimum: 0
+                            type: integer
+                      hasNextPage:
+                        type: boolean
+                      hasPreviousPage:
+                        type: boolean
+                    $id: "#/components/schemas/PaginationMeta"
+                $id: "#/components/schemas/listResponse"
+      operationId: getApiTrucksAdmin
     post:
       tags:
         - Truck
-        - admin
-      summary: Create truck
+        - Admin
+      summary: Create truck (Admin)
       description: Create a new truck in the fleet (Admin only)
       requestBody:
         required: true
@@ -4774,199 +5403,13 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: postApiTrucksAdmin
-    get:
-      tags:
-        - Truck
-        - admin
-      summary: List trucks
-      description: Get paginated list of trucks with filters (Admin only)
-      parameters:
-        - name: page
-          in: query
-          required: false
-          schema:
-            minimum: 1
-            default: 1
-            anyOf:
-              - format: integer
-                default: 0
-                type: string
-              - minimum: 1
-                default: 1
-                type: integer
-        - name: limit
-          in: query
-          required: false
-          schema:
-            minimum: 1
-            maximum: 100
-            default: 20
-            anyOf:
-              - format: integer
-                default: 0
-                type: string
-              - minimum: 1
-                maximum: 100
-                default: 20
-                type: integer
-        - name: status
-          in: query
-          required: false
-          schema:
-            type: string
-            enum:
-              - active
-              - maintenance
-              - inactive
-        - name: assignedDriverId
-          in: query
-          required: false
-          schema:
-            format: uuid
-            type: string
-        - name: search
-          in: query
-          required: false
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Response for status 200
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                  - data
-                  - pagination
-                properties:
-                  data:
-                    type: array
-                    items:
-                      type: object
-                      required:
-                        - id
-                        - truckId
-                        - plateNumber
-                        - make
-                        - model
-                        - capacity
-                        - status
-                        - assignedDriver
-                        - lastGpsUpdate
-                        - currentLocation
-                        - totalPickups
-                      properties:
-                        id:
-                          format: uuid
-                          type: string
-                        truckId:
-                          type: string
-                        plateNumber:
-                          type: string
-                        make:
-                          type: string
-                        model:
-                          type: string
-                        capacity:
-                          type: string
-                        status:
-                          type: string
-                          enum:
-                            - active
-                            - maintenance
-                            - inactive
-                        assignedDriver:
-                          nullable: true
-                          anyOf:
-                            - type: object
-                              required:
-                                - id
-                                - name
-                              properties:
-                                id:
-                                  type: string
-                                name:
-                                  type: string
-                            - type: "null"
-                        lastGpsUpdate:
-                          nullable: true
-                          anyOf:
-                            - anyOf:
-                                - type: Date
-                                - format: date-time
-                                  type: string
-                                - format: date
-                                  type: string
-                                - type: number
-                            - type: "null"
-                        currentLocation:
-                          nullable: true
-                          anyOf:
-                            - type: string
-                            - type: "null"
-                        totalPickups:
-                          anyOf:
-                            - format: integer
-                              default: 0
-                              type: string
-                            - type: integer
-                  pagination:
-                    type: object
-                    required:
-                      - page
-                      - limit
-                      - total
-                      - totalPages
-                      - hasNextPage
-                      - hasPreviousPage
-                    properties:
-                      page:
-                        minimum: 1
-                        anyOf:
-                          - format: integer
-                            default: 0
-                            type: string
-                          - minimum: 1
-                            type: integer
-                      limit:
-                        minimum: 1
-                        anyOf:
-                          - format: integer
-                            default: 0
-                            type: string
-                          - minimum: 1
-                            type: integer
-                      total:
-                        minimum: 0
-                        anyOf:
-                          - format: integer
-                            default: 0
-                            type: string
-                          - minimum: 0
-                            type: integer
-                      totalPages:
-                        minimum: 0
-                        anyOf:
-                          - format: integer
-                            default: 0
-                            type: string
-                          - minimum: 0
-                            type: integer
-                      hasNextPage:
-                        type: boolean
-                      hasPreviousPage:
-                        type: boolean
-                $id: "#/components/schemas/listResponse"
-      operationId: getApiTrucksAdmin
   /api/trucks/admin/{id}:
     get:
       tags:
         - Truck
-        - admin
-      summary: Get truck details
+        - Admin
+      summary: Get truck details (Admin)
       description: Retrieve detailed information about a specific truck
       parameters:
         - name: id
@@ -5163,13 +5606,12 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: getApiTrucksAdminById
     patch:
       tags:
         - Truck
-        - admin
-      summary: Update truck
+        - Admin
+      summary: Update truck (Admin)
       description: Update truck details (Admin only)
       parameters:
         - name: id
@@ -5492,13 +5934,12 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: patchApiTrucksAdminById
     delete:
       tags:
         - Truck
-        - admin
-      summary: Delete truck
+        - Admin
+      summary: Delete truck (Admin)
       description: Soft delete a truck (Admin only)
       parameters:
         - name: id
@@ -5524,14 +5965,13 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: deleteApiTrucksAdminById
   /api/trucks/admin/{id}/assign-driver:
     patch:
       tags:
         - Truck
-        - admin
-      summary: Assign driver to truck
+        - Admin
+      summary: Assign driver to truck (Admin)
       description: Assign or unassign a driver to a truck (Admin only). Set driverId
         to null to unassign.
       parameters:
@@ -5771,7 +6211,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "404":
           description: Response for status 404
           content:
@@ -5784,14 +6223,13 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: patchApiTrucksAdminByIdAssign-driver
   /api/trucks/admin/{id}/maintenance:
     post:
       tags:
         - Truck
-        - admin
-      summary: Schedule maintenance
+        - Admin
+      summary: Schedule maintenance (Admin)
       description: Schedule maintenance for a truck (Admin only)
       parameters:
         - name: id
@@ -6002,14 +6440,13 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: postApiTrucksAdminByIdMaintenance
   /api/trucks/admin/{id}/maintenance/{maintenanceId}:
     patch:
       tags:
         - Truck
-        - admin
-      summary: Update maintenance record
+        - Admin
+      summary: Update maintenance record (Admin)
       description: Update a maintenance record (Admin only)
       parameters:
         - name: id
@@ -6241,13 +6678,12 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: patchApiTrucksAdminByIdMaintenanceByMaintenanceId
   /api/trucks/{id}/maintenance:
     get:
       tags:
         - Truck
-      summary: Get maintenance history
+      summary: Get maintenance history (Admin & Driver)
       description: Retrieve maintenance history for a truck (Admin or Driver)
       parameters:
         - name: id
@@ -6334,7 +6770,7 @@ paths:
     post:
       tags:
         - Truck
-      summary: GPS webhook (stub)
+      summary: GPS webhook (stub) (Public)
       description: Webhook endpoint for GPS tracking updates (stub implementation)
       requestBody:
         required: true
@@ -6365,7 +6801,7 @@ paths:
     get:
       tags:
         - Driver
-      summary: Get driver profile
+      summary: Get driver profile (Driver)
       description: Retrieve the authenticated driver's profile
       responses:
         "200":
@@ -6507,14 +6943,13 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: getApiDriversMe
   /api/drivers/admin/:
     post:
       tags:
         - Driver
-        - admin
-      summary: Create driver
+        - Admin
+      summary: Create driver (Admin)
       description: Create a new driver account (Admin only). Creates user account and
         sends welcome email with temporary password.
       requestBody:
@@ -6780,13 +7215,12 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: postApiDriversAdmin
     get:
       tags:
         - Driver
-        - admin
-      summary: List drivers
+        - Admin
+      summary: List drivers (Admin)
       description: Get paginated list of drivers with filters (Admin only)
       parameters:
         - name: page
@@ -6963,14 +7397,15 @@ paths:
                         type: boolean
                       hasPreviousPage:
                         type: boolean
+                    $id: "#/components/schemas/PaginationMeta"
                 $id: "#/components/schemas/listResponse"
       operationId: getApiDriversAdmin
   /api/drivers/admin/{id}:
     get:
       tags:
         - Driver
-        - admin
-      summary: Get driver details
+        - Admin
+      summary: Get driver details (Admin)
       description: Retrieve detailed information about a specific driver
       parameters:
         - name: id
@@ -7119,13 +7554,12 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: getApiDriversAdminById
     patch:
       tags:
         - Driver
-        - admin
-      summary: Update driver
+        - Admin
+      summary: Update driver (Admin)
       description: Update driver details (Admin only)
       parameters:
         - name: id
@@ -7361,13 +7795,12 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: patchApiDriversAdminById
     delete:
       tags:
         - Driver
-        - admin
-      summary: Delete driver
+        - Admin
+      summary: Delete driver (Admin)
       description: Soft delete a driver (Admin only)
       parameters:
         - name: id
@@ -7393,14 +7826,13 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: deleteApiDriversAdminById
   /api/zone/public/list:
     get:
       tags:
         - Zone
         - Public
-      summary: List active zones
+      summary: List active zones (Public)
       description: Get list of all active zones with basic information (id, name,
         color). No authentication required. Used for customer registration form.
       responses:
@@ -7436,14 +7868,13 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: getApiZonePublicList
   /api/zone/admin/stats:
     get:
       tags:
         - Zone
         - Admin
-      summary: Get zone dashboard statistics
+      summary: Get zone dashboard statistics (Admin)
       description: Retrieve overview metrics for zone management dashboard. Requires
         admin role.
       responses:
@@ -7504,7 +7935,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "403":
           description: Response for status 403
           content:
@@ -7517,7 +7947,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "500":
           description: Response for status 500
           content:
@@ -7530,14 +7959,13 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: getApiZoneAdminStats
   /api/zone/admin/list:
     get:
       tags:
         - Zone
         - Admin
-      summary: List all zones
+      summary: List all zones (Admin)
       description: Get list of all zones with optional search and status filtering.
         Requires admin role.
       parameters:
@@ -7589,7 +8017,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "403":
           description: Response for status 403
           content:
@@ -7602,7 +8029,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "500":
           description: Response for status 500
           content:
@@ -7615,14 +8041,13 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: getApiZoneAdminList
   /api/zone/admin/{id}:
     get:
       tags:
         - Zone
         - Admin
-      summary: Get zone by ID
+      summary: Get zone by ID (Admin)
       description: Retrieve detailed information about a specific zone. Requires admin role.
       parameters:
         - name: id
@@ -7650,7 +8075,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "403":
           description: Response for status 403
           content:
@@ -7663,7 +8087,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "404":
           description: Response for status 404
           content:
@@ -7693,13 +8116,12 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: getApiZoneAdminById
     patch:
       tags:
         - Zone
         - Admin
-      summary: Update zone
+      summary: Update zone (Admin)
       description: Update zone details (name, description, areas, color, status).
         Requires admin role.
       parameters:
@@ -7820,7 +8242,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "403":
           description: Response for status 403
           content:
@@ -7833,7 +8254,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "404":
           description: Response for status 404
           content:
@@ -7863,13 +8283,12 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: patchApiZoneAdminById
     delete:
       tags:
         - Zone
         - Admin
-      summary: Delete zone
+      summary: Delete zone (Admin)
       description: Soft delete a zone. Customer and driver zone assignments will be
         removed. Requires admin role.
       parameters:
@@ -7908,7 +8327,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "403":
           description: Response for status 403
           content:
@@ -7921,7 +8339,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "404":
           description: Response for status 404
           content:
@@ -7951,14 +8368,13 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: deleteApiZoneAdminById
   /api/zone/admin/:
     post:
       tags:
         - Zone
         - Admin
-      summary: Create new zone
+      summary: Create new zone (Admin)
       description: Create a new service zone with name, description, areas, and color.
         Requires admin role.
       requestBody:
@@ -8114,7 +8530,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "403":
           description: Response for status 403
           content:
@@ -8127,7 +8542,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "500":
           description: Response for status 500
           content:
@@ -8140,14 +8554,13 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: postApiZoneAdmin
   /api/zone/admin/{id}/toggle:
     patch:
       tags:
         - Zone
         - Admin
-      summary: Toggle zone status
+      summary: Toggle zone status (Admin)
       description: Toggle zone between active and inactive status. Requires admin role.
       parameters:
         - name: id
@@ -8175,7 +8588,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "403":
           description: Response for status 403
           content:
@@ -8188,7 +8600,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "404":
           description: Response for status 404
           content:
@@ -8218,14 +8629,129 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: patchApiZoneAdminByIdToggle
+  /api/subscription/active:
+    get:
+      tags:
+        - Subscription
+        - Public
+      summary: Get active subscription plans (Public)
+      description: Retrieve all active subscription plans with optional filtering by
+        type (prepaid/postpaid) and billing cycle (monthly/quarterly/yearly).
+        Results can be sorted by name, price, pickups, or bins in ascending or
+        descending order. No authentication required.
+      parameters:
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - prepaid
+              - postpaid
+        - name: billingCycle
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - monthly
+              - quarterly
+              - yearly
+        - name: sortBy
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - name
+              - price
+              - pickups
+              - bins
+        - name: sortOrder
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+      responses:
+        "200":
+          description: Response for status 200
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - id
+                    - name
+                    - description
+                    - type
+                    - pickups
+                    - bins
+                    - billingCycle
+                    - price
+                    - badgeColor
+                  properties:
+                    id:
+                      format: uuid
+                      type: string
+                    name:
+                      type: string
+                    description:
+                      nullable: true
+                      anyOf:
+                        - type: string
+                        - type: "null"
+                    type:
+                      type: string
+                      enum:
+                        - prepaid
+                        - postpaid
+                    pickups:
+                      anyOf:
+                        - format: integer
+                          default: 0
+                          type: string
+                        - type: integer
+                    bins:
+                      anyOf:
+                        - format: integer
+                          default: 0
+                          type: string
+                        - type: integer
+                    billingCycle:
+                      type: string
+                      enum:
+                        - monthly
+                        - quarterly
+                        - yearly
+                    price:
+                      type: string
+                    badgeColor:
+                      type: string
+        "500":
+          description: Response for status 500
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+      operationId: getApiSubscriptionActive
   /api/subscription/admin/stats:
     get:
       tags:
         - Subscription
         - Admin
-      summary: Get subscription dashboard statistics
+      summary: Get subscription dashboard statistics (Admin)
       description: Retrieve total plans, active plans, subscriber count, and estimated
         revenue for a given subscription type (prepaid or postpaid). Requires
         admin role.
@@ -8290,7 +8816,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "403":
           description: Response for status 403
           content:
@@ -8303,7 +8828,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "500":
           description: Response for status 500
           content:
@@ -8316,14 +8840,13 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: getApiSubscriptionAdminStats
   /api/subscription/admin/plans:
     get:
       tags:
         - Subscription
         - Admin
-      summary: List subscription plans
+      summary: List subscription plans (Admin)
       description: Retrieve all subscription plans with optional filtering by type
         (prepaid/postpaid) and status (all/active/inactive). Each plan includes
         the current active subscriber count. Requires admin role.
@@ -8468,7 +8991,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "403":
           description: Response for status 403
           content:
@@ -8481,7 +9003,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "500":
           description: Response for status 500
           content:
@@ -8494,13 +9015,12 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: getApiSubscriptionAdminPlans
     post:
       tags:
         - Subscription
         - Admin
-      summary: Create subscription plan
+      summary: Create subscription plan (Admin)
       description: Create a new prepaid or postpaid subscription plan with pricing,
         pickup allocations, and BIN count. Plan names must be globally unique.
         Requires admin role.
@@ -8831,7 +9351,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "403":
           description: Response for status 403
           content:
@@ -8844,7 +9363,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "500":
           description: Response for status 500
           content:
@@ -8857,14 +9375,13 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: postApiSubscriptionAdminPlans
   /api/subscription/admin/plans/{id}:
     get:
       tags:
         - Subscription
         - Admin
-      summary: Get subscription plan by ID
+      summary: Get subscription plan by ID (Admin)
       description: Retrieve detailed information about a specific subscription plan
         including current subscriber count. Requires admin role.
       parameters:
@@ -8984,7 +9501,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "403":
           description: Response for status 403
           content:
@@ -8997,7 +9513,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "404":
           description: Response for status 404
           content:
@@ -9026,13 +9541,12 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: getApiSubscriptionAdminPlansById
     patch:
       tags:
         - Subscription
         - Admin
-      summary: Update subscription plan
+      summary: Update subscription plan (Admin)
       description: Update subscription plan details (name, description, pickups, BINs,
         billing cycle, price, badge color, status). All fields are optional.
         Requires admin role.
@@ -9298,7 +9812,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "403":
           description: Response for status 403
           content:
@@ -9311,7 +9824,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "404":
           description: Response for status 404
           content:
@@ -9340,13 +9852,12 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: patchApiSubscriptionAdminPlansById
     delete:
       tags:
         - Subscription
         - Admin
-      summary: Delete subscription plan
+      summary: Delete subscription plan (Admin)
       description: Soft delete a subscription plan. Plans with active subscribers
         cannot be deleted — deactivate the plan instead. Requires admin role.
       parameters:
@@ -9384,7 +9895,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "401":
           description: Response for status 401
           content:
@@ -9397,7 +9907,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "403":
           description: Response for status 403
           content:
@@ -9410,7 +9919,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "404":
           description: Response for status 404
           content:
@@ -9439,14 +9947,13 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: deleteApiSubscriptionAdminPlansById
   /api/subscription/admin/plans/{id}/toggle:
     patch:
       tags:
         - Subscription
         - Admin
-      summary: Toggle subscription plan status
+      summary: Toggle subscription plan status (Admin)
       description: Toggle a subscription plan between active and inactive. Corresponds
         to the Activate/Deactivate button in the UI. Requires admin role.
       parameters:
@@ -9487,7 +9994,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "403":
           description: Response for status 403
           content:
@@ -9500,7 +10006,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "404":
           description: Response for status 404
           content:
@@ -9529,14 +10034,13 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: patchApiSubscriptionAdminPlansByIdToggle
   /api/rates/admin/stats:
     get:
       tags:
         - Rate
         - Admin
-      summary: Get rate dashboard statistics
+      summary: Get rate dashboard statistics (Admin)
       description: Retrieve total rates, active rates, upcoming rates, and the number
         of customer types with at least one rate configured. Requires admin
         role.
@@ -9597,7 +10101,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "403":
           description: Response for status 403
           content:
@@ -9610,7 +10113,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "500":
           description: Response for status 500
           content:
@@ -9623,14 +10125,13 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: getApiRatesAdminStats
   /api/rates/admin:
     get:
       tags:
         - Rate
         - Admin
-      summary: List pay-as-you-go rates
+      summary: List pay-as-you-go rates (Admin)
       description: Retrieve all pickup rates. Optionally filter by customer type ID or
         computed status (active, upcoming, inactive). Each rate includes the
         associated customer type and a computed status field. Requires admin
@@ -9756,7 +10257,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "403":
           description: Response for status 403
           content:
@@ -9769,7 +10269,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "500":
           description: Response for status 500
           content:
@@ -9782,13 +10281,12 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: getApiRatesAdmin
     post:
       tags:
         - Rate
         - Admin
-      summary: Create pay-as-you-go rate
+      summary: Create pay-as-you-go rate (Admin)
       description: Create a new pay-as-you-go pickup rate for a customer type. If
         isActive is true, any previously active rate for the same customer type
         is automatically deactivated to ensure only one active rate per type.
@@ -9989,7 +10487,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "403":
           description: Response for status 403
           content:
@@ -10002,7 +10499,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "404":
           description: Response for status 404
           content:
@@ -10031,14 +10527,13 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: postApiRatesAdmin
   /api/rates/admin/{id}:
     get:
       tags:
         - Rate
         - Admin
-      summary: Get rate by ID
+      summary: Get rate by ID (Admin)
       description: Retrieve a single pay-as-you-go rate by its UUID, including the
         associated customer type and computed status. Requires admin role.
       parameters:
@@ -10136,7 +10631,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "403":
           description: Response for status 403
           content:
@@ -10149,7 +10643,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "404":
           description: Response for status 404
           content:
@@ -10178,13 +10671,12 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: getApiRatesAdminById
     patch:
       tags:
         - Rate
         - Admin
-      summary: Update pay-as-you-go rate
+      summary: Update pay-as-you-go rate (Admin)
       description: Update rate details (customer type, amount, effective date, active
         status, note). All fields are optional. Activating a rate automatically
         deactivates any other active rate for the same customer type. Requires
@@ -10350,7 +10842,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "403":
           description: Response for status 403
           content:
@@ -10363,7 +10854,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "404":
           description: Response for status 404
           content:
@@ -10392,13 +10882,12 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: patchApiRatesAdminById
     delete:
       tags:
         - Rate
         - Admin
-      summary: Delete pay-as-you-go rate
+      summary: Delete pay-as-you-go rate (Admin)
       description: Permanently delete a rate record. This action cannot be undone.
         Requires admin role.
       parameters:
@@ -10436,7 +10925,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "403":
           description: Response for status 403
           content:
@@ -10449,7 +10937,6 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
         "404":
           description: Response for status 404
           content:
@@ -10478,8 +10965,1731 @@ paths:
                   message:
                     type: string
                 $id: "#/components/schemas/ErrorResponse"
-                additionalProperties: false
       operationId: deleteApiRatesAdminById
+  /api/quick-mail/admin/send:
+    post:
+      tags:
+        - Quick Mail
+        - Admin
+      summary: Send bulk email (Admin)
+      description: Send a bulk email to all active customers, customers in a specific
+        zone, or a custom list of email addresses. Emails are sent in batches.
+        Requires admin role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - recipientType
+                - subject
+                - message
+              properties:
+                recipientType:
+                  type: string
+                  enum:
+                    - all
+                    - zone
+                    - custom
+                zoneId:
+                  format: uuid
+                  description: Required when recipientType is 'zone'
+                  type: string
+                emails:
+                  minItems: 1
+                  description: Required when recipientType is 'custom'
+                  type: array
+                  items:
+                    format: email
+                    type: string
+                subject:
+                  minLength: 1
+                  maxLength: 255
+                  type: string
+                message:
+                  minLength: 1
+                  type: string
+              $id: "#/components/schemas/SendRequest"
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - recipientType
+                - subject
+                - message
+              properties:
+                recipientType:
+                  type: string
+                  enum:
+                    - all
+                    - zone
+                    - custom
+                zoneId:
+                  format: uuid
+                  description: Required when recipientType is 'zone'
+                  type: string
+                emails:
+                  minItems: 1
+                  description: Required when recipientType is 'custom'
+                  type: array
+                  items:
+                    format: email
+                    type: string
+                subject:
+                  minLength: 1
+                  maxLength: 255
+                  type: string
+                message:
+                  minLength: 1
+                  type: string
+              $id: "#/components/schemas/SendRequest"
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - recipientType
+                - subject
+                - message
+              properties:
+                recipientType:
+                  type: string
+                  enum:
+                    - all
+                    - zone
+                    - custom
+                zoneId:
+                  format: uuid
+                  description: Required when recipientType is 'zone'
+                  type: string
+                emails:
+                  minItems: 1
+                  description: Required when recipientType is 'custom'
+                  type: array
+                  items:
+                    format: email
+                    type: string
+                subject:
+                  minLength: 1
+                  maxLength: 255
+                  type: string
+                message:
+                  minLength: 1
+                  type: string
+              $id: "#/components/schemas/SendRequest"
+      responses:
+        "202":
+          description: Response for status 202
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - message
+                  - recipientCount
+                properties:
+                  success:
+                    const: true
+                    type: boolean
+                  message:
+                    type: string
+                  recipientCount:
+                    minimum: 0
+                    anyOf:
+                      - format: integer
+                        default: 0
+                        type: string
+                      - minimum: 0
+                        type: integer
+                $id: "#/components/schemas/SendResponse"
+        "400":
+          description: Response for status 400
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Response for status 401
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Response for status 403
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Response for status 404
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - message
+                properties:
+                  success:
+                    const: false
+                    type: boolean
+                  message:
+                    type: string
+                $id: "#/components/schemas/NotFoundError"
+        "500":
+          description: Response for status 500
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+      operationId: postApiQuick-mailAdminSend
+  /api/quick-mail/admin/history:
+    get:
+      tags:
+        - Quick Mail
+        - Admin
+      summary: List sent mail history (Admin)
+      description: Retrieve a paginated list of all previously sent bulk emails,
+        ordered newest first. Requires admin role.
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            minimum: 1
+            default: 1
+            anyOf:
+              - format: integer
+                default: 0
+                type: string
+              - minimum: 1
+                default: 1
+                type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            minimum: 1
+            maximum: 100
+            default: 20
+            anyOf:
+              - format: integer
+                default: 0
+                type: string
+              - minimum: 1
+                maximum: 100
+                default: 20
+                type: integer
+      responses:
+        "200":
+          description: Response for status 200
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - pagination
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - id
+                        - subject
+                        - message
+                        - recipientType
+                        - zoneId
+                        - zoneName
+                        - customEmails
+                        - recipientCount
+                        - deliveredCount
+                        - failedCount
+                        - status
+                        - sentBy
+                        - senderName
+                        - createdAt
+                      properties:
+                        id:
+                          format: uuid
+                          type: string
+                        subject:
+                          type: string
+                        message:
+                          type: string
+                        recipientType:
+                          type: string
+                          enum:
+                            - all
+                            - zone
+                            - custom
+                        zoneId:
+                          nullable: true
+                          anyOf:
+                            - format: uuid
+                              type: string
+                            - type: "null"
+                        zoneName:
+                          nullable: true
+                          anyOf:
+                            - type: string
+                            - type: "null"
+                        customEmails:
+                          type: array
+                          items:
+                            type: string
+                        recipientCount:
+                          minimum: 0
+                          anyOf:
+                            - format: integer
+                              default: 0
+                              type: string
+                            - minimum: 0
+                              type: integer
+                        deliveredCount:
+                          minimum: 0
+                          anyOf:
+                            - format: integer
+                              default: 0
+                              type: string
+                            - minimum: 0
+                              type: integer
+                        failedCount:
+                          minimum: 0
+                          anyOf:
+                            - format: integer
+                              default: 0
+                              type: string
+                            - minimum: 0
+                              type: integer
+                        status:
+                          type: string
+                          enum:
+                            - pending
+                            - completed
+                            - partial
+                            - failed
+                        sentBy:
+                          format: uuid
+                          type: string
+                        senderName:
+                          nullable: true
+                          anyOf:
+                            - type: string
+                            - type: "null"
+                        createdAt:
+                          anyOf:
+                            - type: Date
+                            - format: date-time
+                              type: string
+                            - format: date
+                              type: string
+                            - type: number
+                      $id: "#/components/schemas/HistoryItem"
+                  pagination:
+                    type: object
+                    required:
+                      - page
+                      - limit
+                      - total
+                      - totalPages
+                      - hasNextPage
+                      - hasPreviousPage
+                    properties:
+                      page:
+                        minimum: 1
+                        anyOf:
+                          - format: integer
+                            default: 0
+                            type: string
+                          - minimum: 1
+                            type: integer
+                      limit:
+                        minimum: 1
+                        anyOf:
+                          - format: integer
+                            default: 0
+                            type: string
+                          - minimum: 1
+                            type: integer
+                      total:
+                        minimum: 0
+                        anyOf:
+                          - format: integer
+                            default: 0
+                            type: string
+                          - minimum: 0
+                            type: integer
+                      totalPages:
+                        minimum: 0
+                        anyOf:
+                          - format: integer
+                            default: 0
+                            type: string
+                          - minimum: 0
+                            type: integer
+                      hasNextPage:
+                        type: boolean
+                      hasPreviousPage:
+                        type: boolean
+                    $id: "#/components/schemas/PaginationMeta"
+        "401":
+          description: Response for status 401
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Response for status 403
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Response for status 500
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+      operationId: getApiQuick-mailAdminHistory
+  /api/team/stats:
+    get:
+      tags:
+        - Team
+      summary: Get team stats (Admin)
+      description: Returns total members, active members, super admin count, and
+        currently online count.
+      responses:
+        "200":
+          description: Response for status 200
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - totalMembers
+                  - activeMembers
+                  - superAdmins
+                  - onlineNow
+                properties:
+                  totalMembers:
+                    anyOf:
+                      - format: integer
+                        default: 0
+                        type: string
+                      - type: integer
+                  activeMembers:
+                    anyOf:
+                      - format: integer
+                        default: 0
+                        type: string
+                      - type: integer
+                  superAdmins:
+                    anyOf:
+                      - format: integer
+                        default: 0
+                        type: string
+                      - type: integer
+                  onlineNow:
+                    anyOf:
+                      - format: integer
+                        default: 0
+                        type: string
+                      - type: integer
+                $id: "#/components/schemas/stats"
+        "401":
+          description: Response for status 401
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Response for status 403
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+      operationId: getApiTeamStats
+  /api/team/roles:
+    get:
+      tags:
+        - Team
+      summary: List roles (Admin)
+      description: Returns all roles with their associated permissions.
+      responses:
+        "200":
+          description: Response for status 200
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - id
+                    - name
+                    - displayName
+                    - description
+                    - isSystem
+                    - permissions
+                  properties:
+                    id:
+                      format: uuid
+                      type: string
+                    name:
+                      type: string
+                    displayName:
+                      type: string
+                    description:
+                      nullable: true
+                      anyOf:
+                        - type: string
+                        - type: "null"
+                    isSystem:
+                      type: boolean
+                    permissions:
+                      type: array
+                      items:
+                        type: object
+                        required:
+                          - id
+                          - key
+                          - displayName
+                          - description
+                        properties:
+                          id:
+                            format: uuid
+                            type: string
+                          key:
+                            type: string
+                          displayName:
+                            type: string
+                          description:
+                            nullable: true
+                            anyOf:
+                              - type: string
+                              - type: "null"
+                $id: "#/components/schemas/rolesResponse"
+        "401":
+          description: Response for status 401
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Response for status 403
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+      operationId: getApiTeamRoles
+    post:
+      tags:
+        - Team
+      summary: Create role (Admin)
+      description: Creates a new custom role with the specified permissions. System
+        roles cannot be created via this endpoint.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - displayName
+                - permissionIds
+              properties:
+                name:
+                  minLength: 1
+                  maxLength: 50
+                  pattern: ^[a-z0-9_]+$
+                  description: Lowercase slug, e.g. 'billing_manager'
+                  type: string
+                displayName:
+                  minLength: 1
+                  maxLength: 100
+                  type: string
+                description:
+                  maxLength: 255
+                  type: string
+                permissionIds:
+                  minItems: 1
+                  type: array
+                  items:
+                    format: uuid
+                    type: string
+              $id: "#/components/schemas/createRole"
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - name
+                - displayName
+                - permissionIds
+              properties:
+                name:
+                  minLength: 1
+                  maxLength: 50
+                  pattern: ^[a-z0-9_]+$
+                  description: Lowercase slug, e.g. 'billing_manager'
+                  type: string
+                displayName:
+                  minLength: 1
+                  maxLength: 100
+                  type: string
+                description:
+                  maxLength: 255
+                  type: string
+                permissionIds:
+                  minItems: 1
+                  type: array
+                  items:
+                    format: uuid
+                    type: string
+              $id: "#/components/schemas/createRole"
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - name
+                - displayName
+                - permissionIds
+              properties:
+                name:
+                  minLength: 1
+                  maxLength: 50
+                  pattern: ^[a-z0-9_]+$
+                  description: Lowercase slug, e.g. 'billing_manager'
+                  type: string
+                displayName:
+                  minLength: 1
+                  maxLength: 100
+                  type: string
+                description:
+                  maxLength: 255
+                  type: string
+                permissionIds:
+                  minItems: 1
+                  type: array
+                  items:
+                    format: uuid
+                    type: string
+              $id: "#/components/schemas/createRole"
+      responses:
+        "201":
+          description: Response for status 201
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - id
+                  - name
+                  - displayName
+                  - description
+                  - isSystem
+                  - permissions
+                properties:
+                  id:
+                    format: uuid
+                    type: string
+                  name:
+                    type: string
+                  displayName:
+                    type: string
+                  description:
+                    nullable: true
+                    anyOf:
+                      - type: string
+                      - type: "null"
+                  isSystem:
+                    type: boolean
+                  permissions:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - id
+                        - key
+                        - displayName
+                        - description
+                      properties:
+                        id:
+                          format: uuid
+                          type: string
+                        key:
+                          type: string
+                        displayName:
+                          type: string
+                        description:
+                          nullable: true
+                          anyOf:
+                            - type: string
+                            - type: "null"
+                $id: "#/components/schemas/createRoleResponse"
+        "401":
+          description: Response for status 401
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Response for status 403
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Response for status 404
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Response for status 409
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+      operationId: postApiTeamRoles
+  /api/team/permissions:
+    get:
+      tags:
+        - Team
+      summary: List permissions (Admin)
+      description: Returns all available permissions.
+      responses:
+        "200":
+          description: Response for status 200
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - id
+                    - key
+                    - displayName
+                    - description
+                  properties:
+                    id:
+                      format: uuid
+                      type: string
+                    key:
+                      type: string
+                    displayName:
+                      type: string
+                    description:
+                      nullable: true
+                      anyOf:
+                        - type: string
+                        - type: "null"
+                $id: "#/components/schemas/permissionsResponse"
+        "401":
+          description: Response for status 401
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Response for status 403
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+      operationId: getApiTeamPermissions
+  /api/team/:
+    get:
+      tags:
+        - Team
+      summary: List team members (Admin)
+      description: Returns a paginated list of team members. Supports filtering by
+        status, roleId, and search.
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            minimum: 1
+            default: 1
+            anyOf:
+              - format: integer
+                default: 0
+                type: string
+              - minimum: 1
+                default: 1
+                type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            minimum: 1
+            maximum: 100
+            default: 20
+            anyOf:
+              - format: integer
+                default: 0
+                type: string
+              - minimum: 1
+                maximum: 100
+                default: 20
+                type: integer
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - active
+              - inactive
+        - name: roleId
+          in: query
+          required: false
+          schema:
+            format: uuid
+            type: string
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Response for status 200
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - pagination
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - id
+                        - user
+                        - role
+                        - phoneNumber
+                        - status
+                        - lastLoginAt
+                        - createdAt
+                      properties:
+                        id:
+                          format: uuid
+                          type: string
+                        user:
+                          type: object
+                          required:
+                            - id
+                            - name
+                            - email
+                          properties:
+                            id:
+                              format: uuid
+                              type: string
+                            name:
+                              type: string
+                            email:
+                              format: email
+                              type: string
+                        role:
+                          type: object
+                          required:
+                            - id
+                            - name
+                            - displayName
+                          properties:
+                            id:
+                              format: uuid
+                              type: string
+                            name:
+                              type: string
+                            displayName:
+                              type: string
+                        phoneNumber:
+                          nullable: true
+                          anyOf:
+                            - type: string
+                            - type: "null"
+                        status:
+                          type: string
+                          enum:
+                            - active
+                            - inactive
+                        lastLoginAt:
+                          nullable: true
+                          anyOf:
+                            - anyOf:
+                                - type: Date
+                                - format: date-time
+                                  type: string
+                                - format: date
+                                  type: string
+                                - type: number
+                            - type: "null"
+                        createdAt:
+                          anyOf:
+                            - type: Date
+                            - format: date-time
+                              type: string
+                            - format: date
+                              type: string
+                            - type: number
+                  pagination:
+                    type: object
+                    required:
+                      - page
+                      - limit
+                      - total
+                      - totalPages
+                      - hasNextPage
+                      - hasPreviousPage
+                    properties:
+                      page:
+                        minimum: 1
+                        anyOf:
+                          - format: integer
+                            default: 0
+                            type: string
+                          - minimum: 1
+                            type: integer
+                      limit:
+                        minimum: 1
+                        anyOf:
+                          - format: integer
+                            default: 0
+                            type: string
+                          - minimum: 1
+                            type: integer
+                      total:
+                        minimum: 0
+                        anyOf:
+                          - format: integer
+                            default: 0
+                            type: string
+                          - minimum: 0
+                            type: integer
+                      totalPages:
+                        minimum: 0
+                        anyOf:
+                          - format: integer
+                            default: 0
+                            type: string
+                          - minimum: 0
+                            type: integer
+                      hasNextPage:
+                        type: boolean
+                      hasPreviousPage:
+                        type: boolean
+                    $id: "#/components/schemas/PaginationMeta"
+                $id: "#/components/schemas/listResponse"
+        "401":
+          description: Response for status 401
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Response for status 403
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+      operationId: getApiTeam
+    post:
+      tags:
+        - Team
+      summary: Add team member (Admin)
+      description: Creates a new team member account and sends an invitation email
+        with a temporary password.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - firstName
+                - lastName
+                - email
+                - roleId
+              properties:
+                firstName:
+                  minLength: 1
+                  maxLength: 50
+                  type: string
+                lastName:
+                  minLength: 1
+                  maxLength: 50
+                  type: string
+                email:
+                  format: email
+                  type: string
+                phoneNumber:
+                  minLength: 7
+                  maxLength: 20
+                  type: string
+                roleId:
+                  format: uuid
+                  type: string
+                status:
+                  type: string
+                  enum:
+                    - active
+                    - inactive
+              $id: "#/components/schemas/create"
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - firstName
+                - lastName
+                - email
+                - roleId
+              properties:
+                firstName:
+                  minLength: 1
+                  maxLength: 50
+                  type: string
+                lastName:
+                  minLength: 1
+                  maxLength: 50
+                  type: string
+                email:
+                  format: email
+                  type: string
+                phoneNumber:
+                  minLength: 7
+                  maxLength: 20
+                  type: string
+                roleId:
+                  format: uuid
+                  type: string
+                status:
+                  type: string
+                  enum:
+                    - active
+                    - inactive
+              $id: "#/components/schemas/create"
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - firstName
+                - lastName
+                - email
+                - roleId
+              properties:
+                firstName:
+                  minLength: 1
+                  maxLength: 50
+                  type: string
+                lastName:
+                  minLength: 1
+                  maxLength: 50
+                  type: string
+                email:
+                  format: email
+                  type: string
+                phoneNumber:
+                  minLength: 7
+                  maxLength: 20
+                  type: string
+                roleId:
+                  format: uuid
+                  type: string
+                status:
+                  type: string
+                  enum:
+                    - active
+                    - inactive
+              $id: "#/components/schemas/create"
+      responses:
+        "201":
+          description: Response for status 201
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - id
+                  - user
+                  - role
+                  - permissions
+                  - phoneNumber
+                  - status
+                  - lastLoginAt
+                  - createdAt
+                  - updatedAt
+                properties:
+                  id:
+                    format: uuid
+                    type: string
+                  user:
+                    type: object
+                    required:
+                      - id
+                      - name
+                      - email
+                    properties:
+                      id:
+                        format: uuid
+                        type: string
+                      name:
+                        type: string
+                      email:
+                        format: email
+                        type: string
+                  role:
+                    type: object
+                    required:
+                      - id
+                      - name
+                      - displayName
+                    properties:
+                      id:
+                        format: uuid
+                        type: string
+                      name:
+                        type: string
+                      displayName:
+                        type: string
+                  permissions:
+                    type: array
+                    items:
+                      type: string
+                  phoneNumber:
+                    nullable: true
+                    anyOf:
+                      - type: string
+                      - type: "null"
+                  status:
+                    type: string
+                    enum:
+                      - active
+                      - inactive
+                  lastLoginAt:
+                    nullable: true
+                    anyOf:
+                      - anyOf:
+                          - type: Date
+                          - format: date-time
+                            type: string
+                          - format: date
+                            type: string
+                          - type: number
+                      - type: "null"
+                  createdAt:
+                    anyOf:
+                      - type: Date
+                      - format: date-time
+                        type: string
+                      - format: date
+                        type: string
+                      - type: number
+                  updatedAt:
+                    anyOf:
+                      - type: Date
+                      - format: date-time
+                        type: string
+                      - format: date
+                        type: string
+                      - type: number
+                $id: "#/components/schemas/memberResponse"
+        "400":
+          description: Response for status 400
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Response for status 401
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Response for status 403
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Response for status 404
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Response for status 409
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+      operationId: postApiTeam
+  /api/team/{id}:
+    get:
+      tags:
+        - Team
+      summary: Get team member (Admin)
+      description: Returns detailed information about a specific team member.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        "200":
+          description: Response for status 200
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - id
+                  - user
+                  - role
+                  - permissions
+                  - phoneNumber
+                  - status
+                  - lastLoginAt
+                  - createdAt
+                  - updatedAt
+                properties:
+                  id:
+                    format: uuid
+                    type: string
+                  user:
+                    type: object
+                    required:
+                      - id
+                      - name
+                      - email
+                    properties:
+                      id:
+                        format: uuid
+                        type: string
+                      name:
+                        type: string
+                      email:
+                        format: email
+                        type: string
+                  role:
+                    type: object
+                    required:
+                      - id
+                      - name
+                      - displayName
+                    properties:
+                      id:
+                        format: uuid
+                        type: string
+                      name:
+                        type: string
+                      displayName:
+                        type: string
+                  permissions:
+                    type: array
+                    items:
+                      type: string
+                  phoneNumber:
+                    nullable: true
+                    anyOf:
+                      - type: string
+                      - type: "null"
+                  status:
+                    type: string
+                    enum:
+                      - active
+                      - inactive
+                  lastLoginAt:
+                    nullable: true
+                    anyOf:
+                      - anyOf:
+                          - type: Date
+                          - format: date-time
+                            type: string
+                          - format: date
+                            type: string
+                          - type: number
+                      - type: "null"
+                  createdAt:
+                    anyOf:
+                      - type: Date
+                      - format: date-time
+                        type: string
+                      - format: date
+                        type: string
+                      - type: number
+                  updatedAt:
+                    anyOf:
+                      - type: Date
+                      - format: date-time
+                        type: string
+                      - format: date
+                        type: string
+                      - type: number
+                $id: "#/components/schemas/memberResponse"
+        "401":
+          description: Response for status 401
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Response for status 403
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Response for status 404
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+      operationId: getApiTeamById
+    patch:
+      tags:
+        - Team
+      summary: Update team member (Admin)
+      description: Update a team member's role, status, or phone number.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            format: uuid
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                roleId:
+                  format: uuid
+                  type: string
+                phoneNumber:
+                  nullable: true
+                  anyOf:
+                    - minLength: 7
+                      maxLength: 20
+                      type: string
+                    - type: "null"
+                status:
+                  type: string
+                  enum:
+                    - active
+                    - inactive
+              $id: "#/components/schemas/update"
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                roleId:
+                  format: uuid
+                  type: string
+                phoneNumber:
+                  nullable: true
+                  anyOf:
+                    - minLength: 7
+                      maxLength: 20
+                      type: string
+                    - type: "null"
+                status:
+                  type: string
+                  enum:
+                    - active
+                    - inactive
+              $id: "#/components/schemas/update"
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                roleId:
+                  format: uuid
+                  type: string
+                phoneNumber:
+                  nullable: true
+                  anyOf:
+                    - minLength: 7
+                      maxLength: 20
+                      type: string
+                    - type: "null"
+                status:
+                  type: string
+                  enum:
+                    - active
+                    - inactive
+              $id: "#/components/schemas/update"
+      responses:
+        "200":
+          description: Response for status 200
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - id
+                  - user
+                  - role
+                  - permissions
+                  - phoneNumber
+                  - status
+                  - lastLoginAt
+                  - createdAt
+                  - updatedAt
+                properties:
+                  id:
+                    format: uuid
+                    type: string
+                  user:
+                    type: object
+                    required:
+                      - id
+                      - name
+                      - email
+                    properties:
+                      id:
+                        format: uuid
+                        type: string
+                      name:
+                        type: string
+                      email:
+                        format: email
+                        type: string
+                  role:
+                    type: object
+                    required:
+                      - id
+                      - name
+                      - displayName
+                    properties:
+                      id:
+                        format: uuid
+                        type: string
+                      name:
+                        type: string
+                      displayName:
+                        type: string
+                  permissions:
+                    type: array
+                    items:
+                      type: string
+                  phoneNumber:
+                    nullable: true
+                    anyOf:
+                      - type: string
+                      - type: "null"
+                  status:
+                    type: string
+                    enum:
+                      - active
+                      - inactive
+                  lastLoginAt:
+                    nullable: true
+                    anyOf:
+                      - anyOf:
+                          - type: Date
+                          - format: date-time
+                            type: string
+                          - format: date
+                            type: string
+                          - type: number
+                      - type: "null"
+                  createdAt:
+                    anyOf:
+                      - type: Date
+                      - format: date-time
+                        type: string
+                      - format: date
+                        type: string
+                      - type: number
+                  updatedAt:
+                    anyOf:
+                      - type: Date
+                      - format: date-time
+                        type: string
+                      - format: date
+                        type: string
+                      - type: number
+                $id: "#/components/schemas/memberResponse"
+        "400":
+          description: Response for status 400
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Response for status 401
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Response for status 403
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Response for status 404
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+      operationId: patchApiTeamById
+    delete:
+      tags:
+        - Team
+      summary: Delete team member (Admin)
+      description: Permanently removes the team member and their associated user account.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        "204":
+          description: Response for status 204
+          content:
+            type: void
+        "401":
+          description: Response for status 401
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Response for status 403
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Response for status 404
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                $id: "#/components/schemas/ErrorResponse"
+      operationId: deleteApiTeamById
 components:
   schemas:
     HealthResponse:
@@ -10778,6 +12988,26 @@ components:
               type: string
             - type: number
       $id: "#/components/schemas/CustomerTypeItem"
+    CustomerTypeCreateRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          minLength: 1
+          maxLength: 100
+          type: string
+      $id: "#/components/schemas/CustomerTypeCreateRequest"
+    CustomerTypeUpdateRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          minLength: 1
+          maxLength: 100
+          type: string
+      $id: "#/components/schemas/CustomerTypeUpdateRequest"
     AdminListCustomersQuery:
       type: object
       properties:
@@ -11291,8 +13521,8 @@ components:
               type: boolean
             hasPreviousPage:
               type: boolean
+          $id: "#/components/schemas/PaginationMeta"
       $id: "#/components/schemas/AdminCustomersListResponse"
-      additionalProperties: false
     ErrorResponse:
       type: object
       required:
@@ -11301,7 +13531,6 @@ components:
         message:
           type: string
       $id: "#/components/schemas/ErrorResponse"
-      additionalProperties: false
     SaveLocationRequest:
       examples:
         - address: 123 Independence Avenue
@@ -12032,6 +14261,7 @@ components:
               type: boolean
             hasPreviousPage:
               type: boolean
+          $id: "#/components/schemas/PaginationMeta"
       $id: "#/components/schemas/AdminListResponse"
     AdminDetailedResponse:
       type: object
@@ -12641,6 +14871,7 @@ components:
               type: boolean
             hasPreviousPage:
               type: boolean
+          $id: "#/components/schemas/PaginationMeta"
       $id: "#/components/schemas/listResponse"
     ZoneResponse:
       type: object
@@ -12826,3 +15057,654 @@ components:
           description: Zone name already exists
           type: string
       $id: "#/components/schemas/DuplicateNameError"
+    SendRequest:
+      type: object
+      required:
+        - recipientType
+        - subject
+        - message
+      properties:
+        recipientType:
+          type: string
+          enum:
+            - all
+            - zone
+            - custom
+        zoneId:
+          format: uuid
+          description: Required when recipientType is 'zone'
+          type: string
+        emails:
+          minItems: 1
+          description: Required when recipientType is 'custom'
+          type: array
+          items:
+            format: email
+            type: string
+        subject:
+          minLength: 1
+          maxLength: 255
+          type: string
+        message:
+          minLength: 1
+          type: string
+      $id: "#/components/schemas/SendRequest"
+    HistoryQuery:
+      type: object
+      properties:
+        page:
+          minimum: 1
+          default: 1
+          anyOf:
+            - format: integer
+              default: 0
+              type: string
+            - minimum: 1
+              default: 1
+              type: integer
+        limit:
+          minimum: 1
+          maximum: 100
+          default: 20
+          anyOf:
+            - format: integer
+              default: 0
+              type: string
+            - minimum: 1
+              maximum: 100
+              default: 20
+              type: integer
+      $id: "#/components/schemas/HistoryQuery"
+    SendResponse:
+      type: object
+      required:
+        - success
+        - message
+        - recipientCount
+      properties:
+        success:
+          const: true
+          type: boolean
+        message:
+          type: string
+        recipientCount:
+          minimum: 0
+          anyOf:
+            - format: integer
+              default: 0
+              type: string
+            - minimum: 0
+              type: integer
+      $id: "#/components/schemas/SendResponse"
+    HistoryItem:
+      type: object
+      required:
+        - id
+        - subject
+        - message
+        - recipientType
+        - zoneId
+        - zoneName
+        - customEmails
+        - recipientCount
+        - deliveredCount
+        - failedCount
+        - status
+        - sentBy
+        - senderName
+        - createdAt
+      properties:
+        id:
+          format: uuid
+          type: string
+        subject:
+          type: string
+        message:
+          type: string
+        recipientType:
+          type: string
+          enum:
+            - all
+            - zone
+            - custom
+        zoneId:
+          nullable: true
+          anyOf:
+            - format: uuid
+              type: string
+            - type: "null"
+        zoneName:
+          nullable: true
+          anyOf:
+            - type: string
+            - type: "null"
+        customEmails:
+          type: array
+          items:
+            type: string
+        recipientCount:
+          minimum: 0
+          anyOf:
+            - format: integer
+              default: 0
+              type: string
+            - minimum: 0
+              type: integer
+        deliveredCount:
+          minimum: 0
+          anyOf:
+            - format: integer
+              default: 0
+              type: string
+            - minimum: 0
+              type: integer
+        failedCount:
+          minimum: 0
+          anyOf:
+            - format: integer
+              default: 0
+              type: string
+            - minimum: 0
+              type: integer
+        status:
+          type: string
+          enum:
+            - pending
+            - completed
+            - partial
+            - failed
+        sentBy:
+          format: uuid
+          type: string
+        senderName:
+          nullable: true
+          anyOf:
+            - type: string
+            - type: "null"
+        createdAt:
+          anyOf:
+            - type: Date
+            - format: date-time
+              type: string
+            - format: date
+              type: string
+            - type: number
+      $id: "#/components/schemas/HistoryItem"
+    PaginationMeta:
+      type: object
+      required:
+        - page
+        - limit
+        - total
+        - totalPages
+        - hasNextPage
+        - hasPreviousPage
+      properties:
+        page:
+          minimum: 1
+          anyOf:
+            - format: integer
+              default: 0
+              type: string
+            - minimum: 1
+              type: integer
+        limit:
+          minimum: 1
+          anyOf:
+            - format: integer
+              default: 0
+              type: string
+            - minimum: 1
+              type: integer
+        total:
+          minimum: 0
+          anyOf:
+            - format: integer
+              default: 0
+              type: string
+            - minimum: 0
+              type: integer
+        totalPages:
+          minimum: 0
+          anyOf:
+            - format: integer
+              default: 0
+              type: string
+            - minimum: 0
+              type: integer
+        hasNextPage:
+          type: boolean
+        hasPreviousPage:
+          type: boolean
+      $id: "#/components/schemas/PaginationMeta"
+    permission:
+      type: object
+      required:
+        - id
+        - key
+        - displayName
+        - description
+      properties:
+        id:
+          format: uuid
+          type: string
+        key:
+          type: string
+        displayName:
+          type: string
+        description:
+          nullable: true
+          anyOf:
+            - type: string
+            - type: "null"
+      $id: "#/components/schemas/permission"
+    role:
+      type: object
+      required:
+        - id
+        - name
+        - displayName
+        - description
+        - isSystem
+        - permissions
+      properties:
+        id:
+          format: uuid
+          type: string
+        name:
+          type: string
+        displayName:
+          type: string
+        description:
+          nullable: true
+          anyOf:
+            - type: string
+            - type: "null"
+        isSystem:
+          type: boolean
+        permissions:
+          type: array
+          items:
+            type: object
+            required:
+              - id
+              - key
+              - displayName
+              - description
+            properties:
+              id:
+                format: uuid
+                type: string
+              key:
+                type: string
+              displayName:
+                type: string
+              description:
+                nullable: true
+                anyOf:
+                  - type: string
+                  - type: "null"
+      $id: "#/components/schemas/role"
+    stats:
+      type: object
+      required:
+        - totalMembers
+        - activeMembers
+        - superAdmins
+        - onlineNow
+      properties:
+        totalMembers:
+          anyOf:
+            - format: integer
+              default: 0
+              type: string
+            - type: integer
+        activeMembers:
+          anyOf:
+            - format: integer
+              default: 0
+              type: string
+            - type: integer
+        superAdmins:
+          anyOf:
+            - format: integer
+              default: 0
+              type: string
+            - type: integer
+        onlineNow:
+          anyOf:
+            - format: integer
+              default: 0
+              type: string
+            - type: integer
+      $id: "#/components/schemas/stats"
+    memberResponse:
+      type: object
+      required:
+        - id
+        - user
+        - role
+        - permissions
+        - phoneNumber
+        - status
+        - lastLoginAt
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          format: uuid
+          type: string
+        user:
+          type: object
+          required:
+            - id
+            - name
+            - email
+          properties:
+            id:
+              format: uuid
+              type: string
+            name:
+              type: string
+            email:
+              format: email
+              type: string
+        role:
+          type: object
+          required:
+            - id
+            - name
+            - displayName
+          properties:
+            id:
+              format: uuid
+              type: string
+            name:
+              type: string
+            displayName:
+              type: string
+        permissions:
+          type: array
+          items:
+            type: string
+        phoneNumber:
+          nullable: true
+          anyOf:
+            - type: string
+            - type: "null"
+        status:
+          type: string
+          enum:
+            - active
+            - inactive
+        lastLoginAt:
+          nullable: true
+          anyOf:
+            - anyOf:
+                - type: Date
+                - format: date-time
+                  type: string
+                - format: date
+                  type: string
+                - type: number
+            - type: "null"
+        createdAt:
+          anyOf:
+            - type: Date
+            - format: date-time
+              type: string
+            - format: date
+              type: string
+            - type: number
+        updatedAt:
+          anyOf:
+            - type: Date
+            - format: date-time
+              type: string
+            - format: date
+              type: string
+            - type: number
+      $id: "#/components/schemas/memberResponse"
+    memberListItem:
+      type: object
+      required:
+        - id
+        - user
+        - role
+        - phoneNumber
+        - status
+        - lastLoginAt
+        - createdAt
+      properties:
+        id:
+          format: uuid
+          type: string
+        user:
+          type: object
+          required:
+            - id
+            - name
+            - email
+          properties:
+            id:
+              format: uuid
+              type: string
+            name:
+              type: string
+            email:
+              format: email
+              type: string
+        role:
+          type: object
+          required:
+            - id
+            - name
+            - displayName
+          properties:
+            id:
+              format: uuid
+              type: string
+            name:
+              type: string
+            displayName:
+              type: string
+        phoneNumber:
+          nullable: true
+          anyOf:
+            - type: string
+            - type: "null"
+        status:
+          type: string
+          enum:
+            - active
+            - inactive
+        lastLoginAt:
+          nullable: true
+          anyOf:
+            - anyOf:
+                - type: Date
+                - format: date-time
+                  type: string
+                - format: date
+                  type: string
+                - type: number
+            - type: "null"
+        createdAt:
+          anyOf:
+            - type: Date
+            - format: date-time
+              type: string
+            - format: date
+              type: string
+            - type: number
+      $id: "#/components/schemas/memberListItem"
+    rolesResponse:
+      type: array
+      items:
+        type: object
+        required:
+          - id
+          - name
+          - displayName
+          - description
+          - isSystem
+          - permissions
+        properties:
+          id:
+            format: uuid
+            type: string
+          name:
+            type: string
+          displayName:
+            type: string
+          description:
+            nullable: true
+            anyOf:
+              - type: string
+              - type: "null"
+          isSystem:
+            type: boolean
+          permissions:
+            type: array
+            items:
+              type: object
+              required:
+                - id
+                - key
+                - displayName
+                - description
+              properties:
+                id:
+                  format: uuid
+                  type: string
+                key:
+                  type: string
+                displayName:
+                  type: string
+                description:
+                  nullable: true
+                  anyOf:
+                    - type: string
+                    - type: "null"
+      $id: "#/components/schemas/rolesResponse"
+    permissionsResponse:
+      type: array
+      items:
+        type: object
+        required:
+          - id
+          - key
+          - displayName
+          - description
+        properties:
+          id:
+            format: uuid
+            type: string
+          key:
+            type: string
+          displayName:
+            type: string
+          description:
+            nullable: true
+            anyOf:
+              - type: string
+              - type: "null"
+      $id: "#/components/schemas/permissionsResponse"
+    createRole:
+      type: object
+      required:
+        - name
+        - displayName
+        - permissionIds
+      properties:
+        name:
+          minLength: 1
+          maxLength: 50
+          pattern: ^[a-z0-9_]+$
+          description: Lowercase slug, e.g. 'billing_manager'
+          type: string
+        displayName:
+          minLength: 1
+          maxLength: 100
+          type: string
+        description:
+          maxLength: 255
+          type: string
+        permissionIds:
+          minItems: 1
+          type: array
+          items:
+            format: uuid
+            type: string
+      $id: "#/components/schemas/createRole"
+    createRoleResponse:
+      type: object
+      required:
+        - id
+        - name
+        - displayName
+        - description
+        - isSystem
+        - permissions
+      properties:
+        id:
+          format: uuid
+          type: string
+        name:
+          type: string
+        displayName:
+          type: string
+        description:
+          nullable: true
+          anyOf:
+            - type: string
+            - type: "null"
+        isSystem:
+          type: boolean
+        permissions:
+          type: array
+          items:
+            type: object
+            required:
+              - id
+              - key
+              - displayName
+              - description
+            properties:
+              id:
+                format: uuid
+                type: string
+              key:
+                type: string
+              displayName:
+                type: string
+              description:
+                nullable: true
+                anyOf:
+                  - type: string
+                  - type: "null"
+      $id: "#/components/schemas/createRoleResponse"
+    notFoundError:
+      type: object
+      required:
+        - success
+        - message
+      properties:
+        success:
+          const: false
+          type: boolean
+        message:
+          type: string
+      $id: "#/components/schemas/notFoundError"
+    conflictError:
+      type: object
+      required:
+        - success
+        - message
+      properties:
+        success:
+          const: false
+          type: boolean
+        message:
+          type: string
+      $id: "#/components/schemas/conflictError"

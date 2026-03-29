@@ -9,7 +9,6 @@ const emit = defineEmits<{
 }>()
 
 const zones = ref<{ id: string; name: string }[]>([])
-const trucks = ref<{ id: string; truckId: string; plateNumber: string }[]>([])
 
 // Split name into first/last
 const nameParts = (props.driver?.user?.name ?? '').trim().split(' ')
@@ -21,18 +20,19 @@ const form = reactive({
   licenseNumber: props.driver?.licenseNumber ?? '',
   licenseExpiry: props.driver?.licenseExpiry ?? '',
   zoneId:        props.driver?.zone?.id ?? '',
-  truckId:       props.driver?.assignedTruck?.id ?? '',
   status:        props.driver?.status ?? 'active',
+})
+
+const assignedTruckDisplay = computed(() => {
+  const truck = props.driver?.assignedTruck
+  if (!truck) return 'Unassigned'
+  return `${truck.truckId ?? 'N/A'} — ${truck.plateNumber ?? 'N/A'}`
 })
 
 onMounted(async () => {
   const api = useApi()
-  const [zoneData, truckData] = await Promise.all([
-    api.get<any>('/zone/public/list'),
-    api.get<any>('/trucks/admin/'),
-  ])
+  const zoneData = await api.get<any>('/zone/public/list')
   if (zoneData) zones.value = Array.isArray(zoneData) ? zoneData : (zoneData.data ?? [])
-  if (truckData) trucks.value = Array.isArray(truckData) ? truckData : (truckData.data ?? [])
 })
 
 const errors = reactive<Record<string, string>>({})
@@ -56,7 +56,6 @@ function submit() {
     licenseNumber: form.licenseNumber || undefined,
     licenseExpiry: form.licenseExpiry || undefined,
     zoneId:        form.zoneId || undefined,
-    truckId:       form.truckId || undefined,
     status:        form.status,
   })
 }
@@ -149,15 +148,12 @@ function onBlur(e: Event, field: string) {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
           <div style="display:flex;flex-direction:column;gap:6px">
             <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Assigned Truck</label>
-            <select
-              v-model="form.truckId"
-              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:${form.truckId ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
-              @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
-              @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
-            >
-              <option value="">Unassigned</option>
-              <option v-for="t in trucks" :key="t.id" :value="t.id">{{ t.truckId }} — {{ t.plateNumber }}</option>
-            </select>
+            <input
+              :value="assignedTruckDisplay"
+              type="text"
+              readonly
+              style="width:100%;height:39px;padding:0 12px;background:#f8f9fa;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;cursor:default"
+            />
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
             <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Zone</label>
