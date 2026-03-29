@@ -122,9 +122,9 @@ async function fetchStats() {
 async function fetchCustomerTypes() {
   const api = useApi()
   
-  console.log('[Rates] Fetching customer types from /customer/types')
+  console.log('[Rates] Fetching customer types from /customer/admin/types')
   const response = await api.get<{ data: CustomerType[] }>(
-    '/customer/types',
+    '/customer/admin/types',
     'Failed to load customer types'
   )
   

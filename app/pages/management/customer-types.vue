@@ -2,19 +2,56 @@
 definePageMeta({ layout: 'dashboard' })
 
 interface CustomerType {
-  id: number
+  id: string  // UUID from API
   name: string
-  description: string
-  color: string
-  customerCount: number
+  description: string  // Client-side only
+  color: string  // Client-side only
+  customerCount: number  // Client-side only
 }
 
-const customerTypes = ref<CustomerType[]>([
-  { id: 1, name: 'Regular',    description: 'Standard residential customers with basic pickup needs.',          color: '#6b7280', customerCount: 142 },
-  { id: 2, name: 'Commercial', description: 'Business and commercial entities with higher volume pickups.',     color: '#3b82f6', customerCount: 58 },
-  { id: 3, name: 'Estate',     description: 'Gated communities and estate developments with bulk service.',     color: '#8b5cf6', customerCount: 23 },
-  { id: 4, name: 'Industrial', description: 'Large-scale industrial facilities requiring specialized handling.', color: '#f97316', customerCount: 11 },
-])
+interface ApiCustomerType {
+  id: string
+  name: string
+  createdAt: string
+  updatedAt: string
+}
+
+const customerTypes = ref<CustomerType[]>([])
+const loading = ref(false)
+const submitting = ref(false)
+const deleting = ref(false)
+
+// Fetch customer types from API
+async function fetchCustomerTypes() {
+  loading.value = true
+  const api = useApi()
+  
+  console.log('[CustomerTypes] Fetching from /customer/admin/types')
+  const response = await api.get<ApiCustomerType[]>(
+    '/customer/admin/types',
+    'Failed to load customer types'
+  )
+  
+  if (response) {
+    console.log('[CustomerTypes] Received:', response)
+    // Transform API response to include client-side fields
+    customerTypes.value = response.map((ct, index) => ({
+      id: ct.id,
+      name: ct.name,
+      description: '',  // Not in API
+      color: getColorForIndex(index),  // Assign colors cyclically
+      customerCount: 0,  // Not in API (would need separate endpoint)
+    }))
+  }
+  
+  loading.value = false
+}
+
+// Helper to assign colors cyclically
+function getColorForIndex(index: number): string {
+  const colors = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444','#ffb400','#ec4899','#14b8a6']
+  return colors[index % colors.length]!
+}
 
 // Add modal
 const showAddModal = ref(false)
@@ -27,20 +64,50 @@ function openAdd() {
   showAddModal.value = true
 }
 
-function handleAdd() {
-  if (!addForm.value.name.trim()) { addError.value = 'Name is required.'; return }
-  customerTypes.value.push({
-    id: Date.now(),
-    name: addForm.value.name.trim(),
-    description: addForm.value.description.trim(),
-    color: addForm.value.color,
-    customerCount: 0,
-  })
-  showAddModal.value = false
+async function handleAdd() {
+  if (!addForm.value.name.trim()) { 
+    addError.value = 'Name is required.'
+    return 
+  }
+  
+  submitting.value = true
+  addError.value = ''
+  
+  try {
+    const api = useApi()
+    const toast = useAppToast()
+    
+    console.log('[CustomerTypes] Creating customer type:', addForm.value.name)
+    
+    const response = await api.post<ApiCustomerType>(
+      '/customer/admin/types',
+      { name: addForm.value.name.trim() },
+      'Failed to create customer type'
+    )
+    
+    if (response) {
+      console.log('[CustomerTypes] Created successfully:', response)
+      toast.success('Customer type created successfully')
+      showAddModal.value = false
+      await fetchCustomerTypes()
+    }
+  } catch (err: any) {
+    console.error('[CustomerTypes] Failed to create:', err)
+    const errorMessage = err?.message || 'Failed to create customer type'
+    
+    if (errorMessage.toLowerCase().includes('already exists') || 
+        errorMessage.toLowerCase().includes('duplicate')) {
+      addError.value = 'A customer type with this name already exists'
+    } else {
+      addError.value = errorMessage
+    }
+  } finally {
+    submitting.value = false
+  }
 }
 
 const showEditModal = ref(false)
-const editForm = ref<CustomerType>({ id: 0, name: '', description: '', color: '#ffb400', customerCount: 0 })
+const editForm = ref<CustomerType>({ id: '', name: '', description: '', color: '#ffb400', customerCount: 0 })
 const editError = ref('')
 
 function openEdit(ct: CustomerType) {
@@ -49,19 +116,46 @@ function openEdit(ct: CustomerType) {
   showEditModal.value = true
 }
 
-function handleEdit() {
-  if (!editForm.value.name.trim()) { editError.value = 'Name is required.'; return }
-  const idx = customerTypes.value.findIndex(c => c.id === editForm.value.id)
-  if (idx !== -1) {
-    customerTypes.value[idx] = {
-      id: customerTypes.value[idx]!.id,
-      customerCount: customerTypes.value[idx]!.customerCount,
-      name: editForm.value.name.trim(),
-      description: editForm.value.description.trim(),
-      color: editForm.value.color,
-    }
+async function handleEdit() {
+  if (!editForm.value.name.trim()) { 
+    editError.value = 'Name is required.'
+    return 
   }
-  showEditModal.value = false
+  
+  submitting.value = true
+  editError.value = ''
+  
+  try {
+    const api = useApi()
+    const toast = useAppToast()
+    
+    console.log('[CustomerTypes] Updating customer type:', editForm.value.id)
+    
+    const response = await api.patch<ApiCustomerType>(
+      `/customer/admin/types/${editForm.value.id}`,
+      { name: editForm.value.name.trim() },
+      'Failed to update customer type'
+    )
+    
+    if (response) {
+      console.log('[CustomerTypes] Updated successfully:', response)
+      toast.success('Customer type updated successfully')
+      showEditModal.value = false
+      await fetchCustomerTypes()
+    }
+  } catch (err: any) {
+    console.error('[CustomerTypes] Failed to update:', err)
+    const errorMessage = err?.message || 'Failed to update customer type'
+    
+    if (errorMessage.toLowerCase().includes('already exists') || 
+        errorMessage.toLowerCase().includes('duplicate')) {
+      editError.value = 'A customer type with this name already exists'
+    } else {
+      editError.value = errorMessage
+    }
+  } finally {
+    submitting.value = false
+  }
 }
 
 // Delete modal
@@ -73,16 +167,53 @@ function openDelete(ct: CustomerType) {
   showDeleteModal.value = true
 }
 
-function handleDelete() {
-  if (deleteTarget.value) {
-    customerTypes.value = customerTypes.value.filter(c => c.id !== deleteTarget.value!.id)
+async function handleDelete() {
+  if (!deleteTarget.value) return
+  
+  deleting.value = true
+  const api = useApi()
+  const toast = useAppToast()
+  
+  console.log('[CustomerTypes] Deleting customer type:', deleteTarget.value.id)
+  
+  try {
+    await api.del(
+      `/customer/admin/types/${deleteTarget.value.id}`,
+      'Failed to delete customer type'
+    )
+    
+    console.log('[CustomerTypes] Deleted successfully')
+    toast.success('Customer type deleted successfully')
+    showDeleteModal.value = false
+    deleteTarget.value = null
+    await fetchCustomerTypes()
+  } catch (err: any) {
+    console.error('[CustomerTypes] Failed to delete:', err)
+    const errorMessage = err?.message || 'Failed to delete customer type'
+    
+    if (errorMessage.toLowerCase().includes('customers') || 
+        errorMessage.toLowerCase().includes('assigned')) {
+      toast.error('Cannot delete', 'This customer type has customers assigned to it')
+    } else {
+      toast.error('Failed to delete customer type', errorMessage)
+    }
+  } finally {
+    deleting.value = false
   }
-  showDeleteModal.value = false
-  deleteTarget.value = null
 }
 
 const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444','#ffb400','#ec4899','#14b8a6']
+
+// Fetch data on mount
+onMounted(fetchCustomerTypes)
 </script>
+
+<style scoped>
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+</style>
 
 <template>
   <div style="display:flex;flex-direction:column;gap:32px;font-family:'Manrope',sans-serif">
@@ -93,7 +224,8 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
         <h1 style="font-size:28px;font-weight:700;color:#111;margin:0;line-height:1.3">Customer Types</h1>
         <p style="font-size:14px;color:#6b7280;margin:6px 0 0">Manage customer type classifications</p>
       </div>
-      <button @click="openAdd" style="display:flex;align-items:center;gap:8px;background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">
+      <button @click="openAdd" :disabled="submitting || deleting" 
+        :style="`display:flex;align-items:center;gap:8px;background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting || deleting ? 'not-allowed' : 'pointer'};opacity:${submitting || deleting ? '0.5' : '1'}`">
         <Icon name="lucide:plus" style="width:16px;height:16px" />
         Add Customer Type
       </button>
@@ -136,11 +268,13 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
 
         <!-- Right: actions -->
         <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
-          <button @click="openEdit(ct)" style="display:flex;align-items:center;gap:6px;background:#ececec;color:#1a1a1a;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">
+          <button @click="openEdit(ct)" :disabled="submitting || deleting" 
+            :style="`display:flex;align-items:center;gap:6px;background:#ececec;color:#1a1a1a;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting || deleting ? 'not-allowed' : 'pointer'};opacity:${submitting || deleting ? '0.5' : '1'}`">
             <Icon name="lucide:pencil" style="width:14px;height:14px" />
             Edit
           </button>
-          <button @click="openDelete(ct)" :disabled="ct.customerCount > 0" :style="`display:flex;align-items:center;gap:6px;background:${ct.customerCount > 0 ? '#f5f5f5' : '#fef2f2'};color:${ct.customerCount > 0 ? '#9ca3af' : '#ef4444'};border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${ct.customerCount > 0 ? 'not-allowed' : 'pointer'}`">
+          <button @click="openDelete(ct)" :disabled="ct.customerCount > 0 || submitting || deleting" 
+            :style="`display:flex;align-items:center;gap:6px;background:${ct.customerCount > 0 || submitting || deleting ? '#f5f5f5' : '#fef2f2'};color:${ct.customerCount > 0 || submitting || deleting ? '#9ca3af' : '#ef4444'};border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${ct.customerCount > 0 || submitting || deleting ? 'not-allowed' : 'pointer'}`">
             <Icon name="lucide:trash-2" style="width:14px;height:14px" />
             Delete
           </button>
@@ -185,8 +319,13 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
           </div>
         </div>
         <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px">
-          <button @click="showAddModal=false" style="background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Cancel</button>
-          <button @click="handleAdd" style="background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Add Type</button>
+          <button @click="showAddModal=false" :disabled="submitting" 
+            :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.5' : '1'}`">Cancel</button>
+          <button @click="handleAdd" :disabled="submitting" 
+            :style="`background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px;opacity:${submitting ? '0.8' : '1'}`">
+            <Icon v-if="submitting" name="lucide:loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
+            {{ submitting ? 'Creating...' : 'Add Type' }}
+          </button>
         </div>
       </div>
     </div>
@@ -220,8 +359,13 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
           </div>
         </div>
         <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px">
-          <button @click="showEditModal=false" style="background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Cancel</button>
-          <button @click="handleEdit" style="background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Save Changes</button>
+          <button @click="showEditModal=false" :disabled="submitting" 
+            :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.5' : '1'}`">Cancel</button>
+          <button @click="handleEdit" :disabled="submitting" 
+            :style="`background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px;opacity:${submitting ? '0.8' : '1'}`">
+            <Icon v-if="submitting" name="lucide:loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
+            {{ submitting ? 'Saving...' : 'Save Changes' }}
+          </button>
         </div>
       </div>
     </div>
@@ -243,8 +387,13 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
           <p style="font-size:13px;color:#6b7280;margin:0">This action cannot be undone. All configuration for this type will be permanently removed.</p>
         </div>
         <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px">
-          <button @click="showDeleteModal=false" style="background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Cancel</button>
-          <button @click="handleDelete" style="background:#ef4444;color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Delete</button>
+          <button @click="showDeleteModal=false" :disabled="deleting" 
+            :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${deleting ? 'not-allowed' : 'pointer'};opacity:${deleting ? '0.5' : '1'}`">Cancel</button>
+          <button @click="handleDelete" :disabled="deleting" 
+            :style="`background:#ef4444;color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${deleting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px;opacity:${deleting ? '0.8' : '1'}`">
+            <Icon v-if="deleting" name="lucide:loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
+            {{ deleting ? 'Deleting...' : 'Delete' }}
+          </button>
         </div>
       </div>
     </div>
