@@ -2,7 +2,7 @@
 const props = defineProps<{
   truck: {
     id: string; plate: string; vin: string; make: string; model: string
-    year: number | string; capacity: string; status: string; driver: string
+    year: number | string; capacity: string; status: string
   }
 }>()
 
@@ -10,7 +10,7 @@ const emit = defineEmits<{
   (e: 'close'): void
   (e: 'submit', data: {
     plate: string; vin: string; make: string; model: string
-    year: number; capacity: string; status: string; driver: string
+    year: number; capacity: string; status: string
   }): void
 }>()
 
@@ -22,11 +22,65 @@ const form = reactive({
   year:     Number(props.truck.year),
   capacity: props.truck.capacity,
   status:   props.truck.status,
-  driver:   props.truck.driver,
+})
+
+const errors = reactive({
+  plate: '',
+  vin: '',
+  make: '',
+  model: '',
+  capacity: '',
 })
 
 const statuses = ['active', 'maintenance', 'inactive']
-const drivers  = ['John Smith', 'Maria Garcia', 'James Wilson', 'Lisa Anderson', 'Robert Taylor', 'Unassigned']
+const submitting = ref(false)
+
+function validate(): boolean {
+  let isValid = true
+  
+  errors.plate = ''
+  errors.vin = ''
+  errors.make = ''
+  errors.model = ''
+  errors.capacity = ''
+  
+  if (!form.plate.trim()) {
+    errors.plate = 'Plate number is required'
+    isValid = false
+  }
+  
+  if (!form.vin.trim()) {
+    errors.vin = 'VIN number is required'
+    isValid = false
+  }
+  
+  if (!form.make.trim()) {
+    errors.make = 'Make is required'
+    isValid = false
+  }
+  
+  if (!form.model.trim()) {
+    errors.model = 'Model is required'
+    isValid = false
+  }
+  
+  if (!form.capacity.trim()) {
+    errors.capacity = 'Capacity is required'
+    isValid = false
+  }
+  
+  return isValid
+}
+
+function submit() {
+  if (!validate()) {
+    console.log('[EditTruckModal] Validation failed')
+    return
+  }
+  
+  submitting.value = true
+  emit('submit', { ...form })
+}
 
 const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
 const selectStyle = `width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`
@@ -34,8 +88,6 @@ const inputStyle = `width:100%;height:39px;padding:0 12px;background:white;borde
 
 function onFocus(e: Event) { (e.target as HTMLElement).style.borderColor = '#ffb400' }
 function onBlur(e: Event)  { (e.target as HTMLElement).style.borderColor = '#e5e7eb' }
-
-function submit() { emit('submit', { ...form }) }
 </script>
 
 <template>
@@ -76,25 +128,29 @@ function submit() { emit('submit', { ...form }) }
 
         <!-- Plate Number -->
         <div style="display:flex;flex-direction:column;gap:6px">
-          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Plate Number</label>
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Plate Number <span style="color:#ef4444">*</span></label>
           <input v-model="form.plate" type="text" :style="inputStyle" @focus="onFocus" @blur="onBlur" />
+          <p v-if="errors.plate" style="font-size:12px;color:#ef4444;margin:0">{{ errors.plate }}</p>
         </div>
 
         <!-- VIN Number -->
         <div style="display:flex;flex-direction:column;gap:6px">
-          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">VIN Number</label>
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">VIN Number <span style="color:#ef4444">*</span></label>
           <input v-model="form.vin" type="text" :style="inputStyle" @focus="onFocus" @blur="onBlur" />
+          <p v-if="errors.vin" style="font-size:12px;color:#ef4444;margin:0">{{ errors.vin }}</p>
         </div>
 
         <!-- Make + Model -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
           <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Make</label>
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Make <span style="color:#ef4444">*</span></label>
             <input v-model="form.make" type="text" :style="inputStyle" @focus="onFocus" @blur="onBlur" />
+            <p v-if="errors.make" style="font-size:12px;color:#ef4444;margin:0">{{ errors.make }}</p>
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Model</label>
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Model <span style="color:#ef4444">*</span></label>
             <input v-model="form.model" type="text" :style="inputStyle" @focus="onFocus" @blur="onBlur" />
+            <p v-if="errors.model" style="font-size:12px;color:#ef4444;margin:0">{{ errors.model }}</p>
           </div>
         </div>
 
@@ -105,8 +161,9 @@ function submit() { emit('submit', { ...form }) }
             <input v-model.number="form.year" type="number" :style="inputStyle" @focus="onFocus" @blur="onBlur" />
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Capacity</label>
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Capacity <span style="color:#ef4444">*</span></label>
             <input v-model="form.capacity" type="text" :style="inputStyle" @focus="onFocus" @blur="onBlur" />
+            <p v-if="errors.capacity" style="font-size:12px;color:#ef4444;margin:0">{{ errors.capacity }}</p>
           </div>
         </div>
 
@@ -115,14 +172,6 @@ function submit() { emit('submit', { ...form }) }
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Status</label>
           <select v-model="form.status" :style="selectStyle" @focus="onFocus" @blur="onBlur">
             <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
-          </select>
-        </div>
-
-        <!-- Assigned Driver -->
-        <div style="display:flex;flex-direction:column;gap:6px">
-          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Assigned Driver</label>
-          <select v-model="form.driver" :style="selectStyle" @focus="onFocus" @blur="onBlur">
-            <option v-for="d in drivers" :key="d" :value="d">{{ d }}</option>
           </select>
         </div>
 
@@ -137,11 +186,15 @@ function submit() { emit('submit', { ...form }) }
           @click="emit('close')"
         >Cancel</button>
         <button
-          style="height:40px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
-          @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
+          :disabled="submitting"
+          style="height:40px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2);display:flex;align-items:center;gap:8px"
+          @mouseover="!submitting && (($event.currentTarget as HTMLElement).style.opacity='0.9')"
           @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
           @click="submit"
-        >Save Changes</button>
+        >
+          <UIcon v-if="submitting" name="i-lucide-loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
+          {{ submitting ? 'Saving...' : 'Save Changes' }}
+        </button>
       </div>
 
     </div>

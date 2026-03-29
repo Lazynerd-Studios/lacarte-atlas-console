@@ -7,11 +7,15 @@ const loading = ref(true)
 const notFound = ref(false)
 
 onMounted(async () => {
+  console.log('[truck-detail] Component mounted, fetching truck:', route.params.id)
   const api = useApi()
   const data = await api.get<any>(`/trucks/admin/${route.params.id}`)
+  console.log('[truck-detail] Truck response:', data)
   if (data) {
     truck.value = data
+    console.log('[truck-detail] Loaded truck:', truck.value.truckId)
   } else {
+    console.log('[truck-detail] Truck not found')
     notFound.value = true
   }
   loading.value = false
@@ -19,8 +23,10 @@ onMounted(async () => {
 
 const showEditModal = ref(false)
 const showMaintenanceModal = ref(false)
+const showAssignDriverModal = ref(false)
 
 function handleMaintenance(data: { type: string; technician: string; date: string; estimatedCost: string; notes: string }) {
+  console.log('[truck-detail] Adding maintenance record:', data)
   maintenanceHistory.unshift({
     date: data.date,
     type: data.type,
@@ -30,17 +36,44 @@ function handleMaintenance(data: { type: string; technician: string; date: strin
     notes: data.notes,
   })
   showMaintenanceModal.value = false
+  console.log('[truck-detail] Maintenance record added, total records:', maintenanceHistory.length)
 }
 
-function handleEdit(data: { plate: string; vin: string; make: string; model: string; year: number; capacity: string; status: string; driver: string }) {
-  truck.value.plateNumber = data.plate
-  truck.value.vinNumber = data.vin
-  truck.value.make = data.make
-  truck.value.model = data.model
-  truck.value.year = String(data.year)
-  truck.value.capacity = data.capacity
-  truck.value.status = data.status
-  showEditModal.value = false
+async function handleAssignDriver(driverId: string) {
+  console.log('[truck-detail] Assigning driver:', driverId, 'to truck:', route.params.id)
+  const api = useApi()
+  const result = await api.patch(`/trucks/admin/${route.params.id}/assign-driver`, { driverId }, 'Failed to assign driver')
+  console.log('[truck-detail] Assign driver result:', result)
+  
+  if (result !== null) {
+    showAssignDriverModal.value = false
+    // Refresh truck data
+    const data = await api.get<any>(`/trucks/admin/${route.params.id}`)
+    if (data) {
+      truck.value = data
+      console.log('[truck-detail] Truck data refreshed after driver assignment')
+    }
+  }
+}
+
+async function handleEdit(data: { plate: string; vin: string; make: string; model: string; year: number; capacity: string; status: string }) {
+  console.log('[truck-detail] Updating truck, payload:', data)
+  const api = useApi()
+  const result = await api.patch(`/trucks/admin/${route.params.id}`, data, 'Failed to update truck')
+  console.log('[truck-detail] Update result:', result)
+  
+  if (result !== null) {
+    // Update local state
+    truck.value.plateNumber = data.plate
+    truck.value.vinNumber = data.vin
+    truck.value.make = data.make
+    truck.value.model = data.model
+    truck.value.year = String(data.year)
+    truck.value.capacity = data.capacity
+    truck.value.status = data.status
+    showEditModal.value = false
+    console.log('[truck-detail] Truck updated successfully')
+  }
 }
 
 const statusBadge = computed(() => {
@@ -52,6 +85,18 @@ const statusBadge = computed(() => {
 
 const activeTab = ref('Vehicle Details')
 const tabs = ['Vehicle Details', 'Maintenance History', 'Route History']
+
+watch(activeTab, (newTab) => {
+  console.log('[truck-detail] Tab changed to:', newTab)
+})
+
+watch(showEditModal, (isOpen) => {
+  if (isOpen) console.log('[truck-detail] Opening edit modal')
+})
+
+watch(showMaintenanceModal, (isOpen) => {
+  if (isOpen) console.log('[truck-detail] Opening maintenance modal')
+})
 
 const maintenanceHistory = reactive([
   { date: '2026-02-15', type: 'Oil Change',          technician: 'AutoCare Ltd',    cost: 'GHS 320.00',  status: 'completed', notes: 'Full synthetic 10W-30' },
@@ -130,6 +175,15 @@ const routeHistory = [
               @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
               @click="showEditModal = true"
             >Edit Truck</button>
+            <button
+              style="height:40px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px"
+              @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
+              @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
+              @click="showAssignDriverModal = true"
+            >
+              <UIcon name="i-lucide-user-plus" style="width:16px;height:16px" />
+              Assign Driver
+            </button>
             <button
               style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
               @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
@@ -314,9 +368,17 @@ const routeHistory = [
 
   <EditTruckModal
     v-if="showEditModal && truck"
-    :truck="{ id: truck.truckId, plate: truck.plateNumber, vin: truck.vinNumber, make: truck.make, model: truck.model, year: truck.year, capacity: truck.capacity, status: truck.status, driver: truck.assignedDriver?.name ?? 'Unassigned' }"
+    :truck="{ id: truck.truckId, plate: truck.plateNumber, vin: truck.vinNumber, make: truck.make, model: truck.model, year: truck.year, capacity: truck.capacity, status: truck.status }"
     @close="showEditModal = false"
     @submit="handleEdit"
+  />
+
+  <AssignDriverToTruckModal
+    v-if="showAssignDriverModal && truck"
+    :truck-id="truck.truckId"
+    :current-driver="truck.assignedDriver?.name"
+    @close="showAssignDriverModal = false"
+    @submit="handleAssignDriver"
   />
 
   <MaintenanceModal
