@@ -8,8 +8,12 @@ interface TeamStats {
   onlineNow: number
 }
 
-definePageMeta({ layout: 'dashboard' })
+definePageMeta({ 
+  layout: 'dashboard',
+  middleware: 'auth'
+})
 
+const authStore = useAuthStore()
 const showAddRoleModal = ref(false)
 const showDeleteModal = ref(false)
 const memberToDelete = ref<TeamMember | null>(null)
@@ -17,6 +21,7 @@ const deleting = ref(false)
 const submitting = ref(false)
 const members = ref<TeamMember[]>([])
 const loading = ref(false)
+const initialLoading = ref(true)
 const stats = ref<TeamStats>({
   totalMembers: 0,
   activeMembers: 0,
@@ -28,6 +33,9 @@ const statsLoading = ref(false)
 /**
  * Handles role creation from AddRoleModal
  * 
+ * Authorization:
+ * - Verifies user has admin privileges before allowing operation
+ * 
  * Error Handling Strategy:
  * - Client-side validation: Handled in modal component
  * - 400 validation errors (duplicate name, invalid fields): Handled in modal component
@@ -36,6 +44,11 @@ const statsLoading = ref(false)
  * - Network errors: Automatic error toast (handled by useErrorHandler)
  */
 async function handleAddRole(data: CreateRolePayload) {
+  // Check authorization before allowing operation
+  if (!checkAuthorization('create roles')) {
+    return
+  }
+  
   submitting.value = true
   const api = useApi()
   const toast = useAppToast()
@@ -66,6 +79,9 @@ function openDeleteModal(member: TeamMember) {
 /**
  * Handles team member deletion
  * 
+ * Authorization:
+ * - Verifies user has admin privileges before allowing operation
+ * 
  * Error Handling:
  * - 401: Automatic redirect to login (handled by useApi)
  * - 403, 404, 500: Automatic error toast (handled by useErrorHandler)
@@ -73,6 +89,13 @@ function openDeleteModal(member: TeamMember) {
  */
 async function handleDelete() {
   if (!memberToDelete.value) return
+  
+  // Check authorization before allowing operation
+  if (!checkAuthorization('delete team members')) {
+    showDeleteModal.value = false
+    memberToDelete.value = null
+    return
+  }
   
   deleting.value = true
   const api = useApi()
@@ -161,17 +184,51 @@ function getRoleDisplay(member: TeamMember): { name: string; color: string; bg: 
   return { name: roleName, color: roleColor, bg }
 }
 
+/**
+ * Checks if the current user has admin privileges
+ * Returns true if user is admin, false otherwise
+ */
+function hasAdminPrivileges(): boolean {
+  // Check if user has admin role or super admin role
+  const userRole = authStore.user?.role?.toLowerCase() || ''
+  return userRole.includes('admin') || userRole.includes('super')
+}
+
+/**
+ * Checks authorization before performing operations
+ * Shows error toast and returns false if user lacks privileges
+ */
+function checkAuthorization(operationName: string): boolean {
+  if (!hasAdminPrivileges()) {
+    const toast = useAppToast()
+    toast.error('Unauthorized', `You don't have permission to ${operationName}`)
+    return false
+  }
+  return true
+}
+
 // Fetch data on mount
 onMounted(async () => {
+  // Check authorization before displaying content
+  if (!checkAuthorization('access team management')) {
+    return
+  }
+  
+  initialLoading.value = true
   await Promise.all([
     fetchMembers(),
     fetchStats(),
   ])
+  initialLoading.value = false
 })
 </script>
 
 <template>
-  <div style="display:flex;flex-direction:column;gap:28px">
+  <div v-if="initialLoading" style="display:flex;flex-direction:column;gap:28px">
+    <PageSkeleton type="table" :rows="6" :cards="4" />
+  </div>
+
+  <div v-else style="display:flex;flex-direction:column;gap:28px">
 
     <!-- Header -->
     <div style="display:flex;align-items:center;justify-content:space-between">
@@ -181,18 +238,20 @@ onMounted(async () => {
       </div>
       <div style="display:flex;gap:12px">
         <button
+          :disabled="submitting || deleting"
           style="height:40px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
           @click="showAddRoleModal = true"
-          @mouseover="($event.currentTarget as HTMLElement).style.background='#e6a200'"
-          @mouseleave="($event.currentTarget as HTMLElement).style.background='#ffb400'"
+          @mouseover="!(submitting || deleting) && (($event.currentTarget as HTMLElement).style.background='#e6a200')"
+          @mouseleave="!(submitting || deleting) && (($event.currentTarget as HTMLElement).style.background='#ffb400')"
         >
           <UIcon name="i-lucide-shield" style="width:16px;height:16px" />
           Add Role
         </button>
         <button
+          :disabled="submitting || deleting"
           style="height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
-          @mouseover="($event.currentTarget as HTMLElement).style.background='#e6a200'"
-          @mouseleave="($event.currentTarget as HTMLElement).style.background='#ffb400'"
+          @mouseover="!(submitting || deleting) && (($event.currentTarget as HTMLElement).style.background='#e6a200')"
+          @mouseleave="!(submitting || deleting) && (($event.currentTarget as HTMLElement).style.background='#ffb400')"
           @click="$router.push('/team/add')"
         >
           <UIcon name="i-lucide-plus" style="width:16px;height:16px" />
@@ -277,17 +336,19 @@ onMounted(async () => {
             <td style="padding:16px">
               <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px">
                 <button
+                  :disabled="deleting || submitting"
                   style="width:32px;height:32px;border-radius:20px;border:1px solid #ececec;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center"
-                  @mouseover="($event.currentTarget as HTMLElement).style.background='#f8f9fa'"
-                  @mouseleave="($event.currentTarget as HTMLElement).style.background='white'"
+                  @mouseover="!(deleting || submitting) && (($event.currentTarget as HTMLElement).style.background='#f8f9fa')"
+                  @mouseleave="!(deleting || submitting) && (($event.currentTarget as HTMLElement).style.background='white')"
                   @click="$router.push(`/team/${m.id}/edit`)"
                 >
                   <UIcon name="i-lucide-pencil" style="width:15px;height:15px;color:#6b7280" />
                 </button>
                 <button
+                  :disabled="deleting || submitting"
                   style="width:32px;height:32px;border-radius:20px;border:1px solid #fecaca;background:#fef2f2;cursor:pointer;display:flex;align-items:center;justify-content:center"
-                  @mouseover="($event.currentTarget as HTMLElement).style.background='#fee2e2'"
-                  @mouseleave="($event.currentTarget as HTMLElement).style.background='#fef2f2'"
+                  @mouseover="!(deleting || submitting) && (($event.currentTarget as HTMLElement).style.background='#fee2e2')"
+                  @mouseleave="!(deleting || submitting) && (($event.currentTarget as HTMLElement).style.background='#fef2f2')"
                   @click="openDeleteModal(m)"
                 >
                   <UIcon name="i-lucide-trash-2" style="width:15px;height:15px;color:#ef4444" />

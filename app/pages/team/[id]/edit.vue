@@ -3,8 +3,12 @@ import type { TeamMember, Role, Permission } from '~/types/team'
 import { validateTeamMemberForm } from '~/utils/teamValidation'
 import { formToUpdateMemberPayload } from '~/utils/teamTransform'
 
-definePageMeta({ layout: 'dashboard' })
+definePageMeta({ 
+  layout: 'dashboard',
+  middleware: 'auth'
+})
 
+const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 const toast = useAppToast()
@@ -22,7 +26,7 @@ const errors = reactive<Record<string, string>>({})
 const roles = ref<Role[]>([])
 const allPermissions = ref<Permission[]>([])
 const selectedPermissions = ref<string[]>([])
-const loading = ref(false)
+const loading = ref(true)
 const submitting = ref(false)
 
 // Group permissions by module
@@ -49,7 +53,6 @@ const permissionGroups = computed(() => {
  * - Network errors: Automatic error toast (handled by useErrorHandler)
  */
 async function loadMember() {
-  loading.value = true
   const api = useApi()
   
   try {
@@ -70,8 +73,6 @@ async function loadMember() {
     // Handle invalid member ID error
     toast.error('Member not found', 'The requested team member could not be found')
     router.push('/team')
-  } finally {
-    loading.value = false
   }
 }
 
@@ -170,7 +171,32 @@ function isGroupPartial(module: string): boolean {
 }
 
 /**
+ * Checks if the current user has admin privileges
+ * Returns true if user is admin, false otherwise
+ */
+function hasAdminPrivileges(): boolean {
+  // Check if user has admin role or super admin role
+  const userRole = authStore.user?.role?.toLowerCase() || ''
+  return userRole.includes('admin') || userRole.includes('super')
+}
+
+/**
+ * Checks authorization before performing operations
+ * Shows error toast and returns false if user lacks privileges
+ */
+function checkAuthorization(operationName: string): boolean {
+  if (!hasAdminPrivileges()) {
+    toast.error('Unauthorized', `You don't have permission to ${operationName}`)
+    return false
+  }
+  return true
+}
+
+/**
  * Handles form submission for updating a team member
+ * 
+ * Authorization:
+ * - Verifies user has admin privileges before allowing operation
  * 
  * Validation:
  * - Client-side validation using validation utilities
@@ -191,6 +217,11 @@ function isGroupPartial(module: string): boolean {
  * - Navigate to team list page
  */
 async function handleSubmit() {
+  // Check authorization before allowing operation
+  if (!checkAuthorization('update team members')) {
+    return
+  }
+  
   // Clear previous errors
   Object.keys(errors).forEach(key => delete errors[key])
   
@@ -254,11 +285,19 @@ const securityNotes = [
 
 // Fetch data on mount
 onMounted(async () => {
+  // Check authorization before displaying content
+  if (!checkAuthorization('access team management')) {
+    router.push('/team')
+    return
+  }
+  
+  loading.value = true
   await Promise.all([
     loadMember(),
     fetchRoles(),
     fetchPermissions(),
   ])
+  loading.value = false
 })
 </script>
 

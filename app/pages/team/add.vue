@@ -3,8 +3,12 @@ import type { Role } from '~/types/team'
 import { validateTeamMemberForm } from '~/utils/teamValidation'
 import { formToCreateMemberPayload } from '~/utils/teamTransform'
 
-definePageMeta({ layout: 'dashboard' })
+definePageMeta({ 
+  layout: 'dashboard',
+  middleware: 'auth'
+})
 
+const authStore = useAuthStore()
 const form = reactive({
   firstName: '',
   lastName: '',
@@ -17,6 +21,7 @@ const form = reactive({
 const errors = reactive<Record<string, string>>({})
 const roles = ref<Role[]>([])
 const submitting = ref(false)
+const loading = ref(true)
 const router = useRouter()
 const toast = useAppToast()
 
@@ -29,16 +34,43 @@ const toast = useAppToast()
  * - Network errors: Automatic error toast (handled by useErrorHandler)
  */
 async function fetchRoles() {
+  loading.value = true
   const api = useApi()
   
   const response = await api.get<{ roles: Role[] }>('/api/team/admin/roles')
   if (response) {
     roles.value = response.roles
   }
+  loading.value = false
+}
+
+/**
+ * Checks if the current user has admin privileges
+ * Returns true if user is admin, false otherwise
+ */
+function hasAdminPrivileges(): boolean {
+  // Check if user has admin role or super admin role
+  const userRole = authStore.user?.role?.toLowerCase() || ''
+  return userRole.includes('admin') || userRole.includes('super')
+}
+
+/**
+ * Checks authorization before performing operations
+ * Shows error toast and returns false if user lacks privileges
+ */
+function checkAuthorization(operationName: string): boolean {
+  if (!hasAdminPrivileges()) {
+    toast.error('Unauthorized', `You don't have permission to ${operationName}`)
+    return false
+  }
+  return true
 }
 
 /**
  * Handles form submission for adding a new team member
+ * 
+ * Authorization:
+ * - Verifies user has admin privileges before allowing operation
  * 
  * Validation:
  * - Client-side validation using validation utilities
@@ -59,6 +91,11 @@ async function fetchRoles() {
  * - Navigate to team list page
  */
 async function handleSubmit() {
+  // Check authorization before allowing operation
+  if (!checkAuthorization('add team members')) {
+    return
+  }
+  
   // Clear previous errors
   Object.keys(errors).forEach(key => delete errors[key])
   
@@ -103,6 +140,12 @@ async function handleSubmit() {
 
 // Fetch roles on mount
 onMounted(() => {
+  // Check authorization before displaying content
+  if (!checkAuthorization('access team management')) {
+    router.push('/team')
+    return
+  }
+  
   fetchRoles()
 })
 
@@ -125,7 +168,11 @@ function inputStyle(focused = false) {
 </script>
 
 <template>
-  <div style="display:flex;flex-direction:column;gap:28px">
+  <div v-if="loading" style="display:flex;flex-direction:column;gap:28px">
+    <PageSkeleton type="dashboard" />
+  </div>
+
+  <div v-else style="display:flex;flex-direction:column;gap:28px">
 
     <!-- Back link -->
     <NuxtLink to="/team" style="display:inline-flex;align-items:center;gap:8px;text-decoration:none">

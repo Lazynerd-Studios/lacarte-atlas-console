@@ -179,9 +179,9 @@ function onBlur(e: Event, field: string) {
       <div style="flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:20px">
 
         <!-- Role Name -->
-        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;flex-direction:column;gap:6px">
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Role Name</label>
-          <input v-model="form.name" type="text" placeholder="e.g. Operations Manager" :style="inputStyle('name')"
+          <input v-model="form.name" type="text" placeholder="e.g. Operations Manager" :disabled="submitting" :style="inputStyle('name')"
             @focus="onFocus($event, 'name')" @blur="onBlur($event, 'name')" />
           <span v-if="errors.name" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.name }}</span>
         </div>
@@ -191,6 +191,7 @@ function onBlur(e: Event, field: string) {
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Description <span style="color:#9ca3af;font-weight:400">(optional)</span></label>
           <textarea
             v-model="form.description"
+            :disabled="submitting"
             placeholder="Brief description of this role..."
             rows="2"
             style="width:100%;padding:8px 12px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;resize:none;box-sizing:border-box;line-height:1.5"
@@ -211,7 +212,7 @@ function onBlur(e: Event, field: string) {
             <div v-for="group in permissionGroups" :key="group.label" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:16px">
               <!-- Group header with select all -->
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-                <label style="display:flex;align-items:center;gap:8px;cursor:pointer" @click="toggleGroup(group)">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer" :style="submitting ? 'cursor:not-allowed;opacity:0.6' : ''" @click="!submitting && toggleGroup(group)">
                   <div :style="`width:18px;height:18px;border:2px solid ${isGroupSelected(group) ? '#ffb400' : '#d1d5db'};border-radius:4px;display:flex;align-items:center;justify-content:center;background:${isGroupSelected(group) ? '#ffb400' : 'white'};position:relative`">
                     <UIcon v-if="isGroupSelected(group)" name="i-lucide-check" style="width:12px;height:12px;color:white" />
                     <div v-else-if="isGroupPartial(group)" style="width:10px;height:2px;background:#ffb400;border-radius:1px" />
@@ -226,7 +227,8 @@ function onBlur(e: Event, field: string) {
                   v-for="perm in group.permissions"
                   :key="perm.id"
                   style="display:flex;align-items:center;gap:8px;cursor:pointer"
-                  @click="togglePermission(perm.id)"
+                  :style="submitting ? 'cursor:not-allowed;opacity:0.6' : ''"
+                  @click="!submitting && togglePermission(perm.id)"
                 >
                   <div :style="`width:16px;height:16px;border:2px solid ${form.permissions.includes(perm.id) ? '#ffb400' : '#d1d5db'};border-radius:4px;display:flex;align-items:center;justify-content:center;background:${form.permissions.includes(perm.id) ? '#ffb400' : 'white'}`">
                     <UIcon v-if="form.permissions.includes(perm.id)" name="i-lucide-check" style="width:10px;height:10px;color:white" />
@@ -245,7 +247,10 @@ function onBlur(e: Event, field: string) {
         <button
           style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
           :disabled="submitting"
+          :style="submitting ? 'opacity:0.6;cursor:not-allowed' : ''"
           @click="emit('close')"
+          @mouseover="!submitting && (($event.currentTarget as HTMLElement).style.background='#e0e0e0')"
+          @mouseleave="!submitting && (($event.currentTarget as HTMLElement).style.background='#ececec')"
         >Cancel</button>
         <button
           style="height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2);display:flex;align-items:center;gap:8px"
