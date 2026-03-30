@@ -15,6 +15,7 @@ const form = reactive({
 const loading = ref(false)
 const error = ref('')
 const errors = reactive({ email: '', password: '' })
+const showPassword = ref(false)
 
 function validateEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
@@ -118,14 +119,21 @@ async function onSubmit() {
                 <UIcon name="i-lucide-lock" style="position:absolute;left:16px;top:50%;transform:translateY(-50%);width:20px;height:20px;color:#6b7280" />
                 <input
                   v-model="form.password"
-                  type="password"
+                  :type="showPassword ? 'text' : 'password'"
                   placeholder="Enter your password"
                   required
-                  :style="`width:100%;height:48px;padding-left:48px;padding-right:12px;background:white;border:1px solid ${errors.password ? '#ef4444' : '#ececec'};border-radius:20px;font-size:14px;color:#111;outline:none;font-family:'Manrope',sans-serif;box-sizing:border-box`"
+                  :style="`width:100%;height:48px;padding-left:48px;padding-right:48px;background:white;border:1px solid ${errors.password ? '#ef4444' : '#ececec'};border-radius:20px;font-size:14px;color:#111;outline:none;font-family:'Manrope',sans-serif;box-sizing:border-box`"
                   @focus="($event.target as HTMLElement).style.borderColor = errors.password ? '#ef4444' : '#ffb400'"
                   @blur="($event.target as HTMLElement).style.borderColor = errors.password ? '#ef4444' : '#ececec'"
                   @input="errors.password = ''"
                 />
+                <button
+                  type="button"
+                  style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center"
+                  @click="showPassword = !showPassword"
+                >
+                  <UIcon :name="showPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'" style="width:20px;height:20px;color:#6b7280" />
+                </button>
               </div>
               <p v-if="errors.password" style="font-size:12px;color:#ef4444;margin:0;font-family:'Manrope',sans-serif">{{ errors.password }}</p>
             </div>

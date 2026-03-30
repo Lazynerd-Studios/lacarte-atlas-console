@@ -16,7 +16,7 @@ export const useAuthStore = defineStore('auth', () => {
     
     try {
       const config = useRuntimeConfig()
-      const res = await fetch(`${config.public.apiBase}/auth/session`, {
+      const res = await fetch(`${config.public.apiBase}/auth/get-session`, {
         headers: {
           'Authorization': `Bearer ${token.value}`,
           'Content-Type': 'application/json',
@@ -75,6 +75,7 @@ export const useAuthStore = defineStore('auth', () => {
             'Authorization': `Bearer ${token.value}`,
             'Content-Type': 'application/json',
           },
+          body: JSON.stringify({}),
         })
       } catch (error) {
         console.error('[auth] Sign out failed:', error)
