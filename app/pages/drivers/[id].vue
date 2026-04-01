@@ -193,11 +193,11 @@ function stopBadge(status: string) {
       <div style="display:flex;align-items:center;justify-content:space-between;min-height:87px">
         <div style="display:flex;align-items:center;gap:16px">
           <div style="width:64px;height:64px;border-radius:9999px;background:#ffb400;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <span style="font-size:24px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ (driver?.user?.name ?? 'U').split(' ').map((n: string) => n[0]).join('') }}</span>
+            <span style="font-size:24px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ ((driver?.name || driver?.user?.name) ?? 'U').split(' ').map((n: string) => n[0]).join('') }}</span>
           </div>
           <div style="display:flex;flex-direction:column;gap:8px">
             <div style="display:flex;align-items:center;gap:12px">
-              <span style="font-size:24px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">{{ driver?.user?.name }}</span>
+              <span style="font-size:24px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">{{ driver?.name || driver?.user?.name || 'Unknown Driver' }}</span>
               <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;color:${statusBadge.color};background:${statusBadge.bg};border:1px solid ${statusBadge.border};border-radius:14px;padding:3px 11px`">
                 {{ statusBadge.label }}
               </span>
@@ -578,7 +578,7 @@ function stopBadge(status: string) {
 
   <AssignBinModal
     v-if="showAssignBinModal"
-    :driverName="driver?.user?.name ?? ''"
+    :driverName="driver?.name || driver?.user?.name || ''"
     @close="showAssignBinModal = false"
     @submit="handleAssignBin"
   />

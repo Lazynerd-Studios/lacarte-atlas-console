@@ -82,10 +82,10 @@ function statusStyle(s: string) {
       >
         <div style="display:flex;align-items:flex-start;gap:12px">
           <div style="width:48px;height:48px;border-radius:9999px;background:#ffb400;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <span style="font-size:18px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ (d.user?.name ?? 'U').split(' ').map((n: string) => n[0]).join('') }}</span>
+            <span style="font-size:18px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ ((d.name || d.user?.name) ?? 'U').split(' ').map((n: string) => n[0]).join('') }}</span>
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
-            <span style="font-size:16px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">{{ d.user?.name }}</span>
+            <span style="font-size:16px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">{{ d.name || d.user?.name || 'Unknown Driver' }}</span>
             <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:2px 10px;width:fit-content;color:${statusStyle(d.status).color};background:${statusStyle(d.status).bg};border:1px solid ${statusStyle(d.status).border}`">{{ d.status }}</span>
           </div>
         </div>
@@ -146,7 +146,7 @@ function statusStyle(s: string) {
 
   <AssignPickupModal
     v-if="showAssignPickupModal && selectedDriver"
-    :driver-name="selectedDriver.user?.name ?? ''"
+    :driver-name="selectedDriver.name || selectedDriver.user?.name || ''"
     @close="showAssignPickupModal = false"
     @submit="handleAssignPickup"
   />
