@@ -9,6 +9,7 @@ definePageMeta({
 })
 
 const authStore = useAuthStore()
+const { hasPermission, isSuperAdmin } = usePermissions()
 const route = useRoute()
 const router = useRouter()
 const toast = useAppToast()
@@ -150,12 +151,10 @@ function isGroupPartial(module: string): boolean {
 
 /**
  * Checks if the current user has admin privileges
- * Returns true if user is admin, false otherwise
+ * Returns true if user is super admin or has team.manage permission
  */
 function hasAdminPrivileges(): boolean {
-  // Check if user has admin role or super admin role
-  const userRole = authStore.user?.role?.toLowerCase() || ''
-  return userRole.includes('admin') || userRole.includes('super')
+  return isSuperAdmin.value || hasPermission('team.manage')
 }
 
 /**

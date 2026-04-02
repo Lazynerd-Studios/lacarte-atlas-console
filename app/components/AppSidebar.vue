@@ -4,29 +4,48 @@ const emit = defineEmits<{ (e: 'close'): void }>()
 
 const route = useRoute()
 const authStore = useAuthStore()
+const { hasPermission, hasAnyPermission, isSuperAdmin } = usePermissions()
 
 const collapsed = useState('sidebarCollapsed', () => false)
 
-const navLinks = [
-  { label: 'Dashboard',          icon: 'i-lucide-layout-dashboard', to: '/' },
-  { label: 'Customers',          icon: 'i-lucide-users',            to: '/customers' },
-  { label: 'Drivers & Trucks',   icon: 'i-lucide-truck',            to: '/drivers' },
-  { label: 'Pickup Requests',    icon: 'i-lucide-package',          to: '/pickups' },
-  { label: 'Live Tracking',      icon: 'i-lucide-map-pin',          to: '/tracking' },
-  { label: 'Billing & Payments', icon: 'i-lucide-credit-card',      to: '/billing' },
-  { label: 'Shop',               icon: 'i-lucide-shopping-bag',     to: '/shop' },
-  { label: 'Inventory',          icon: 'i-lucide-boxes',            to: '/inventory' },
-  { label: 'Support Tickets',    icon: 'i-lucide-headphones',       to: '/support' },
-  { label: 'Team',               icon: 'i-lucide-users-round',      to: '/team' },
-  { label: 'Settings',           icon: 'i-lucide-settings',         to: '/settings' },
-]
+// Navigation links with permission requirements
+const navLinks = computed(() => [
+  { label: 'Dashboard',          icon: 'i-lucide-layout-dashboard', to: '/', permission: null },
+  { label: 'Customers',          icon: 'i-lucide-users',            to: '/customers', permission: 'customers.view' },
+  { label: 'Drivers & Trucks',   icon: 'i-lucide-truck',            to: '/drivers', permission: 'drivers.view' },
+  { label: 'Pickup Requests',    icon: 'i-lucide-package',          to: '/pickups', permission: 'pickups.view' },
+  { label: 'Live Tracking',      icon: 'i-lucide-map-pin',          to: '/tracking', permission: 'tracking.view' },
+  { label: 'Billing & Payments', icon: 'i-lucide-credit-card',      to: '/billing', permission: 'billing.view' },
+  { label: 'Shop',               icon: 'i-lucide-shopping-bag',     to: '/shop', permission: 'shop.view' },
+  { label: 'Inventory',          icon: 'i-lucide-boxes',            to: '/inventory', permission: 'inventory.view' },
+  { label: 'Support Tickets',    icon: 'i-lucide-headphones',       to: '/support', permission: 'support.view' },
+  { label: 'Team',               icon: 'i-lucide-users-round',      to: '/team', permission: 'team.view' },
+  { label: 'Settings',           icon: 'i-lucide-settings',         to: '/settings', permission: null },
+].filter(link => !link.permission || hasPermission(link.permission)))
 
-const reportsSubLinks = [
-  { label: 'Analytics',            to: '/reports/analytics' },
-  { label: 'Operations Analytics', to: '/reports/operations' },
-  { label: 'Customer Analytics',   to: '/reports/customers' },
-  { label: 'Zone Performance',     to: '/reports/zones' },
-]
+const reportsSubLinks = computed(() => [
+  { label: 'Analytics',            to: '/reports/analytics', permission: 'reports.view' },
+  { label: 'Operations Analytics', to: '/reports/operations', permission: 'reports.view' },
+  { label: 'Customer Analytics',   to: '/reports/customers', permission: 'reports.view' },
+  { label: 'Zone Performance',     to: '/reports/zones', permission: 'reports.view' },
+].filter(link => !link.permission || hasPermission(link.permission)))
+
+const commsSubLinks = computed(() => [
+  { label: 'Quick SMS',  to: '/comms/sms', permission: 'communications.send' },
+  { label: 'Quick Mail', to: '/comms/mail', permission: 'communications.send' },
+].filter(link => !link.permission || hasPermission(link.permission)))
+
+const managementSubLinks = computed(() => [
+  { label: 'Customer Types',          to: '/management/customer-types', permission: 'management.view' },
+  { label: 'Subscription Management', to: '/management/subscriptions', permission: 'management.view' },
+  { label: 'Rate Management',         to: '/management/rates', permission: 'management.view' },
+  { label: 'Zone Management',         to: '/management/zones', permission: 'management.view' },
+].filter(link => !link.permission || hasPermission(link.permission)))
+
+// Show groups only if user has access to at least one sub-link
+const showReports = computed(() => reportsSubLinks.value.length > 0)
+const showManagement = computed(() => managementSubLinks.value.length > 0)
+const showComms = computed(() => commsSubLinks.value.length > 0)
 
 const isReportsOpen = ref(route.path.startsWith('/reports'))
 const isManagementOpen = ref(route.path.startsWith('/management'))
@@ -35,18 +54,6 @@ const isCommsOpen = ref(route.path.startsWith('/comms'))
 const isReportsActive = computed(() => route.path.startsWith('/reports'))
 const isManagementActive = computed(() => route.path.startsWith('/management'))
 const isCommsActive = computed(() => route.path.startsWith('/comms'))
-
-const commsSubLinks = [
-  { label: 'Quick SMS',  to: '/comms/sms' },
-  { label: 'Quick Mail', to: '/comms/mail' },
-]
-
-const managementSubLinks = [
-  { label: 'Customer Types',          to: '/management/customer-types' },
-  { label: 'Subscription Management', to: '/management/subscriptions' },
-  { label: 'Rate Management',         to: '/management/rates' },
-  { label: 'Zone Management',         to: '/management/zones' },
-]
 
 watch(() => route.path, (p) => {
   if (p.startsWith('/reports'))    isReportsOpen.value = true
@@ -168,7 +175,7 @@ function toggleGroup(group: 'reports' | 'management' | 'comms') {
       </NuxtLink>
 
       <!-- Reports -->
-      <div>
+      <div v-if="showReports">
         <div
           :style="`
             position:relative;display:flex;align-items:center;gap:12px;height:40px;
@@ -206,7 +213,7 @@ function toggleGroup(group: 'reports' | 'management' | 'comms') {
       </div>
 
       <!-- Management -->
-      <div>
+      <div v-if="showManagement">
         <div
           :style="`
             position:relative;display:flex;align-items:center;gap:12px;height:40px;
@@ -244,7 +251,7 @@ function toggleGroup(group: 'reports' | 'management' | 'comms') {
       </div>
 
       <!-- Communications -->
-      <div>
+      <div v-if="showComms">
         <div
           :style="`
             position:relative;display:flex;align-items:center;gap:12px;height:40px;
