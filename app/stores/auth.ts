@@ -9,16 +9,9 @@ export const useAuthStore = defineStore('auth', () => {
   async function fetchTeamMemberProfile() {
     if (!token.value || !user.value) return
     
-    // Check if user has a team member ID
-    const teamMemberId = user.value.teamMemberId || user.value.id
-    if (!teamMemberId) {
-      console.warn('[auth] No team member ID found, skipping profile fetch')
-      return
-    }
-    
     try {
       const config = useRuntimeConfig()
-      const res = await fetch(`${config.public.apiBase}/team/${teamMemberId}`, {
+      const res = await fetch(`${config.public.apiBase}/user/profile`, {
         headers: {
           'Authorization': `Bearer ${token.value}`,
           'Content-Type': 'application/json',
@@ -26,16 +19,20 @@ export const useAuthStore = defineStore('auth', () => {
       })
       
       if (res.ok) {
-        const data = await res.json()
-        teamMember.value = data
-        // Merge team member role and permissions into user object
-        if (user.value) {
-          user.value.role = data.role || user.value.role
-          user.value.permissions = data.permissions || []
+        const response = await res.json()
+        const data = response.data
+        
+        // Store the full profile data
+        teamMember.value = data.admin
+        
+        // Merge admin role and permissions into user object
+        if (user.value && data.admin) {
+          user.value.role = data.admin.role?.name || user.value.role
+          user.value.permissions = data.admin.permissions || []
         }
       }
     } catch (error) {
-      console.error('[auth] Failed to fetch team member profile:', error)
+      console.error('[auth] Failed to fetch user profile:', error)
     }
   }
 

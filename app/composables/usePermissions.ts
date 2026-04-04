@@ -5,8 +5,8 @@ export const usePermissions = () => {
   const hasPermission = (permission: string): boolean => {
     if (!authStore.user) return false
     
-    // Admin and Super Admin have all permissions (case-insensitive)
-    const userRole = (authStore.user.role?.name || authStore.user.role || '').toLowerCase()
+    // Admin and Super Admin have all permissions (case-insensitive, handle underscores)
+    const userRole = (authStore.user.role?.name || authStore.user.role || '').toLowerCase().replace(/_/g, ' ')
     if (userRole === 'super admin' || userRole === 'admin') {
       return true
     }
@@ -26,11 +26,12 @@ export const usePermissions = () => {
     return permissions.every(permission => hasPermission(permission))
   }
 
-  // Check if user has a specific role (case-insensitive)
+  // Check if user has a specific role (case-insensitive, handles underscores)
   const hasRole = (roleName: string): boolean => {
     if (!authStore.user) return false
-    const userRole = (authStore.user.role?.name || authStore.user.role || '').toLowerCase()
-    return userRole === roleName.toLowerCase()
+    const userRole = (authStore.user.role?.name || authStore.user.role || '').toLowerCase().replace(/_/g, ' ')
+    const checkRole = roleName.toLowerCase().replace(/_/g, ' ')
+    return userRole === checkRole
   }
 
   // Check if user has any of the specified roles

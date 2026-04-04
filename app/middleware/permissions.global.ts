@@ -17,8 +17,8 @@ export default defineNuxtRouteMiddleware((to) => {
     return navigateTo('/login')
   }
 
-  // Admin and Super Admin have access to everything (case-insensitive)
-  const userRole = (authStore.user.role?.name || authStore.user.role || '').toLowerCase()
+  // Admin and Super Admin have access to everything (case-insensitive, handle underscores)
+  const userRole = (authStore.user.role?.name || authStore.user.role || '').toLowerCase().replace(/_/g, ' ')
   if (userRole === 'super admin' || userRole === 'admin') {
     return
   }
