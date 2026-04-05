@@ -5,21 +5,21 @@ const props = defineProps<{
     name: string
     description: string
     icon: string
-    status: string
+    isActive: boolean
     displayOrder: number
   }
 }>()
 
 const emit = defineEmits<{
   close: []
-  submit: [data: { name: string; description: string; icon: string; status: string; displayOrder: number }]
+  submit: [data: { name: string; description: string; icon: string; isActive: boolean; displayOrder: number }]
 }>()
 
 const form = reactive({
   name: props.item.name,
   description: props.item.description,
   icon: props.item.icon,
-  status: props.item.status,
+  isActive: props.item.isActive,
   displayOrder: props.item.displayOrder
 })
 
@@ -130,12 +130,9 @@ function handleSubmit() {
         </div>
 
         <!-- Status -->
-        <div>
-          <label style="display:block;font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:8px">Status *</label>
-          <select v-model="form.status" style="width:100%;height:42px;padding:0 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;cursor:pointer">
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
+        <div style="display:flex;align-items:center;gap:12px">
+          <input v-model="form.isActive" type="checkbox" id="isActive" style="width:18px;height:18px;accent-color:#ffb400;cursor:pointer" />
+          <label for="isActive" style="font-size:14px;font-weight:500;color:#1a1a1a;cursor:pointer">Active</label>
         </div>
 
       </div>

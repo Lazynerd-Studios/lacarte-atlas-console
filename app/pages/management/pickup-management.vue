@@ -6,7 +6,7 @@ interface DisposableType {
   name: string
   description: string
   icon: string
-  status: 'active' | 'inactive'
+  isActive: boolean
   displayOrder: number
   createdAt: string
 }
@@ -16,7 +16,7 @@ interface EstimatedQuantity {
   label: string
   description: string
   displayOrder: number
-  status: 'active' | 'inactive'
+  isActive: boolean
   createdAt: string
 }
 
@@ -28,7 +28,7 @@ const disposableTypes = ref<DisposableType[]>([])
 const searchDisposable = ref('')
 
 async function fetchDisposableTypes() {
-  const data = await api.get<any>('/disposable-type/admin/list')
+  const data = await api.get<any>('/disposable/item-types')
   if (data) disposableTypes.value = Array.isArray(data) ? data : (data.data ?? data.disposableTypes ?? [])
 }
 
@@ -44,8 +44,8 @@ const estimatedQuantities = ref<EstimatedQuantity[]>([])
 const searchQuantity = ref('')
 
 async function fetchEstimatedQuantities() {
-  const data = await api.get<any>('/estimated-quantity/admin/list')
-  if (data) estimatedQuantities.value = Array.isArray(data) ? data : (data.data ?? data.estimatedQuantities ?? [])
+  const data = await api.get<any>('/disposable/quantities')
+  if (data) estimatedQuantities.value = Array.isArray(data) ? data : (data.data ?? data.quantities ?? [])
 }
 
 const filteredQuantity = computed(() => 
@@ -63,8 +63,8 @@ onMounted(() => {
 // Add Disposable Type Modal
 const showAddDisposableModal = ref(false)
 
-async function handleAddDisposable(data: { name: string; description: string; icon: string; status: string; displayOrder: number }) {
-  const result = await api.post('/disposable-type/admin/', data, 'Failed to create disposable type')
+async function handleAddDisposable(data: { name: string; description: string; icon: string; isActive: boolean; displayOrder: number }) {
+  const result = await api.post('/disposable/item-types', data, 'Failed to create disposable type')
   if (result !== null) {
     showAddDisposableModal.value = false
     await fetchDisposableTypes()
@@ -80,9 +80,9 @@ function openEditDisposable(item: DisposableType) {
   showEditDisposableModal.value = true
 }
 
-async function handleEditDisposable(data: { name: string; description: string; icon: string; status: string; displayOrder: number }) {
+async function handleEditDisposable(data: { name: string; description: string; icon: string; isActive: boolean; displayOrder: number }) {
   if (!editDisposableTarget.value) return
-  const result = await api.put(`/disposable-type/admin/${editDisposableTarget.value.id}`, data, 'Failed to update disposable type')
+  const result = await api.patch(`/disposable/item-types/${editDisposableTarget.value.id}`, data, 'Failed to update disposable type')
   if (result !== null) {
     showEditDisposableModal.value = false
     editDisposableTarget.value = null
@@ -101,7 +101,7 @@ function openDeleteDisposable(item: DisposableType) {
 
 async function handleDeleteDisposable() {
   if (!deleteDisposableTarget.value) return
-  const result = await api.del(`/disposable-type/admin/${deleteDisposableTarget.value.id}`, 'Failed to delete disposable type')
+  const result = await api.del(`/disposable/item-types/${deleteDisposableTarget.value.id}`, 'Failed to delete disposable type')
   if (result !== null) {
     showDeleteDisposableModal.value = false
     deleteDisposableTarget.value = null
@@ -112,8 +112,8 @@ async function handleDeleteDisposable() {
 // Add Estimated Quantity Modal
 const showAddQuantityModal = ref(false)
 
-async function handleAddQuantity(data: { label: string; description: string; displayOrder: number; status: string }) {
-  const result = await api.post('/estimated-quantity/admin/', data, 'Failed to create estimated quantity')
+async function handleAddQuantity(data: { label: string; description: string; displayOrder: number; isActive: boolean }) {
+  const result = await api.post('/disposable/quantities', data, 'Failed to create estimated quantity')
   if (result !== null) {
     showAddQuantityModal.value = false
     await fetchEstimatedQuantities()
@@ -129,9 +129,9 @@ function openEditQuantity(item: EstimatedQuantity) {
   showEditQuantityModal.value = true
 }
 
-async function handleEditQuantity(data: { label: string; description: string; displayOrder: number; status: string }) {
+async function handleEditQuantity(data: { label: string; description: string; displayOrder: number; isActive: boolean }) {
   if (!editQuantityTarget.value) return
-  const result = await api.put(`/estimated-quantity/admin/${editQuantityTarget.value.id}`, data, 'Failed to update estimated quantity')
+  const result = await api.patch(`/disposable/quantities/${editQuantityTarget.value.id}`, data, 'Failed to update estimated quantity')
   if (result !== null) {
     showEditQuantityModal.value = false
     editQuantityTarget.value = null
@@ -150,7 +150,7 @@ function openDeleteQuantity(item: EstimatedQuantity) {
 
 async function handleDeleteQuantity() {
   if (!deleteQuantityTarget.value) return
-  const result = await api.del(`/estimated-quantity/admin/${deleteQuantityTarget.value.id}`, 'Failed to delete estimated quantity')
+  const result = await api.del(`/disposable/quantities/${deleteQuantityTarget.value.id}`, 'Failed to delete estimated quantity')
   if (result !== null) {
     showDeleteQuantityModal.value = false
     deleteQuantityTarget.value = null
@@ -223,8 +223,8 @@ async function handleDeleteQuantity() {
               <td style="padding:16px 24px;font-size:13px;color:#6b7280">{{ item.description }}</td>
               <td style="padding:16px 24px;text-align:center;font-size:13px;font-weight:600;color:#1a1a1a">{{ item.displayOrder }}</td>
               <td style="padding:16px 24px;text-align:center">
-                <span :style="`font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px;${item.status === 'active' ? 'background:#dcfce7;color:#16a34a' : 'background:#f3f4f6;color:#9ca3af'}`">
-                  {{ item.status === 'active' ? 'Active' : 'Inactive' }}
+                <span :style="`font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px;${item.isActive ? 'background:#dcfce7;color:#16a34a' : 'background:#f3f4f6;color:#9ca3af'}`">
+                  {{ item.isActive ? 'Active' : 'Inactive' }}
                 </span>
               </td>
               <td style="padding:16px 24px;text-align:right">
@@ -279,8 +279,8 @@ async function handleDeleteQuantity() {
               <td style="padding:16px 24px;font-size:13px;color:#6b7280">{{ item.description }}</td>
               <td style="padding:16px 24px;text-align:center;font-size:13px;font-weight:600;color:#1a1a1a">{{ item.displayOrder }}</td>
               <td style="padding:16px 24px;text-align:center">
-                <span :style="`font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px;${item.status === 'active' ? 'background:#dcfce7;color:#16a34a' : 'background:#f3f4f6;color:#9ca3af'}`">
-                  {{ item.status === 'active' ? 'Active' : 'Inactive' }}
+                <span :style="`font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px;${item.isActive ? 'background:#dcfce7;color:#16a34a' : 'background:#f3f4f6;color:#9ca3af'}`">
+                  {{ item.isActive ? 'Active' : 'Inactive' }}
                 </span>
               </td>
               <td style="padding:16px 24px;text-align:right">
