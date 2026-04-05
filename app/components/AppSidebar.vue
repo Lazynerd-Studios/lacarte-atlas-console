@@ -40,6 +40,7 @@ const managementSubLinks = computed(() => [
   { label: 'Subscription Management', to: '/management/subscriptions', permission: 'management.view' },
   { label: 'Rate Management',         to: '/management/rates', permission: 'management.view' },
   { label: 'Zone Management',         to: '/management/zones', permission: 'management.view' },
+  { label: 'Pickup Management',       to: '/management/pickup-management', permission: 'management.view' },
 ].filter(link => !link.permission || hasPermission(link.permission)))
 
 // Show groups only if user has access to at least one sub-link
