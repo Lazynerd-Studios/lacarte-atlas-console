@@ -29,7 +29,14 @@ const searchDisposable = ref('')
 
 async function fetchDisposableTypes() {
   const data = await api.get<any>('/disposable/item-types')
-  if (data) disposableTypes.value = Array.isArray(data) ? data : (data.data ?? data.disposableTypes ?? [])
+  if (data) {
+    const items = Array.isArray(data) ? data : (data.data ?? data.disposableTypes ?? [])
+    // Convert numeric isActive (0/1) to boolean for UI
+    disposableTypes.value = items.map((item: any) => ({
+      ...item,
+      isActive: !!item.isActive
+    }))
+  }
 }
 
 const filteredDisposable = computed(() => 
@@ -45,7 +52,14 @@ const searchQuantity = ref('')
 
 async function fetchEstimatedQuantities() {
   const data = await api.get<any>('/disposable/quantities')
-  if (data) estimatedQuantities.value = Array.isArray(data) ? data : (data.data ?? data.quantities ?? [])
+  if (data) {
+    const items = Array.isArray(data) ? data : (data.data ?? data.quantities ?? [])
+    // Convert numeric isActive (0/1) to boolean for UI
+    estimatedQuantities.value = items.map((item: any) => ({
+      ...item,
+      isActive: !!item.isActive
+    }))
+  }
 }
 
 const filteredQuantity = computed(() => 
@@ -64,12 +78,7 @@ onMounted(() => {
 const showAddDisposableModal = ref(false)
 
 async function handleAddDisposable(data: { name: string; description: string; icon: string; isActive: boolean; displayOrder: number }) {
-  // Convert boolean to number for API (backend expects 0 or 1)
-  const payload = {
-    ...data,
-    isActive: data.isActive ? 1 : 0
-  }
-  const result = await api.post('/disposable/item-types', payload, 'Failed to create disposable type')
+  const result = await api.post('/disposable/item-types', data, 'Failed to create disposable type')
   if (result !== null) {
     showAddDisposableModal.value = false
     await fetchDisposableTypes()
@@ -87,12 +96,7 @@ function openEditDisposable(item: DisposableType) {
 
 async function handleEditDisposable(data: { name: string; description: string; icon: string; isActive: boolean; displayOrder: number }) {
   if (!editDisposableTarget.value) return
-  // Convert boolean to number for API (backend expects 0 or 1)
-  const payload = {
-    ...data,
-    isActive: data.isActive ? 1 : 0
-  }
-  const result = await api.patch(`/disposable/item-types/${editDisposableTarget.value.id}`, payload, 'Failed to update disposable type')
+  const result = await api.patch(`/disposable/item-types/${editDisposableTarget.value.id}`, data, 'Failed to update disposable type')
   if (result !== null) {
     showEditDisposableModal.value = false
     editDisposableTarget.value = null
@@ -123,12 +127,7 @@ async function handleDeleteDisposable() {
 const showAddQuantityModal = ref(false)
 
 async function handleAddQuantity(data: { label: string; description: string; displayOrder: number; isActive: boolean }) {
-  // Convert boolean to number for API (backend expects 0 or 1)
-  const payload = {
-    ...data,
-    isActive: data.isActive ? 1 : 0
-  }
-  const result = await api.post('/disposable/quantities', payload, 'Failed to create estimated quantity')
+  const result = await api.post('/disposable/quantities', data, 'Failed to create estimated quantity')
   if (result !== null) {
     showAddQuantityModal.value = false
     await fetchEstimatedQuantities()
@@ -146,12 +145,7 @@ function openEditQuantity(item: EstimatedQuantity) {
 
 async function handleEditQuantity(data: { label: string; description: string; displayOrder: number; isActive: boolean }) {
   if (!editQuantityTarget.value) return
-  // Convert boolean to number for API (backend expects 0 or 1)
-  const payload = {
-    ...data,
-    isActive: data.isActive ? 1 : 0
-  }
-  const result = await api.patch(`/disposable/quantities/${editQuantityTarget.value.id}`, payload, 'Failed to update estimated quantity')
+  const result = await api.patch(`/disposable/quantities/${editQuantityTarget.value.id}`, data, 'Failed to update estimated quantity')
   if (result !== null) {
     showEditQuantityModal.value = false
     editQuantityTarget.value = null
