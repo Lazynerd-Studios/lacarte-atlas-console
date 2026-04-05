@@ -548,28 +548,13 @@ watch(activeTab, (newTab) => {
           </div>
 
           <!-- Pagination -->
-          <div v-if="activityPagination.totalPages > 1" style="display:flex;align-items:center;justify-content:space-between;padding:16px 0">
-            <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">
-              Showing {{ ((activityPagination.page - 1) * activityPagination.limit) + 1 }} to {{ Math.min(activityPagination.page * activityPagination.limit, activityPagination.total) }} of {{ activityPagination.total }} logs
-            </p>
-            <div style="display:flex;align-items:center;gap:8px">
-              <button
-                @click="goToPage(activityPagination.page - 1)"
-                :disabled="!activityPagination.hasPreviousPage"
-                :style="`display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;border:1px solid #e5e7eb;background:white;cursor:${activityPagination.hasPreviousPage ? 'pointer' : 'not-allowed'};opacity:${activityPagination.hasPreviousPage ? '1' : '0.5'}`"
-              >
-                <Icon name="lucide:chevron-left" style="width:16px;height:16px;color:#6b7280" />
-              </button>
-              <span style="font-size:13px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ activityPagination.page }} / {{ activityPagination.totalPages }}</span>
-              <button
-                @click="goToPage(activityPagination.page + 1)"
-                :disabled="!activityPagination.hasNextPage"
-                :style="`display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;border:1px solid #e5e7eb;background:white;cursor:${activityPagination.hasNextPage ? 'pointer' : 'not-allowed'};opacity:${activityPagination.hasNextPage ? '1' : '0.5'}`"
-              >
-                <Icon name="lucide:chevron-right" style="width:16px;height:16px;color:#6b7280" />
-              </button>
-            </div>
-          </div>
+          <AppPagination
+            v-if="activityPagination.total > 0"
+            :page="activityPagination.page"
+            :total="activityPagination.total"
+            :per-page="activityPagination.limit"
+            @update:page="goToPage"
+          />
         </div>
 
       </div>
