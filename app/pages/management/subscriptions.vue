@@ -12,6 +12,7 @@ interface Plan {
   billingCycle: BillingCycle
   pickupCount: number
   binCount: number
+  price: number
   color: string
   subscriberCount: number
   isActive: boolean
@@ -41,6 +42,7 @@ interface FormData {
   billingCycle: BillingCycle
   pickupCount: string
   binCount: string
+  price: string
   color: string
   isActive: boolean
 }
@@ -64,6 +66,7 @@ function apiToPlan(apiPlan: ApiPlan): Plan {
     billingCycle: apiPlan.billingCycle,
     pickupCount: apiPlan.pickups,
     binCount: apiPlan.bins,
+    price: apiPlan.price,
     color: apiPlan.badgeColor,
     subscriberCount: apiPlan.subscriberCount,
     isActive: apiPlan.isActive,
@@ -94,6 +97,12 @@ function validateForm(form: FormData): string[] {
     errors.push('Valid BIN count is required.')
   }
   
+  // Validate price is non-negative number
+  const price = Number(form.price)
+  if (!form.price || isNaN(price) || price < 0) {
+    errors.push('Valid price is required.')
+  }
+  
   return errors
 }
 
@@ -113,7 +122,7 @@ function formToApiPayload(form: FormData, billingType: BillingType) {
     pickups: Number(form.pickupCount),
     bins: Number(form.binCount),
     billingCycle: form.billingCycle,
-    price: 0, // TODO: Add price field to form
+    price: Number(form.price),
     badgeColor: form.color,
     isActive: form.isActive,
   }
@@ -249,7 +258,7 @@ function blankForm() {
   return {
     name: '', description: '',
     billingCycle: 'monthly' as BillingCycle,
-    pickupCount: '', binCount: '',
+    pickupCount: '', binCount: '', price: '',
     color: '#3b82f6', isActive: true,
   }
 }
@@ -336,16 +345,16 @@ async function handleAdd() {
 
 // ── Edit modal ──
 const showEditModal = ref(false)
-const editForm = ref<Plan & { pickupStr: string; binStr: string }>({
+const editForm = ref<Plan & { pickupStr: string; binStr: string; priceStr: string }>({
   id: '', name: '', description: '', billingType: 'prepaid', billingCycle: 'monthly',
-  pickupCount: 0, binCount: 0, color: '#3b82f6', subscriberCount: 0, isActive: true,
-  pickupStr: '', binStr: '',
+  pickupCount: 0, binCount: 0, price: 0, color: '#3b82f6', subscriberCount: 0, isActive: true,
+  pickupStr: '', binStr: '', priceStr: '',
 })
 const editError = ref('')
 
 function openEdit(p: Plan) {
   console.log('[openEdit] Opening edit modal for plan:', p.id, p.name)
-  editForm.value = { ...p, pickupStr: String(p.pickupCount), binStr: String(p.binCount) }
+  editForm.value = { ...p, pickupStr: String(p.pickupCount), binStr: String(p.binCount), priceStr: String(p.price) }
   editError.value = ''
   showEditModal.value = true
 }
@@ -370,6 +379,7 @@ async function handleEdit() {
     billingCycle: editForm.value.billingCycle,
     pickupCount: editForm.value.pickupStr,
     binCount: editForm.value.binStr,
+    price: editForm.value.priceStr,
     color: editForm.value.color,
     isActive: editForm.value.isActive,
   }
@@ -396,6 +406,7 @@ async function handleEdit() {
       pickups: Number(formData.pickupCount),
       bins: Number(formData.binCount),
       billingCycle: formData.billingCycle,
+      price: Number(formData.price),
       badgeColor: formData.color,
       isActive: formData.isActive,
     }
@@ -653,8 +664,9 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
           </div>
         </div>
 
-        <!-- Middle: total + cycle -->
+        <!-- Middle: price + cycle -->
         <div style="text-align:center;flex-shrink:0">
+          <p style="font-size:24px;font-weight:700;color:#1a1a1a;margin:0 0 4px">{{ format(plan.price) }}</p>
           <p style="font-size:11px;color:#9ca3af;margin:0 0 4px;font-weight:500;text-transform:uppercase;letter-spacing:0.5px">{{ cycleLabel(plan.billingCycle) }}</p>
           <p style="font-size:11px;color:#9ca3af;margin:4px 0 0;text-transform:capitalize">{{ plan.billingType }}</p>
         </div>
@@ -713,6 +725,13 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
           <!-- Predefined features -->
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px">
             <p style="font-size:13px;font-weight:600;color:#374151;margin:0">Pricing Features</p>
+            <div>
+              <label style="font-size:12px;font-weight:600;color:#374151;display:flex;align-items:center;gap:6px;margin-bottom:6px">
+                <span style="font-size:13px;font-weight:700;color:#f59e0b">GHS</span>
+                Price <span style="color:#ef4444">*</span>
+              </label>
+              <input v-model="addForm.price" type="number" min="0" step="0.01" placeholder="e.g. 50.00" style="width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;background:#fff" />
+            </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
               <div>
                 <label style="font-size:12px;font-weight:600;color:#374151;display:flex;align-items:center;gap:6px;margin-bottom:6px">
@@ -792,6 +811,13 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
           <!-- Predefined features -->
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px">
             <p style="font-size:13px;font-weight:600;color:#374151;margin:0">Pricing Features</p>
+            <div>
+              <label style="font-size:12px;font-weight:600;color:#374151;display:flex;align-items:center;gap:6px;margin-bottom:6px">
+                <span style="font-size:13px;font-weight:700;color:#f59e0b">GHS</span>
+                Price <span style="color:#ef4444">*</span>
+              </label>
+              <input v-model="editForm.priceStr" type="number" min="0" step="0.01" style="width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;background:#fff" />
+            </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
               <div>
                 <label style="font-size:12px;font-weight:600;color:#374151;display:flex;align-items:center;gap:6px;margin-bottom:6px">
