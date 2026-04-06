@@ -203,11 +203,13 @@ const statusBadge = computed(() => {
   if (!pickup.value) return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: 'Unknown' }
   
   const status = pickup.value.status.toLowerCase()
-  if (status === 'pending')    return { bg: 'rgba(255,180,0,0.1)',  border: 'rgba(255,180,0,0.2)',  color: '#d49a00',  label: 'Pending' }
-  if (status === 'assigned')   return { bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)', color: '#3b82f6',  label: 'Assigned' }
-  if (status === 'in-transit' || status === 'in_transit') return { bg: 'rgba(255,180,0,0.1)',  border: 'rgba(255,180,0,0.2)',  color: '#d49a00',  label: 'In Transit' }
-  if (status === 'completed')  return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e',  label: 'Completed' }
-  if (status === 'cancelled')  return { bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.2)',  color: '#ef4444',  label: 'Cancelled' }
+  if (status === 'pending')           return { bg: 'rgba(255,180,0,0.1)',  border: 'rgba(255,180,0,0.2)',  color: '#d49a00',  label: 'Pending' }
+  if (status === 'assigned')          return { bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)', color: '#3b82f6',  label: 'Assigned' }
+  if (status === 'truck_dispatched')  return { bg: 'rgba(255,180,0,0.1)',  border: 'rgba(255,180,0,0.2)',  color: '#d49a00',  label: 'Dispatched' }
+  if (status === 'en_route')          return { bg: 'rgba(255,180,0,0.1)',  border: 'rgba(255,180,0,0.2)',  color: '#d49a00',  label: 'En Route' }
+  if (status === 'picked_up')         return { bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)', color: '#3b82f6',  label: 'Picked Up' }
+  if (status === 'completed')         return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e',  label: 'Completed' }
+  if (status === 'cancelled')         return { bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.2)',  color: '#ef4444',  label: 'Cancelled' }
   return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: pickup.value.status }
 })
 
@@ -286,24 +288,94 @@ const showReassignModal = ref(false)
 const showCancelConfirm = ref(false)
 
 async function startTrip() {
-  // TODO: Implement API call to start trip
-  // For now, just refresh the data
-  await fetchPickupDetails()
-  await fetchActivityLog()
+  try {
+    await api.patch(
+      `/pickup-requests/admin/${route.params.id}/status`,
+      {
+        status: 'truck_dispatched',
+        internalNotes: 'Trip started by admin'
+      },
+      'Failed to start trip'
+    )
+    
+    await fetchPickupDetails()
+    await fetchActivityLog()
+  } catch (err: any) {
+    console.error('Error starting trip:', err)
+  }
+}
+
+async function markEnRoute() {
+  try {
+    await api.patch(
+      `/pickup-requests/admin/${route.params.id}/status`,
+      {
+        status: 'en_route',
+        internalNotes: 'Driver en route to pickup location'
+      },
+      'Failed to mark as en route'
+    )
+    
+    await fetchPickupDetails()
+    await fetchActivityLog()
+  } catch (err: any) {
+    console.error('Error marking as en route:', err)
+  }
+}
+
+async function markPickedUp() {
+  try {
+    await api.patch(
+      `/pickup-requests/admin/${route.params.id}/status`,
+      {
+        status: 'picked_up',
+        internalNotes: 'Waste picked up by driver'
+      },
+      'Failed to mark as picked up'
+    )
+    
+    await fetchPickupDetails()
+    await fetchActivityLog()
+  } catch (err: any) {
+    console.error('Error marking as picked up:', err)
+  }
 }
 
 async function completePickup() {
-  // TODO: Implement API call to complete pickup
-  // For now, just refresh the data
-  await fetchPickupDetails()
-  await fetchActivityLog()
+  try {
+    await api.patch(
+      `/pickup-requests/admin/${route.params.id}/status`,
+      {
+        status: 'completed',
+        internalNotes: 'Pickup completed by admin'
+      },
+      'Failed to complete pickup'
+    )
+    
+    await fetchPickupDetails()
+    await fetchActivityLog()
+  } catch (err: any) {
+    console.error('Error completing pickup:', err)
+  }
 }
 
 async function cancelPickup() {
-  // TODO: Implement API call to cancel pickup
-  showCancelConfirm.value = false
-  await fetchPickupDetails()
-  await fetchActivityLog()
+  try {
+    await api.patch(
+      `/pickup-requests/admin/${route.params.id}/status`,
+      {
+        status: 'cancelled',
+        internalNotes: 'Pickup cancelled by admin'
+      },
+      'Failed to cancel pickup'
+    )
+    
+    showCancelConfirm.value = false
+    await fetchPickupDetails()
+    await fetchActivityLog()
+  } catch (err: any) {
+    console.error('Error cancelling pickup:', err)
+  }
 }
 
 async function handleReassign(data: { driver: string; scheduledDate: string; scheduledTime: string; priority: string; adminNotes: string }) {
@@ -435,26 +507,44 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
             @click="startTrip"
           >Start Trip</button>
 
-          <!-- Complete — shown when in-transit -->
+          <!-- En Route — shown when truck_dispatched -->
           <button
-            v-if="pickup.status.toLowerCase() === 'in-transit' || pickup.status.toLowerCase() === 'in_transit'"
+            v-if="pickup.status.toLowerCase() === 'truck_dispatched'"
+            style="height:40px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
+            @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
+            @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
+            @click="markEnRoute"
+          >Mark En Route</button>
+
+          <!-- Picked Up — shown when en_route -->
+          <button
+            v-if="pickup.status.toLowerCase() === 'en_route'"
+            style="height:40px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
+            @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
+            @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
+            @click="markPickedUp"
+          >Mark Picked Up</button>
+
+          <!-- Complete — shown when picked_up -->
+          <button
+            v-if="pickup.status.toLowerCase() === 'picked_up'"
             style="height:40px;padding:0 16px;background:#22c55e;border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:pointer"
             @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
             @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
             @click="completePickup"
-          >Mark Completed</button>
+          >Complete Trip</button>
 
-          <!-- Track Driver — shown when in-transit or assigned -->
+          <!-- Track Driver — shown when truck_dispatched, en_route, picked_up, or assigned -->
           <button
-            v-if="['assigned', 'in-transit', 'in_transit'].includes(pickup.status.toLowerCase())"
+            v-if="['assigned', 'truck_dispatched', 'en_route', 'picked_up'].includes(pickup.status.toLowerCase())"
             style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
             @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
           >Track Driver</button>
 
-          <!-- Reassign — shown when pending/assigned/in-transit -->
+          <!-- Reassign — shown when pending/assigned/truck_dispatched -->
           <button
-            v-if="['pending','assigned','in-transit','in_transit'].includes(pickup.status.toLowerCase())"
+            v-if="['pending','assigned','truck_dispatched'].includes(pickup.status.toLowerCase())"
             style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
             @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
