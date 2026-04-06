@@ -1,38 +1,54 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'dashboard' })
 
-const requests = ref([
-  {
-    id: 'PR-2026-001', customer: 'Sarah Johnson',  address: '123 Oak Street, Downtown, 12345',
-    date: '2026-03-03', timeSlot: 'Morning (8AM - 12PM)',
-    paymentType: 'subscription', paymentDetail: 'Premium Monthly',
-    paymentStatus: 'active-plan', status: 'pending', driver: '',
-  },
-  {
-    id: 'PR-2026-002', customer: 'Michael Chen',   address: '456 Maple Ave, Westside, 12346',
-    date: '2026-03-03', timeSlot: 'Afternoon (12PM - 4PM)',
-    paymentType: 'one-time', paymentDetail: 'GHS 25.00',
-    paymentStatus: 'paid', status: 'assigned', driver: 'Maria Garcia',
-  },
-  {
-    id: 'PR-2026-003', customer: 'Emma Williams',  address: '789 Pine Road, Eastside, 12347',
-    date: '2026-03-04', timeSlot: 'Morning (8AM - 12PM)',
-    paymentType: 'one-time', paymentDetail: 'GHS 25.00',
-    paymentStatus: 'unpaid', status: 'pending', driver: '',
-  },
-  {
-    id: 'PR-2026-004', customer: 'James Martinez', address: '321 Birch Lane, Northside, 12348',
-    date: '2026-03-03', timeSlot: 'Afternoon (12PM - 4PM)',
-    paymentType: 'subscription', paymentDetail: 'Basic Weekly',
-    paymentStatus: 'active-plan', status: 'pending', driver: '',
-  },
-  {
-    id: 'PR-2026-005', customer: 'Olivia Brown',   address: '654 Cedar Court, Southside, 12349',
-    date: '2026-03-03', timeSlot: 'Morning (8AM - 12PM)',
-    paymentType: 'one-time', paymentDetail: 'GHS 25.00',
-    paymentStatus: 'paid', status: 'completed', driver: 'John Smith',
-  },
-])
+interface PickupRequest {
+  id: string
+  customerId: string
+  preferredPickupDate: string
+  status: string
+  paymentType: string
+  paymentStatus: string
+  createdAt: string
+  updatedAt: string
+  customer: {
+    id: string
+    name: string
+    phoneNumber: string
+    address: string
+    customerType: {
+      id: string
+      name: string
+    }
+  }
+  disposableItemType: {
+    id: string
+    name: string
+  }
+  estimatedQuantity: {
+    id: string
+    label: string
+  }
+}
+
+interface Pagination {
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+  hasNextPage: boolean
+  hasPreviousPage: boolean
+}
+
+const requests = ref<PickupRequest[]>([])
+const pagination = ref<Pagination>({
+  page: 1,
+  limit: 20,
+  total: 0,
+  totalPages: 0,
+  hasNextPage: false,
+  hasPreviousPage: false
+})
+const loading = ref(false)
 
 const activeFilter = ref('All')
 const filters = ['All', 'Pending', 'Assigned', 'Completed']
@@ -42,30 +58,91 @@ const filtered = computed(() => {
   return requests.value.filter(r => r.status.toLowerCase() === activeFilter.value.toLowerCase())
 })
 
-watch(activeFilter, () => { currentPage.value = 1 })
+watch(activeFilter, () => { 
+  pagination.value.page = 1
+  fetchRequests()
+})
 
-const stats = computed(() => ({
-  pending:    requests.value.filter(r => r.status === 'pending').length,
-  assigned:   requests.value.filter(r => r.status === 'assigned').length,
-  completed:  requests.value.filter(r => r.status === 'completed').length,
-  unpaid:     requests.value.filter(r => r.paymentStatus === 'unpaid').length,
-}))
+const stats = ref({
+  pending: 0,
+  assigned: 0,
+  completed: 0,
+  unpaid: 0,
+})
+
+const api = useApi()
+
+async function fetchStats() {
+  const data = await api.get<{
+    pendingRequests?: number
+    assignedToday?: number
+    completed?: number
+    unpaidRequests?: number
+  }>('/pickup-requests/admin/stats', 'Failed to load pickup stats')
+  
+  if (data) {
+    stats.value = {
+      pending: data.pendingRequests ?? 0,
+      assigned: data.assignedToday ?? 0,
+      completed: data.completed ?? 0,
+      unpaid: data.unpaidRequests ?? 0,
+    }
+  }
+}
+
+async function fetchRequests() {
+  loading.value = true
+  try {
+    const params = new URLSearchParams({
+      page: pagination.value.page.toString(),
+      limit: pagination.value.limit.toString(),
+    })
+    
+    if (activeFilter.value !== 'All') {
+      params.append('status', activeFilter.value.toLowerCase())
+    }
+    
+    const data = await api.get<{ data: PickupRequest[]; pagination: Pagination }>(
+      `/pickup-requests/admin/list?${params.toString()}`,
+      'Failed to load pickup requests'
+    )
+    
+    if (data) {
+      requests.value = data.data || []
+      if (data.pagination) {
+        pagination.value = data.pagination
+      }
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
+function formatDate(dateString: string) {
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+onMounted(() => {
+  fetchStats()
+  fetchRequests()
+})
 
 function paymentTypeBadge(type: string) {
   if (type === 'subscription') return { bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)', color: '#3b82f6', label: 'Subscription' }
   return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: 'Pay as you go' }
 }
 
-const currentPage = ref(1)
-const perPage = 10
-const paginated = computed(() => {
-  const start = (currentPage.value - 1) * perPage
-  return filtered.value.slice(start, start + perPage)
+const currentPage = computed({
+  get: () => pagination.value.page,
+  set: (val) => {
+    pagination.value.page = val
+    fetchRequests()
+  }
 })
 
 function paymentStatusBadge(s: string) {
-  if (s === 'active-plan') return { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#22c55e', label: 'Active Plan' }
-  if (s === 'paid')        return { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#22c55e', label: 'Paid' }
+  if (s === 'active-plan' || s === 'paid') return { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#22c55e', label: s === 'paid' ? 'Paid' : 'Active Plan' }
   return { bg: 'white', border: '#ececec', color: '#1a1a1a', label: 'Unpaid' }
 }
 
@@ -77,22 +154,20 @@ function statusBadge(s: string) {
 }
 
 const showAssignDriverModal = ref(false)
-const selectedRequest = ref<typeof requests.value[0] | null>(null)
+const selectedRequest = ref<PickupRequest | null>(null)
 
-function openAssignModal(req: typeof requests.value[0]) {
+function openAssignModal(req: PickupRequest) {
   selectedRequest.value = req
   showAssignDriverModal.value = true
 }
 
-function handleAssignDriver(data: { driver: string; scheduledDate: string; scheduledTime: string; priority: string; adminNotes: string }) {
+async function handleAssignDriver(data: { driver: string; scheduledDate: string; scheduledTime: string; priority: string; adminNotes: string }) {
   if (!selectedRequest.value) return
-  const req = requests.value.find(r => r.id === selectedRequest.value!.id)
-  if (req) {
-    req.driver = data.driver
-    req.status = 'assigned'
-  }
+  // TODO: Call API to assign driver
   showAssignDriverModal.value = false
   selectedRequest.value = null
+  await fetchRequests()
+  await fetchStats()
 }
 </script>
 
@@ -155,25 +230,28 @@ function handleAssignDriver(data: { driver: string; scheduledDate: string; sched
         </thead>
         <tbody>
           <tr
-            v-for="(req, i) in paginated"
+            v-for="(req, i) in filtered"
             :key="req.id"
-            :style="`border-bottom:${i < paginated.length - 1 ? '1px solid #e5e7eb' : 'none'}`"
+            :style="`border-bottom:${i < filtered.length - 1 ? '1px solid #e5e7eb' : 'none'}`"
             @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
           >
             <!-- Request ID -->
-            <td style="padding:20px 8px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ req.id }}</td>
+            <td style="padding:20px 8px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ req.id.slice(0, 8) }}</td>
 
             <!-- Customer -->
-            <td style="padding:20px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ req.customer }}</td>
+            <td style="padding:20px 16px">
+              <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ req.customer.name }}</p>
+              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:2px">{{ req.customer.phoneNumber }}</p>
+            </td>
 
             <!-- Address -->
-            <td style="padding:20px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;max-width:180px">{{ req.address }}</td>
+            <td style="padding:20px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;max-width:180px">{{ req.customer.address }}</td>
 
             <!-- Pickup Date -->
             <td style="padding:20px 16px">
-              <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ req.date }}</p>
-              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:2px">{{ req.timeSlot }}</p>
+              <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ formatDate(req.preferredPickupDate) }}</p>
+              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:2px">{{ req.disposableItemType.name }} - {{ req.estimatedQuantity.label }}</p>
             </td>
 
             <!-- Payment Type -->
@@ -232,8 +310,8 @@ function handleAssignDriver(data: { driver: string; scheduledDate: string; sched
     <!-- Pagination -->
     <AppPagination
       :page="currentPage"
-      :total="filtered.length"
-      :per-page="perPage"
+      :total="pagination.total"
+      :per-page="pagination.limit"
       @update:page="currentPage = $event"
     />
 
@@ -243,13 +321,13 @@ function handleAssignDriver(data: { driver: string; scheduledDate: string; sched
     v-if="showAssignDriverModal && selectedRequest"
     :request="{
       id: selectedRequest.id,
-      customer: selectedRequest.customer,
-      address: selectedRequest.address,
-      date: selectedRequest.date,
-      timeSlot: selectedRequest.timeSlot,
-      binType: '120L General Waste',
+      customer: selectedRequest.customer.name,
+      address: selectedRequest.customer.address,
+      date: formatDate(selectedRequest.preferredPickupDate),
+      timeSlot: '',
+      binType: `${selectedRequest.disposableItemType.name} - ${selectedRequest.estimatedQuantity.label}`,
       paymentType: selectedRequest.paymentType,
-      paymentDetail: selectedRequest.paymentDetail,
+      paymentDetail: '',
       notes: '',
     }"
     @close="showAssignDriverModal = false"

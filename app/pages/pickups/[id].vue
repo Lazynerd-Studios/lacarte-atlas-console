@@ -4,93 +4,384 @@ definePageMeta({ layout: 'dashboard' })
 const route = useRoute()
 const { format } = useCurrency()
 
-const pickup = reactive({
-  id: route.params.id as string || 'PR-2026-002',
-  customer: 'Michael Chen',
-  customerPhone: '(555) 234-5678',
-  customerEmail: 'michael.chen@email.com',
-  address: '456 Maple Ave, Westside, 12346',
-  zone: 'Westside',
-  date: '2026-03-03',
-  timeSlot: 'Afternoon (12PM - 4PM)',
-  paymentType: 'one-time',
-  paymentStatus: 'paid',
-  amount: 25.00,
-  status: 'assigned',
-  driver: 'Maria Garcia',
-  driverPhone: '(555) 987-6543',
-  truck: 'T-003',
-  notes: 'Please leave bin at the gate.',
-  createdAt: '2026-03-01 09:14 AM',
-  assignedAt: '2026-03-01 10:32 AM',
-  startedAt: '',
-  completedAt: '',
+interface PickupRequestDetail {
+  id: string
+  customerId: string
+  preferredPickupDate: string
+  additionalNotes: string | null
+  status: string
+  paymentType: string
+  paymentStatus: string
+  createdAt: string
+  updatedAt: string
+  customer: {
+    id: string
+    name: string
+    phoneNumber: string
+    address: string
+    city: string
+    region: string
+    postalCode: string
+    placeName: string
+    noBins: number
+    status: string
+    customerType: {
+      id: string
+      name: string
+    }
+  }
+  disposableItemType: {
+    id: string
+    name: string
+    description: string
+    icon: string
+  }
+  estimatedQuantity: {
+    id: string
+    label: string
+    description: string
+  }
+  assignment: {
+    id: string
+    scheduledDate: string
+    timeSlot: string
+    priorityLevel: string
+    adminNotes: string
+    driver: {
+      id: string
+      name: string
+      phoneNumber: string
+      licenseNumber: string
+      status: string
+    }
+    truck: {
+      id: string
+      truckId: string
+      plateNumber: string
+      make: string
+      model: string
+    }
+  } | null
+}
+
+interface ActivityLogResponse {
+  timeline: {
+    requestCreated: { completedAt: string | null }
+    driverAssigned: { completedAt: string | null }
+    tripStarted: { completedAt: string | null }
+    pickupCompleted: { completedAt: string | null }
+  }
+  activities: Array<{
+    id: string
+    actorId: string
+    actorType: string
+    action: string
+    description: string
+    module: string
+    entityType: string
+    entityId: string
+    before: any
+    after: any
+    ipAddress: string
+    userAgent: string
+    correlationId: string | null
+    createdAt: string
+  }>
+}
+
+const loading = ref(true)
+const error = ref<string | null>(null)
+const pickupData = ref<PickupRequestDetail | null>(null)
+const activityLogData = ref<ActivityLogResponse | null>(null)
+
+const api = useApi()
+
+const formatDate = (dateStr: string) => {
+  if (!dateStr) return '—'
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+const formatDateTime = (dateStr: string) => {
+  if (!dateStr) return '—'
+  const date = new Date(dateStr)
+  return date.toLocaleString('en-US', { 
+    year: 'numeric', 
+    month: '2-digit', 
+    day: '2-digit', 
+    hour: '2-digit', 
+    minute: '2-digit' 
+  })
+}
+
+// Fetch pickup request details
+async function fetchPickupDetails() {
+  loading.value = true
+  error.value = null
+  
+  try {
+    const data = await api.get<PickupRequestDetail>(
+      `/pickup-requests/admin/${route.params.id}`,
+      'Failed to load pickup request details'
+    )
+    
+    if (data) {
+      pickupData.value = data
+    }
+  } catch (err: any) {
+    error.value = err?.message || 'An unexpected error occurred'
+    console.error('Error fetching pickup details:', err)
+  } finally {
+    loading.value = false
+  }
+}
+
+// Fetch activity log
+async function fetchActivityLog() {
+  try {
+    const data = await api.get<ActivityLogResponse>(
+      `/pickup-requests/admin/${route.params.id}/activity-log`,
+      'Failed to load activity log'
+    )
+    
+    if (data) {
+      activityLogData.value = data
+    }
+  } catch (err: any) {
+    console.error('Error fetching activity log:', err)
+  }
+}
+
+// Computed properties for display
+const pickup = computed(() => {
+  if (!pickupData.value) return null
+  
+  const data = pickupData.value
+  const assignment = data.assignment
+  
+  return {
+    id: data.id,
+    customer: data.customer.name,
+    customerPhone: data.customer.phoneNumber,
+    customerEmail: '—', // Not provided by API
+    address: data.customer.address,
+    city: data.customer.city || '—',
+    region: data.customer.region || '—',
+    postalCode: data.customer.postalCode || '—',
+    placeName: data.customer.placeName || '—',
+    noBins: data.customer.noBins,
+    customerType: data.customer.customerType.name,
+    zone: data.customer.region || data.customer.city || '—',
+    date: formatDate(data.preferredPickupDate),
+    timeSlot: assignment?.timeSlot || '—',
+    paymentType: data.paymentType,
+    paymentStatus: data.paymentStatus,
+    amount: 0, // Not provided by API for individual requests
+    status: data.status,
+    driver: assignment?.driver?.name || null,
+    driverPhone: assignment?.driver?.phoneNumber || null,
+    driverLicense: assignment?.driver?.licenseNumber || null,
+    truck: assignment?.truck ? `${assignment.truck.plateNumber}` : null,
+    truckDetails: assignment?.truck ? `${assignment.truck.make} ${assignment.truck.model}` : null,
+    notes: data.additionalNotes || '—',
+    disposableType: data.disposableItemType.name,
+    estimatedQuantity: data.estimatedQuantity.label,
+    createdAt: formatDateTime(data.createdAt),
+    assignedAt: assignment ? formatDateTime(assignment.scheduledDate) : '',
+    startedAt: '',
+    completedAt: '',
+  }
+})
+
+// Fetch data on mount
+onMounted(() => {
+  fetchPickupDetails()
+  fetchActivityLog()
 })
 
 const statusBadge = computed(() => {
-  if (pickup.status === 'pending')    return { bg: 'rgba(255,180,0,0.1)',  border: 'rgba(255,180,0,0.2)',  color: '#d49a00',  label: 'Pending' }
-  if (pickup.status === 'assigned')   return { bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)', color: '#3b82f6',  label: 'Assigned' }
-  if (pickup.status === 'in-transit') return { bg: 'rgba(255,180,0,0.1)',  border: 'rgba(255,180,0,0.2)',  color: '#d49a00',  label: 'In Transit' }
-  if (pickup.status === 'completed')  return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e',  label: 'Completed' }
-  if (pickup.status === 'cancelled')  return { bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.2)',  color: '#ef4444',  label: 'Cancelled' }
-  return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: pickup.status }
+  if (!pickup.value) return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: 'Unknown' }
+  
+  const status = pickup.value.status.toLowerCase()
+  if (status === 'pending')    return { bg: 'rgba(255,180,0,0.1)',  border: 'rgba(255,180,0,0.2)',  color: '#d49a00',  label: 'Pending' }
+  if (status === 'assigned')   return { bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)', color: '#3b82f6',  label: 'Assigned' }
+  if (status === 'in-transit' || status === 'in_transit') return { bg: 'rgba(255,180,0,0.1)',  border: 'rgba(255,180,0,0.2)',  color: '#d49a00',  label: 'In Transit' }
+  if (status === 'completed')  return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e',  label: 'Completed' }
+  if (status === 'cancelled')  return { bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.2)',  color: '#ef4444',  label: 'Cancelled' }
+  return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: pickup.value.status }
 })
 
 const paymentStatusBadge = computed(() => {
-  if (pickup.paymentStatus === 'active-plan') return { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#22c55e', label: 'Active Plan' }
-  if (pickup.paymentStatus === 'paid')        return { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#22c55e', label: 'Paid' }
-  return { bg: 'white', border: '#ececec', color: '#1a1a1a', label: 'Unpaid' }
+  if (!pickup.value) return { bg: 'white', border: '#ececec', color: '#1a1a1a', label: 'Unknown' }
+  
+  const status = pickup.value.paymentStatus.toLowerCase()
+  if (status === 'active-plan' || status === 'active_plan') return { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#22c55e', label: 'Active Plan' }
+  if (status === 'paid')        return { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#22c55e', label: 'Paid' }
+  if (status === 'unpaid')      return { bg: 'white', border: '#ececec', color: '#1a1a1a', label: 'Unpaid' }
+  return { bg: 'white', border: '#ececec', color: '#1a1a1a', label: pickup.value.paymentStatus }
+})
+
+const paymentTypeLabel = computed(() => {
+  if (!pickup.value) return '—'
+  return pickup.value.paymentType === 'subscription' ? 'Subscription' : 'Pay as you go'
 })
 
 const activeTab = ref('Details')
 const tabs = ['Details', 'Activity Log']
 
 // Timeline steps
-const timeline = computed(() => [
-  { label: 'Request Created',  time: pickup.createdAt,   done: !!pickup.createdAt },
-  { label: 'Driver Assigned',  time: pickup.assignedAt,  done: !!pickup.assignedAt },
-  { label: 'Trip Started',     time: pickup.startedAt,   done: !!pickup.startedAt },
-  { label: 'Pickup Completed', time: pickup.completedAt, done: !!pickup.completedAt },
-])
+const timeline = computed(() => {
+  if (!activityLogData.value) return []
+  
+  const tl = activityLogData.value.timeline
+  
+  return [
+    { 
+      label: 'Request Created',  
+      time: tl.requestCreated.completedAt ? formatDateTime(tl.requestCreated.completedAt) : '',
+      done: !!tl.requestCreated.completedAt 
+    },
+    { 
+      label: 'Driver Assigned',  
+      time: tl.driverAssigned.completedAt ? formatDateTime(tl.driverAssigned.completedAt) : '',
+      done: !!tl.driverAssigned.completedAt 
+    },
+    { 
+      label: 'Trip Started',     
+      time: tl.tripStarted.completedAt ? formatDateTime(tl.tripStarted.completedAt) : '',
+      done: !!tl.tripStarted.completedAt 
+    },
+    { 
+      label: 'Pickup Completed', 
+      time: tl.pickupCompleted.completedAt ? formatDateTime(tl.pickupCompleted.completedAt) : '',
+      done: !!tl.pickupCompleted.completedAt 
+    },
+  ]
+})
 
-const activityLog = ref([
-  { time: '2026-03-01 10:32 AM', actor: 'Admin',        action: 'Driver Maria Garcia assigned to pickup' },
-  { time: '2026-03-01 09:14 AM', actor: 'System',       action: 'Pickup request created by Michael Chen' },
-])
+const activityLog = computed(() => {
+  if (!activityLogData.value) return []
+  
+  return activityLogData.value.activities.map(activity => {
+    // Determine actor display name
+    let actor = 'System'
+    if (activity.actorType === 'customer') {
+      actor = 'Customer'
+    } else if (activity.actorType === 'admin') {
+      actor = 'Admin'
+    } else if (activity.actorType === 'driver') {
+      actor = 'Driver'
+    }
+    
+    return {
+      time: formatDateTime(activity.createdAt),
+      actor,
+      action: activity.description
+    }
+  })
+})
 
 // Actions
 const showReassignModal = ref(false)
 const showCancelConfirm = ref(false)
 
-function startTrip() {
-  pickup.status = 'in-transit'
-  pickup.startedAt = new Date().toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-  activityLog.value.unshift({ time: pickup.startedAt, actor: 'Admin', action: 'Trip started manually by admin' })
+async function startTrip() {
+  // TODO: Implement API call to start trip
+  // For now, just refresh the data
+  await fetchPickupDetails()
+  await fetchActivityLog()
 }
 
-function completePickup() {
-  pickup.status = 'completed'
-  pickup.completedAt = new Date().toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-  activityLog.value.unshift({ time: pickup.completedAt, actor: 'Admin', action: 'Pickup marked as completed by admin' })
+async function completePickup() {
+  // TODO: Implement API call to complete pickup
+  // For now, just refresh the data
+  await fetchPickupDetails()
+  await fetchActivityLog()
 }
 
-function cancelPickup() {
-  pickup.status = 'cancelled'
+async function cancelPickup() {
+  // TODO: Implement API call to cancel pickup
   showCancelConfirm.value = false
-  activityLog.value.unshift({ time: new Date().toLocaleString(), actor: 'Admin', action: 'Pickup cancelled by admin' })
+  await fetchPickupDetails()
+  await fetchActivityLog()
 }
 
-function handleReassign(data: { driver: string }) {
-  pickup.driver = data.driver
-  pickup.status = 'assigned'
-  pickup.assignedAt = new Date().toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-  activityLog.value.unshift({ time: pickup.assignedAt, actor: 'Admin', action: `Pickup reassigned to ${data.driver}` })
-  showReassignModal.value = false
+async function handleReassign(data: { driver: string; scheduledDate: string; scheduledTime: string; priority: string; adminNotes: string }) {
+  try {
+    // Map time slot to API format
+    let timeSlot = 'afternoon'
+    if (data.scheduledTime.toLowerCase().includes('morning')) {
+      timeSlot = 'morning'
+    } else if (data.scheduledTime.toLowerCase().includes('evening')) {
+      timeSlot = 'evening'
+    }
+    
+    // Check if pickup already has a driver assigned
+    const isReassignment = !!pickup.value?.driver
+    
+    if (isReassignment) {
+      // Use reassign endpoint (PATCH) - doesn't include priorityLevel
+      const payload = {
+        driverId: data.driver,
+        scheduledDate: data.scheduledDate,
+        timeSlot: timeSlot,
+        adminNotes: data.adminNotes
+      }
+      
+      await api.patch(
+        `/pickup-requests/admin/${route.params.id}/reassign`,
+        payload,
+        'Failed to reassign driver'
+      )
+    } else {
+      // Use assign endpoint (POST) - includes priorityLevel
+      const payload = {
+        driverId: data.driver,
+        scheduledDate: data.scheduledDate,
+        timeSlot: timeSlot,
+        priorityLevel: data.priority,
+        adminNotes: data.adminNotes
+      }
+      
+      await api.post(
+        `/pickup-requests/admin/${route.params.id}/assign`,
+        payload,
+        'Failed to assign driver'
+      )
+    }
+    
+    showReassignModal.value = false
+    await fetchPickupDetails()
+    await fetchActivityLog()
+  } catch (err: any) {
+    console.error('Error assigning/reassigning driver:', err)
+  }
 }
 </script>
 
 <template>
-  <div style="display:flex;flex-direction:column;gap:21px">
+  <!-- Loading state -->
+  <div v-if="loading" style="display:flex;flex-direction:column;gap:21px">
+    <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:40px;text-align:center">
+      <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Loading pickup details...</p>
+    </div>
+  </div>
+
+  <!-- Error state -->
+  <div v-else-if="error" style="display:flex;flex-direction:column;gap:21px">
+    <NuxtLink to="/pickups" style="display:inline-flex;align-items:center;gap:8px;text-decoration:none">
+      <UIcon name="i-lucide-arrow-left" style="width:16px;height:16px;color:#6b7280" />
+      <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Back to Pickups</span>
+    </NuxtLink>
+    <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:40px;text-align:center">
+      <UIcon name="i-lucide-alert-circle" style="width:48px;height:48px;color:#ef4444;margin:0 auto 16px" />
+      <p style="font-size:16px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;margin-bottom:8px">Failed to Load Pickup</p>
+      <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ error }}</p>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div v-else-if="pickup" style="display:flex;flex-direction:column;gap:21px">
 
     <!-- Back -->
     <NuxtLink to="/pickups" style="display:inline-flex;align-items:center;gap:8px;text-decoration:none">
@@ -137,7 +428,7 @@ function handleReassign(data: { driver: string }) {
         <div style="display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
           <!-- Start Trip — shown when assigned -->
           <button
-            v-if="pickup.status === 'assigned'"
+            v-if="pickup.status.toLowerCase() === 'assigned'"
             style="height:40px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
             @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
             @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
@@ -146,7 +437,7 @@ function handleReassign(data: { driver: string }) {
 
           <!-- Complete — shown when in-transit -->
           <button
-            v-if="pickup.status === 'in-transit'"
+            v-if="pickup.status.toLowerCase() === 'in-transit' || pickup.status.toLowerCase() === 'in_transit'"
             style="height:40px;padding:0 16px;background:#22c55e;border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:pointer"
             @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
             @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
@@ -155,7 +446,7 @@ function handleReassign(data: { driver: string }) {
 
           <!-- Track Driver — shown when in-transit or assigned -->
           <button
-            v-if="pickup.status === 'assigned' || pickup.status === 'in-transit'"
+            v-if="['assigned', 'in-transit', 'in_transit'].includes(pickup.status.toLowerCase())"
             style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
             @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
@@ -163,16 +454,16 @@ function handleReassign(data: { driver: string }) {
 
           <!-- Reassign — shown when pending/assigned/in-transit -->
           <button
-            v-if="['pending','assigned','in-transit'].includes(pickup.status)"
+            v-if="['pending','assigned','in-transit','in_transit'].includes(pickup.status.toLowerCase())"
             style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
             @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
             @click="showReassignModal = true"
-          >{{ pickup.status === 'pending' ? 'Assign Driver' : 'Reassign' }}</button>
+          >{{ pickup.status.toLowerCase() === 'pending' ? 'Assign Driver' : 'Reassign' }}</button>
 
           <!-- Cancel — shown when not completed/cancelled -->
           <button
-            v-if="!['completed','cancelled'].includes(pickup.status)"
+            v-if="!['completed','cancelled'].includes(pickup.status.toLowerCase())"
             style="height:40px;padding:0 16px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);border-radius:20px;font-size:14px;font-weight:500;color:#ef4444;font-family:'Manrope',sans-serif;cursor:pointer"
             @mouseover="($event.currentTarget as HTMLElement).style.background='rgba(239,68,68,0.18)'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background='rgba(239,68,68,0.1)'"
@@ -186,11 +477,11 @@ function handleReassign(data: { driver: string }) {
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:24px">
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:10px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
         <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">Payment Type</p>
-        <p style="font-size:18px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ pickup.paymentType === 'subscription' ? 'Subscription' : 'Pay as you go' }}</p>
+        <p style="font-size:18px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ paymentTypeLabel }}</p>
       </div>
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:10px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-        <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">Amount</p>
-        <p style="font-size:18px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ pickup.paymentType === 'subscription' ? '—' : format(pickup.amount) }}</p>
+        <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">Disposable Type</p>
+        <p style="font-size:18px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ pickup.disposableType }}</p>
       </div>
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:10px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
         <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">Payment Status</p>
@@ -199,8 +490,8 @@ function handleReassign(data: { driver: string }) {
         </span>
       </div>
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:10px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-        <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">Created</p>
-        <p style="font-size:15px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ pickup.createdAt }}</p>
+        <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">Estimated Quantity</p>
+        <p style="font-size:15px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ pickup.estimatedQuantity }}</p>
       </div>
     </div>
 
@@ -227,9 +518,13 @@ function handleReassign(data: { driver: string }) {
               <div v-for="item in [
                 { label: 'Request ID',  value: pickup.id },
                 { label: 'Address',     value: pickup.address },
-                { label: 'Zone',        value: pickup.zone },
+                { label: 'City',        value: pickup.city },
+                { label: 'Region',      value: pickup.region },
+                { label: 'Place Name',  value: pickup.placeName },
                 { label: 'Date',        value: pickup.date },
                 { label: 'Time Slot',   value: pickup.timeSlot },
+                { label: 'Disposable Type', value: pickup.disposableType },
+                { label: 'Estimated Quantity', value: pickup.estimatedQuantity },
                 { label: 'Notes',       value: pickup.notes || '—' },
               ]" :key="item.label" style="display:flex;flex-direction:column;gap:2px">
                 <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">{{ item.label }}</p>
@@ -248,7 +543,8 @@ function handleReassign(data: { driver: string }) {
                 <div v-for="item in [
                   { label: 'Name',  value: pickup.customer },
                   { label: 'Phone', value: pickup.customerPhone },
-                  { label: 'Email', value: pickup.customerEmail },
+                  { label: 'Customer Type', value: pickup.customerType },
+                  { label: 'No. of Bins', value: pickup.noBins },
                 ]" :key="item.label" style="display:flex;flex-direction:column;gap:2px">
                   <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">{{ item.label }}</p>
                   <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ item.value }}</p>
@@ -263,7 +559,9 @@ function handleReassign(data: { driver: string }) {
                 <div v-for="item in [
                   { label: 'Name',  value: pickup.driver },
                   { label: 'Phone', value: pickup.driverPhone },
+                  { label: 'License', value: pickup.driverLicense },
                   { label: 'Truck', value: pickup.truck },
+                  { label: 'Truck Details', value: pickup.truckDetails },
                 ]" :key="item.label" style="display:flex;flex-direction:column;gap:2px">
                   <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">{{ item.label }}</p>
                   <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ item.value }}</p>
@@ -327,16 +625,16 @@ function handleReassign(data: { driver: string }) {
 
   <!-- Reassign modal (reuse AssignDriverModal) -->
   <AssignDriverModal
-    v-if="showReassignModal"
+    v-if="showReassignModal && pickup"
     :request="{
       id: pickup.id,
       customer: pickup.customer,
       address: pickup.address,
       date: pickup.date,
       timeSlot: pickup.timeSlot,
-      binType: '120L General Waste',
+      binType: pickup.disposableType,
       paymentType: pickup.paymentType,
-      paymentDetail: pickup.paymentType === 'subscription' ? 'Subscription' : format(pickup.amount),
+      paymentDetail: paymentTypeLabel,
       notes: pickup.notes,
     }"
     @close="showReassignModal = false"
@@ -345,7 +643,7 @@ function handleReassign(data: { driver: string }) {
 
   <!-- Cancel confirm -->
   <div
-    v-if="showCancelConfirm"
+    v-if="showCancelConfirm && pickup"
     style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:50;display:flex;align-items:center;justify-content:center;padding:24px"
     @click.self="showCancelConfirm = false"
   >

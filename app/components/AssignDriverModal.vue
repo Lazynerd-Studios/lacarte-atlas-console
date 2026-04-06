@@ -20,7 +20,41 @@ const form = reactive({
   adminNotes: '',
 })
 
-const drivers = ['John Smith', 'Maria Garcia', 'James Wilson', 'Lisa Anderson', 'Robert Taylor']
+interface Driver {
+  id: string
+  name: string
+  phoneNumber: string
+  status: string
+}
+
+const drivers = ref<Driver[]>([])
+const loadingDrivers = ref(false)
+const api = useApi()
+
+// Fetch available drivers
+async function fetchDrivers() {
+  loadingDrivers.value = true
+  try {
+    const data = await api.get<{ data: Driver[] }>(
+      '/drivers/admin/',
+      'Failed to load drivers'
+    )
+    
+    if (data?.data) {
+      // Filter to only show active drivers
+      drivers.value = data.data.filter(d => d.status === 'active' || d.status === 'online')
+    }
+  } catch (err) {
+    console.error('Error fetching drivers:', err)
+  } finally {
+    loadingDrivers.value = false
+  }
+}
+
+onMounted(() => {
+  fetchDrivers()
+})
+
 const timeSlots = ['Morning (8AM - 12PM)', 'Afternoon (12PM - 4PM)', 'Evening (4PM - 8PM)']
 const priorities = ['low', 'normal', 'high', 'urgent']
 
@@ -118,9 +152,9 @@ const paymentTypeBadge = computed(() => {
         <!-- Select Driver -->
         <div style="display:flex;flex-direction:column;gap:6px">
           <label style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">Select Driver</label>
-          <select v-model="form.driver" :style="selectStyle" @focus="onFocus" @blur="onBlur">
-            <option value="" disabled>Select a driver</option>
-            <option v-for="d in drivers" :key="d" :value="d">{{ d }}</option>
+          <select v-model="form.driver" :style="selectStyle" @focus="onFocus" @blur="onBlur" :disabled="loadingDrivers">
+            <option value="" disabled>{{ loadingDrivers ? 'Loading drivers...' : 'Select a driver' }}</option>
+            <option v-for="d in drivers" :key="d.id" :value="d.id">{{ d.name }} - {{ d.phoneNumber }}</option>
           </select>
         </div>
 
