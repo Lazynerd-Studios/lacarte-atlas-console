@@ -1,6 +1,8 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'dashboard' })
 
+const api = useApi()
+
 const stats = [
   { label: 'Active Customers', value: '2,847', change: '+12.5%', positive: true, icon: 'i-lucide-users' },
   { label: 'Drivers on Duty',  value: '48',    change: '94% active', positive: null, icon: 'i-lucide-truck' },
@@ -37,18 +39,75 @@ const activities = [
   { text: 'Route completed - Driver #24 (34 stops)', time: '45 minutes ago', badge: 'success', badgeColor: '#22c55e', badgeBg: 'rgba(34,197,94,0.1)', badgeBorder: 'rgba(34,197,94,0.2)' },
 ]
 
-const pendingPickups = [
-  { name: 'Sarah Johnson', address: '123 Oak Street', date: '2026-03-03', type: 'subscription', typeBg: 'rgba(59,130,246,0.1)', typeBorder: 'rgba(59,130,246,0.2)', typeColor: '#3b82f6', unpaid: false },
-  { name: 'Emma Williams', address: '789 Pine Road', date: '2026-03-04', type: 'one-time', typeBg: '#e5e7eb', typeBorder: '#e5e7eb', typeColor: '#6b7280', unpaid: true },
-  { name: 'James Martinez', address: '321 Birch Lane', date: '2026-03-03', type: 'subscription', typeBg: 'rgba(59,130,246,0.1)', typeBorder: 'rgba(59,130,246,0.2)', typeColor: '#3b82f6', unpaid: false },
-]
+interface PickupRequest {
+  id: string
+  customer: {
+    name: string
+    address: string
+  }
+  preferredPickupDate: string
+  paymentType: string
+  paymentStatus: string
+}
 
-const trucks = [
-  { id: 'T-001', driver: 'John Smith',    zone: 'Downtown', eta: '12 min' },
-  { id: 'T-003', driver: 'Maria Garcia',  zone: 'Westside',  eta: '8 min' },
-  { id: 'T-007', driver: 'James Wilson',  zone: 'Eastside',  eta: '25 min' },
-  { id: 'T-012', driver: 'Lisa Anderson', zone: 'Northside', eta: '15 min' },
-]
+interface Truck {
+  id: string
+  truckId: string
+  plateNumber: string
+  status: string
+  assignedDriver: {
+    name: string
+  } | null
+}
+
+const pendingPickups = ref<PickupRequest[]>([])
+const trucks = ref<Truck[]>([])
+
+async function fetchPendingPickups() {
+  try {
+    const data = await api.get<{ data: PickupRequest[] }>(
+      '/pickup-requests/admin/list?status=pending&limit=3',
+      'Failed to load pending pickups'
+    )
+    
+    if (data?.data) {
+      pendingPickups.value = data.data
+    }
+  } catch (err) {
+    console.error('Error fetching pending pickups:', err)
+  }
+}
+
+async function fetchActiveTrucks() {
+  try {
+    const data = await api.get<{ data: Truck[] }>(
+      '/trucks/admin/',
+      'Failed to load trucks'
+    )
+    
+    if (data?.data) {
+      // Filter to only show active trucks (those with assigned drivers and active status)
+      trucks.value = data.data.filter(t => t.assignedDriver && t.status === 'active').slice(0, 4)
+    }
+  } catch (err) {
+    console.error('Error fetching trucks:', err)
+  }
+}
+
+function formatDate(dateStr: string) {
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+function paymentTypeBadge(type: string) {
+  if (type === 'subscription') return { bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)', color: '#3b82f6', label: 'Subscription' }
+  return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: 'Pay as you go' }
+}
+
+onMounted(() => {
+  fetchPendingPickups()
+  fetchActiveTrucks()
+})
 
 // Chart helpers
 const revenueMax = Math.max(...revenueData.map(d => d.value))
@@ -204,34 +263,37 @@ function barH(v: number) { return (v / pickupMax) * innerH }
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
           <div style="display:flex;align-items:center;gap:8px">
             <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Pending Pickup Requests</p>
-            <span style="font-size:12px;font-weight:500;color:#d49a00;background:rgba(255,180,0,0.1);border:1px solid rgba(255,180,0,0.2);border-radius:14px;padding:3px 11px">3</span>
+            <span style="font-size:12px;font-weight:500;color:#d49a00;background:rgba(255,180,0,0.1);border:1px solid rgba(255,180,0,0.2);border-radius:14px;padding:3px 11px">{{ pendingPickups.length }}</span>
           </div>
-          <a href="/pickups" style="font-size:14px;color:#ffb400;font-family:'Manrope',sans-serif;text-decoration:none">View All</a>
+          <NuxtLink to="/pickups" style="font-size:14px;color:#ffb400;font-family:'Manrope',sans-serif;text-decoration:none">View All</NuxtLink>
         </div>
-        <div style="display:flex;flex-direction:column;gap:12px">
-          <div v-for="(p, i) in pendingPickups" :key="i" style="background:#f8f9fa;border-radius:16px;padding:12px;display:flex;gap:12px;align-items:flex-start">
+        <div v-if="pendingPickups.length > 0" style="display:flex;flex-direction:column;gap:12px">
+          <NuxtLink v-for="p in pendingPickups" :key="p.id" :to="`/pickups/${p.id}`" style="background:#f8f9fa;border-radius:16px;padding:12px;display:flex;gap:12px;align-items:flex-start;text-decoration:none;transition:background 0.15s" @mouseover="($event.currentTarget as HTMLElement).style.background='#f0f1f3'" @mouseleave="($event.currentTarget as HTMLElement).style.background='#f8f9fa'">
             <div style="width:40px;height:40px;background:#ffb400;border-radius:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
               <UIcon name="i-lucide-clipboard-list" style="width:20px;height:20px;color:white" />
             </div>
             <div style="flex:1;min-width:0">
               <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
                 <div>
-                  <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ p.name }}</p>
-                  <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ p.address }}</p>
+                  <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ p.customer.name }}</p>
+                  <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ p.customer.address }}</p>
                 </div>
-                <span :style="`flex-shrink:0;font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;color:${p.typeColor};background:${p.typeBg};border:1px solid ${p.typeBorder};border-radius:14px;padding:3px 11px;white-space:nowrap`">
-                  {{ p.type }}
+                <span :style="`flex-shrink:0;font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;color:${paymentTypeBadge(p.paymentType).color};background:${paymentTypeBadge(p.paymentType).bg};border:1px solid ${paymentTypeBadge(p.paymentType).border};border-radius:14px;padding:3px 11px;white-space:nowrap`">
+                  {{ paymentTypeBadge(p.paymentType).label }}
                 </span>
               </div>
               <div style="display:flex;align-items:center;gap:12px">
-                <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Pickup: {{ p.date }}</span>
-                <div v-if="p.unpaid" style="display:flex;align-items:center;gap:4px">
+                <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Pickup: {{ formatDate(p.preferredPickupDate) }}</span>
+                <div v-if="p.paymentStatus === 'unpaid'" style="display:flex;align-items:center;gap:4px">
                   <UIcon name="i-lucide-alert-circle" style="width:12px;height:12px;color:#dc2626" />
                   <span style="font-size:12px;color:#dc2626;font-family:'Manrope',sans-serif">Unpaid</span>
                 </div>
               </div>
             </div>
-          </div>
+          </NuxtLink>
+        </div>
+        <div v-else style="text-align:center;padding:32px 0">
+          <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No pending pickup requests</p>
         </div>
       </div>
     </div>
@@ -240,26 +302,25 @@ function barH(v: number) { return (v / pickupMax) * innerH }
     <div class="grid-cols-2">
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:25px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
         <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin-bottom:16px">Active Trucks</p>
-        <div style="display:flex;flex-direction:column;gap:16px">
-          <div v-for="truck in trucks" :key="truck.id" style="height:64px;background:#f8f9fa;border-radius:16px;padding:0 12px;display:flex;align-items:center;gap:12px">
+        <div v-if="trucks.length > 0" style="display:flex;flex-direction:column;gap:16px">
+          <NuxtLink v-for="truck in trucks" :key="truck.id" :to="`/trucks/${truck.id}`" style="height:64px;background:#f8f9fa;border-radius:16px;padding:0 12px;display:flex;align-items:center;gap:12px;text-decoration:none;transition:background 0.15s" @mouseover="($event.currentTarget as HTMLElement).style.background='#f0f1f3'" @mouseleave="($event.currentTarget as HTMLElement).style.background='#f8f9fa'">
             <div style="width:40px;height:40px;background:#22c55e;border-radius:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
               <UIcon name="i-lucide-truck" style="width:20px;height:20px;color:white" />
             </div>
             <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
               <div style="display:flex;align-items:center;gap:8px">
-                <span style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ truck.id }}</span>
-                <span style="font-size:12px;font-weight:500;color:#22c55e;background:rgba(34,197,94,0.1);border-radius:14px;padding:3px 11px">on-route</span>
+                <span style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ truck.truckId }}</span>
+                <span style="font-size:12px;font-weight:500;color:#22c55e;background:rgba(34,197,94,0.1);border-radius:14px;padding:3px 11px">{{ truck.status }}</span>
               </div>
-              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ truck.driver }}</p>
+              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ truck.assignedDriver?.name || 'No driver' }}</p>
             </div>
             <div style="display:flex;flex-direction:column;gap:2px;align-items:flex-end">
-              <div style="display:flex;align-items:center;gap:4px">
-                <UIcon name="i-lucide-map-pin" style="width:12px;height:12px;color:#6b7280" />
-                <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ truck.zone }}</span>
-              </div>
-              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">ETA: {{ truck.eta }}</p>
+              <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ truck.plateNumber }}</span>
             </div>
-          </div>
+          </NuxtLink>
+        </div>
+        <div v-else style="text-align:center;padding:32px 0">
+          <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No active trucks</p>
         </div>
       </div>
       <!-- Right col intentionally empty -->
