@@ -66,7 +66,7 @@ async function onSubmit() {
 </script>
 
 <template>
-  <div style="position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#f9fafb">
+  <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#f9fafb">
     <!-- Blobs -->
     <div style="position:absolute;top:-160px;right:-80px;width:384px;height:384px;border-radius:9999px;filter:blur(64px);background:linear-gradient(135deg,rgba(255,180,0,0.45),rgba(255,200,61,0.45))" />
     <div style="position:absolute;bottom:-80px;left:-160px;width:384px;height:384px;border-radius:9999px;filter:blur(64px);background:linear-gradient(45deg,rgba(255,180,0,0.45),rgba(255,200,61,0.45))" />
@@ -75,8 +75,8 @@ async function onSubmit() {
     <div style="position:relative;z-index:10;width:100%;max-width:448px;display:flex;flex-direction:column;gap:32px;padding:0 16px">
       <!-- Logo -->
       <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
-        <img src="https://www.figma.com/api/mcp/asset/167049a0-b755-4705-88c3-2229f73c2eb4" alt="LaCarte" style="height:54px;width:auto" />
-        <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Admin Dashboard</p>
+        <img src="/logo.png" alt="LaCarte" style="height:84px;width:auto" />
+        <p style="font-size:18px;color:#6b7280;font-family:'Manrope',sans-serif">Admin Dashboard</p>
       </div>
 
       <!-- Card -->
