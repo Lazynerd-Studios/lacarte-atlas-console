@@ -49,6 +49,7 @@ const pagination = ref<Pagination>({
   hasPreviousPage: false
 })
 const loading = ref(false)
+const initialLoading = ref(true)
 
 const activeFilter = ref('All')
 const filters = ['All', 'Pending', 'Assigned', 'Completed']
@@ -123,9 +124,10 @@ function formatDate(dateString: string) {
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-onMounted(() => {
-  fetchStats()
-  fetchRequests()
+onMounted(async () => {
+  initialLoading.value = true
+  await Promise.all([fetchStats(), fetchRequests()])
+  initialLoading.value = false
 })
 
 function paymentTypeBadge(type: string) {
@@ -176,7 +178,123 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
 </script>
 
 <template>
-  <div style="display:flex;flex-direction:column;gap:32px">
+  <!-- Loading skeleton -->
+  <div v-if="initialLoading" style="display:flex;flex-direction:column;gap:32px">
+    <!-- Header skeleton -->
+    <div>
+      <div class="skeleton" style="height:32px;width:220px;margin-bottom:8px" />
+      <div class="skeleton" style="height:14px;width:380px" />
+    </div>
+
+    <!-- Stat cards skeleton -->
+    <div class="grid-cols-4">
+      <div
+        v-for="i in 4"
+        :key="i"
+        style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)"
+      >
+        <div class="skeleton" style="height:14px;width:120px;margin-bottom:8px" />
+        <div class="skeleton" style="height:28px;width:60px" />
+      </div>
+    </div>
+
+    <!-- Filter bar skeleton -->
+    <div style="display:flex;align-items:center;gap:16px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="skeleton" style="width:16px;height:16px;border-radius:4px" />
+        <div class="skeleton" style="height:14px;width:70px" />
+      </div>
+      <div style="display:flex;gap:8px">
+        <div v-for="i in 4" :key="i" class="skeleton" style="height:32px;width:80px;border-radius:20px" />
+      </div>
+    </div>
+
+    <!-- Table skeleton -->
+    <div class="table-scroll" style="background:white;border:1px solid #ececec;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
+            <th style="padding:14px 8px;text-align:left">
+              <div class="skeleton" style="height:14px;width:80px" />
+            </th>
+            <th style="padding:14px 16px;text-align:left">
+              <div class="skeleton" style="height:14px;width:80px" />
+            </th>
+            <th style="padding:14px 16px;text-align:left">
+              <div class="skeleton" style="height:14px;width:70px" />
+            </th>
+            <th style="padding:14px 16px;text-align:left">
+              <div class="skeleton" style="height:14px;width:90px" />
+            </th>
+            <th style="padding:14px 16px;text-align:left">
+              <div class="skeleton" style="height:14px;width:100px" />
+            </th>
+            <th style="padding:14px 12px;text-align:left">
+              <div class="skeleton" style="height:14px;width:110px" />
+            </th>
+            <th style="padding:14px 16px;text-align:left">
+              <div class="skeleton" style="height:14px;width:60px" />
+            </th>
+            <th style="padding:14px 16px;text-align:right">
+              <div class="skeleton" style="height:14px;width:70px;margin-left:auto" />
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="i in 8" :key="i" :style="`border-bottom:${i < 8 ? '1px solid #e5e7eb' : 'none'}`">
+            <!-- Request ID -->
+            <td style="padding:20px 8px">
+              <div class="skeleton" style="height:14px;width:70px" />
+            </td>
+            <!-- Customer -->
+            <td style="padding:20px 16px">
+              <div class="skeleton" style="height:14px;width:120px;margin-bottom:4px" />
+              <div class="skeleton" style="height:12px;width:100px" />
+            </td>
+            <!-- Address -->
+            <td style="padding:20px 16px">
+              <div class="skeleton" style="height:14px;width:140px" />
+            </td>
+            <!-- Pickup Date -->
+            <td style="padding:20px 16px">
+              <div class="skeleton" style="height:14px;width:100px;margin-bottom:4px" />
+              <div class="skeleton" style="height:12px;width:120px" />
+            </td>
+            <!-- Payment Type -->
+            <td style="padding:20px 16px">
+              <div class="skeleton" style="height:22px;width:100px;border-radius:14px" />
+            </td>
+            <!-- Payment Status -->
+            <td style="padding:20px 12px">
+              <div class="skeleton" style="height:22px;width:80px;border-radius:14px" />
+            </td>
+            <!-- Status -->
+            <td style="padding:20px 16px">
+              <div class="skeleton" style="height:22px;width:80px;border-radius:14px" />
+            </td>
+            <!-- Actions -->
+            <td style="padding:20px 16px;text-align:right">
+              <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px">
+                <div class="skeleton" style="height:32px;width:110px;border-radius:20px" />
+                <div class="skeleton" style="width:32px;height:32px;border-radius:20px" />
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination skeleton -->
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div class="skeleton" style="height:14px;width:140px" />
+      <div style="display:flex;gap:8px">
+        <div class="skeleton" style="height:36px;width:90px;border-radius:8px" />
+        <div class="skeleton" style="height:36px;width:80px;border-radius:8px" />
+      </div>
+    </div>
+  </div>
+
+  <div v-else style="display:flex;flex-direction:column;gap:32px">
 
     <!-- Header -->
     <div>
@@ -338,3 +456,16 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
     @submit="handleAssignDriver"
   />
 </template>
+
+<style scoped>
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: pulse 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+</style>
