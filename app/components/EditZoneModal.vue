@@ -26,9 +26,13 @@ const form = ref({
   isActive: props.zone.isActive,
 })
 const error = ref('')
+const submitting = ref(false)
+
+defineExpose({ submitting })
 
 function submit() {
   if (!form.value.name.trim()) { error.value = 'Zone name is required.'; return }
+  submitting.value = true
   emit('submit', {
     name: form.value.name.trim(),
     description: form.value.description.trim(),
@@ -88,8 +92,12 @@ function submit() {
 
       <!-- Footer -->
       <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px;position:sticky;bottom:0;background:#fff">
-        <button @click="emit('close')" style="background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Cancel</button>
-        <button @click="submit" style="background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Save Changes</button>
+        <button @click="emit('close')" :disabled="submitting" style="background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Cancel</button>
+        <button @click="submit" :disabled="submitting"
+          :style="`background:${submitting ? '#ffd966' : '#ffb400'};color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px;opacity:${submitting ? '0.7' : '1'}`">
+          <Icon v-if="submitting" name="lucide:loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
+          {{ submitting ? 'Saving...' : 'Save Changes' }}
+        </button>
       </div>
     </div>
   </div>

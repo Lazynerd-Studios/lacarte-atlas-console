@@ -77,6 +77,7 @@ const activeZones    = computed(() => stats.value.activeZones)
 
 // ── Add modal ──
 const showAddModal = ref(false)
+const addModalRef = ref<any>(null)
 
 function openAdd() { showAddModal.value = true }
 
@@ -84,27 +85,32 @@ async function handleAdd(data: { name: string; description: string; color: strin
   console.log('[handleAdd] payload:', data)
   const result = await api.post<Zone>('/zone/admin/', data, 'Failed to create zone')
   console.log('[handleAdd] result:', result)
+  if (addModalRef.value) addModalRef.value.submitting = false
   if (result !== null) {
     showAddModal.value = false
     await fetchZones()
     await fetchStats()
+    useAppToast().success('Zone created successfully')
   }
 }
 
 // ── Edit modal ──
 const showEditModal = ref(false)
 const editTarget = ref<Zone | null>(null)
+const editModalRef = ref<any>(null)
 
 function openEdit(z: Zone) { editTarget.value = z; showEditModal.value = true }
 
 async function handleEdit(data: { name: string; description: string; color: string; areas: string[]; isActive: boolean }) {
   if (!editTarget.value) return
-  const result = await api.put(`/zone/admin/${editTarget.value.id}`, data, 'Failed to update zone')
+  const result = await api.patch(`/zone/admin/${editTarget.value.id}`, data, 'Failed to update zone')
+  if (editModalRef.value) editModalRef.value.submitting = false
   if (result !== null) {
     showEditModal.value = false
     editTarget.value = null
     await fetchZones()
     await fetchStats()
+    useAppToast().success('Zone updated successfully')
   }
 }
 
@@ -122,6 +128,7 @@ async function handleDelete() {
     deleteTarget.value = null
     await fetchZones()
     await fetchStats()
+    useAppToast().success('Zone deleted successfully')
   }
 }
 
@@ -330,10 +337,10 @@ async function toggleActive(z: Zone) {
     />
 
     <!-- ── ADD MODAL ── -->
-    <AddZoneModal v-if="showAddModal" @close="showAddModal = false" @submit="handleAdd" />
+    <AddZoneModal v-if="showAddModal" ref="addModalRef" @close="showAddModal = false" @submit="handleAdd" />
 
     <!-- ── EDIT MODAL ── -->
-    <EditZoneModal v-if="showEditModal && editTarget" :zone="editTarget" @close="showEditModal = false" @submit="handleEdit" />
+    <EditZoneModal v-if="showEditModal && editTarget" ref="editModalRef" :zone="editTarget" @close="showEditModal = false" @submit="handleEdit" />
 
     <!-- ── DELETE MODAL ── -->
     <DeleteZoneModal

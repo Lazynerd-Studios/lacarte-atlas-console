@@ -1,4 +1,4 @@
-hb<script setup lang="ts">
+<script setup lang="ts">
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'submit', data: { name: string; description: string; color: string; areas: string[]; isActive: boolean }): void
@@ -8,9 +8,13 @@ const colorOptions = ['#3b82f6','#22c55e','#f97316','#8b5cf6','#ec4899','#ef4444
 
 const form = ref({ name: '', description: '', color: '#3b82f6', areasStr: '', isActive: true })
 const error = ref('')
+const submitting = ref(false)
+
+defineExpose({ submitting })
 
 function submit() {
   if (!form.value.name.trim()) { error.value = 'Zone name is required.'; return }
+  submitting.value = true
   emit('submit', {
     name: form.value.name.trim(),
     description: form.value.description.trim(),
@@ -70,8 +74,12 @@ function submit() {
 
       <!-- Footer -->
       <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px;position:sticky;bottom:0;background:#fff">
-        <button @click="emit('close')" style="background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Cancel</button>
-        <button @click="submit" style="background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Add Zone</button>
+        <button @click="emit('close')" :disabled="submitting" style="background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Cancel</button>
+        <button @click="submit" :disabled="submitting"
+          :style="`background:${submitting ? '#ffd966' : '#ffb400'};color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px;opacity:${submitting ? '0.7' : '1'}`">
+          <Icon v-if="submitting" name="lucide:loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
+          {{ submitting ? 'Creating...' : 'Add Zone' }}
+        </button>
       </div>
     </div>
   </div>

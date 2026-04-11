@@ -435,8 +435,94 @@ onMounted(async () => {
 <template>
   <div style="display:flex;flex-direction:column;gap:32px;font-family:'Manrope',sans-serif">
 
-    <!-- Show PageSkeleton during initial load -->
-    <PageSkeleton v-if="loading && rates.length === 0" type="card-grid" :cards="3" />
+    <!-- Loading skeleton -->
+    <div v-if="loading && rates.length === 0" style="display:flex;flex-direction:column;gap:32px">
+      <!-- Header skeleton -->
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+          <div class="skeleton" style="height:28px;width:220px;margin-bottom:6px" />
+          <div class="skeleton" style="height:14px;width:320px" />
+        </div>
+        <div class="skeleton" style="height:40px;width:120px;border-radius:10px" />
+      </div>
+
+      <!-- Stats skeleton -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px">
+        <div v-for="i in 4" :key="i" style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
+          <div class="skeleton" style="height:12px;width:80px;margin-bottom:10px" />
+          <div class="skeleton" style="height:28px;width:60px" />
+        </div>
+      </div>
+
+      <!-- Filters skeleton -->
+      <div style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;padding:20px 24px;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+        <div class="skeleton" style="height:38px;width:160px;border-radius:10px" />
+        <div class="skeleton" style="height:38px;width:140px;border-radius:10px" />
+        <div class="skeleton" style="height:13px;width:80px;margin-left:auto" />
+      </div>
+
+      <!-- Table skeleton -->
+      <div style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
+              <th style="padding:14px 20px;text-align:left">
+                <div class="skeleton" style="height:13px;width:100px" />
+              </th>
+              <th style="padding:14px 20px;text-align:left">
+                <div class="skeleton" style="height:13px;width:80px" />
+              </th>
+              <th style="padding:14px 20px;text-align:left">
+                <div class="skeleton" style="height:13px;width:90px" />
+              </th>
+              <th style="padding:14px 20px;text-align:left">
+                <div class="skeleton" style="height:13px;width:60px" />
+              </th>
+              <th style="padding:14px 20px;text-align:left">
+                <div class="skeleton" style="height:13px;width:50px" />
+              </th>
+              <th style="padding:14px 20px;text-align:left">
+                <div class="skeleton" style="height:13px;width:70px" />
+              </th>
+              <th style="padding:14px 20px;text-align:right">
+                <div class="skeleton" style="height:13px;width:60px;margin-left:auto" />
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="i in 5" :key="i" style="border-bottom:1px solid #f0f0f0">
+              <td style="padding:16px 20px">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div class="skeleton" style="width:10px;height:10px;border-radius:50%" />
+                  <div class="skeleton" style="height:14px;width:120px" />
+                </div>
+              </td>
+              <td style="padding:16px 20px">
+                <div class="skeleton" style="height:15px;width:80px" />
+              </td>
+              <td style="padding:16px 20px">
+                <div class="skeleton" style="height:13px;width:100px" />
+              </td>
+              <td style="padding:16px 20px">
+                <div class="skeleton" style="height:20px;width:70px;border-radius:20px" />
+              </td>
+              <td style="padding:16px 20px">
+                <div class="skeleton" style="height:13px;width:140px" />
+              </td>
+              <td style="padding:16px 20px">
+                <div class="skeleton" style="height:13px;width:90px" />
+              </td>
+              <td style="padding:16px 20px">
+                <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px">
+                  <div class="skeleton" style="height:30px;width:60px;border-radius:8px" />
+                  <div class="skeleton" style="height:30px;width:70px;border-radius:8px" />
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
 
     <!-- Main content (shown after initial load) -->
     <template v-else>
