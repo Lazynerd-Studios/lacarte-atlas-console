@@ -5,7 +5,7 @@ interface Zone {
   description: string
   color: string
   areas: string[]
-  assignedDrivers: number
+  driverCount: number
   customerCount: number
   isActive: boolean
 }

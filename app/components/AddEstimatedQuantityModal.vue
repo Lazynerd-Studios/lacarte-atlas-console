@@ -4,6 +4,8 @@ const emit = defineEmits<{
   submit: [data: { label: string; description: string; displayOrder: number; isActive: boolean }]
 }>()
 
+const submitting = ref(false)
+
 const form = reactive({
   label: '',
   description: '',
@@ -37,9 +39,11 @@ function validate() {
   return true
 }
 
-function handleSubmit() {
+async function handleSubmit() {
   if (!validate()) return
+  submitting.value = true
   emit('submit', { ...form })
+  // Note: submitting will be reset by parent after API call completes
 }
 </script>
 
@@ -90,11 +94,12 @@ function handleSubmit() {
 
       <!-- Footer -->
       <div style="padding:20px 24px;border-top:1px solid #f0f0f0;display:flex;gap:12px;justify-content:flex-end">
-        <button @click="emit('close')" style="padding:10px 20px;border-radius:10px;border:1.5px solid #e5e7eb;background:#fff;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;cursor:pointer">
+        <button @click="emit('close')" :disabled="submitting" style="padding:10px 20px;border-radius:10px;border:1.5px solid #e5e7eb;background:#fff;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;cursor:pointer">
           Cancel
         </button>
-        <button @click="handleSubmit" style="padding:10px 20px;border-radius:10px;border:none;background:#ffb400;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;cursor:pointer">
-          Create
+        <button @click="handleSubmit" :disabled="submitting" :style="`padding:10px 20px;border-radius:10px;border:none;background:${submitting ? '#f3f4f6' : '#ffb400'};font-size:14px;font-weight:600;color:${submitting ? '#9ca3af' : '#1a1a1a'};font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px`">
+          <Icon v-if="submitting" name="lucide:loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
+          {{ submitting ? 'Creating...' : 'Create' }}
         </button>
       </div>
 

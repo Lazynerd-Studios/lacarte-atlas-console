@@ -33,6 +33,8 @@ interface Zone {
 const api = useApi()
 const activeTab = ref<'compose' | 'history'>('compose')
 const historyFilter = ref<'all' | 'completed' | 'pending' | 'failed'>('all')
+const loadingRecipients = ref(true)
+const loadingHistory = ref(true)
 
 const recipientType = ref<'all' | 'zone' | 'custom'>('all')
 const selectedZone = ref('')
@@ -65,11 +67,23 @@ async function fetchZones() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   console.log('[mail] Component mounted, initializing data')
-  fetchZones()
-  fetchHistory()
-  fetchCustomers()
+  loadingRecipients.value = true
+  loadingHistory.value = true
+  
+  // Fetch recipients data (zones and customers)
+  Promise.all([
+    fetchZones(),
+    fetchCustomers()
+  ]).finally(() => {
+    loadingRecipients.value = false
+  })
+  
+  // Fetch history separately
+  fetchHistory().finally(() => {
+    loadingHistory.value = false
+  })
 })
 
 const allCustomers = ref<Customer[]>([])
@@ -219,15 +233,12 @@ async function sendMail() {
 
   if (recipientType.value === 'zone') {
     payload.zoneId = selectedZone.value
-    payload.emails = []
     const zone = zones.value.find(z => z.id === selectedZone.value)
     console.log('[mail] Sending to zone:', zone?.name, 'ID:', selectedZone.value)
   } else if (recipientType.value === 'custom') {
     payload.emails = selectedCustomers.value.map(c => c.email)
     console.log('[mail] Sending to custom recipients:', payload.emails.length, 'emails')
   } else {
-    payload.zoneId = null
-    payload.emails = []
     console.log('[mail] Sending to all customers')
   }
 
@@ -278,13 +289,40 @@ async function sendMail() {
     <!-- Compose -->
     <div v-if="activeTab === 'compose'" style="background:white;border:1px solid #ececec;border-radius:16px;padding:28px;box-shadow:0 1px 3px rgba(0,0,0,0.06);display:flex;flex-direction:column;gap:22px;max-width:720px">
 
-      <div>
+      <!-- Recipients loading skeleton -->
+      <div v-if="loadingRecipients">
+        <div class="skeleton" style="height:13px;width:80px;margin-bottom:10px" />
+        <div style="display:flex;gap:10px">
+          <div class="skeleton" style="height:36px;width:140px;border-radius:10px" />
+          <div class="skeleton" style="height:36px;width:120px;border-radius:10px" />
+          <div class="skeleton" style="height:36px;width:100px;border-radius:10px" />
+        </div>
+      </div>
+
+      <!-- Recipients loaded -->
+      <div v-else>
         <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:10px">Recipients</label>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button v-for="opt in [{ val: 'all', label: 'All Customers' }, { val: 'zone', label: 'By Zone' }, { val: 'custom', label: 'Custom' }]"
-            :key="opt.val" @click="recipientType = opt.val as any"
-            :style="`padding:8px 18px;border-radius:10px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer;border:1.5px solid ${recipientType === opt.val ? '#ffb400' : '#e5e7eb'};background:${recipientType === opt.val ? '#fff9e6' : '#fff'};color:${recipientType === opt.val ? '#111' : '#6b7280'}`">
-            {{ opt.label }}
+          <button 
+            @click="recipientType = 'all'"
+            :style="`padding:8px 18px;border-radius:10px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer;border:1.5px solid ${recipientType === 'all' ? '#ffb400' : '#e5e7eb'};background:${recipientType === 'all' ? '#fff9e6' : '#fff'};color:${recipientType === 'all' ? '#111' : '#6b7280'};display:flex;align-items:center;gap:8px`">
+            All Customers
+            <span :style="`padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;background:${recipientType === 'all' ? '#ffb400' : '#f3f4f6'};color:${recipientType === 'all' ? '#111' : '#6b7280'}`">
+              {{ allCustomers.length }}
+            </span>
+          </button>
+          <button 
+            @click="recipientType = 'zone'"
+            :style="`padding:8px 18px;border-radius:10px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer;border:1.5px solid ${recipientType === 'zone' ? '#ffb400' : '#e5e7eb'};background:${recipientType === 'zone' ? '#fff9e6' : '#fff'};color:${recipientType === 'zone' ? '#111' : '#6b7280'};display:flex;align-items:center;gap:8px`">
+            By Zone
+            <span :style="`padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;background:${recipientType === 'zone' ? '#ffb400' : '#f3f4f6'};color:${recipientType === 'zone' ? '#111' : '#6b7280'}`">
+              {{ zones.length }}
+            </span>
+          </button>
+          <button 
+            @click="recipientType = 'custom'"
+            :style="`padding:8px 18px;border-radius:10px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer;border:1.5px solid ${recipientType === 'custom' ? '#ffb400' : '#e5e7eb'};background:${recipientType === 'custom' ? '#fff9e6' : '#fff'};color:${recipientType === 'custom' ? '#111' : '#6b7280'}`">
+            Custom
           </button>
         </div>
       </div>
@@ -403,7 +441,26 @@ async function sendMail() {
         </button>
       </div>
 
-      <div style="background:white;border:1px solid #ececec;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+      <!-- History loading skeleton -->
+      <div v-if="loadingHistory" style="background:white;border:1px solid #ececec;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+        <div v-for="i in 4" :key="i" style="padding:18px 24px;border-bottom:1px solid #f0f0f0">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+            <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;gap:10px">
+                <div class="skeleton" style="height:22px;width:90px;border-radius:20px" />
+                <div class="skeleton" style="height:22px;width:120px;border-radius:20px" />
+                <div class="skeleton" style="height:12px;width:100px" />
+              </div>
+              <div class="skeleton" style="height:14px;width:60%" />
+              <div class="skeleton" style="height:13px;width:80%" />
+            </div>
+            <div class="skeleton" style="height:12px;width:140px" />
+          </div>
+        </div>
+      </div>
+
+      <!-- History loaded -->
+      <div v-else style="background:white;border:1px solid #ececec;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
         <div v-if="filteredHistory.length === 0" style="padding:48px;text-align:center;color:#9ca3af;font-size:14px">
           No messages found
         </div>

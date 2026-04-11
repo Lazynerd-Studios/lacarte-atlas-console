@@ -22,6 +22,8 @@ interface EstimatedQuantity {
 
 const api = useApi()
 const activeTab = ref<'disposable' | 'quantity'>('disposable')
+const loading = ref(true)
+const toast = useAppToast()
 
 // Disposable Types
 const disposableTypes = ref<DisposableType[]>([])
@@ -69,9 +71,13 @@ const filteredQuantity = computed(() =>
   )
 )
 
-onMounted(() => {
-  fetchDisposableTypes()
-  fetchEstimatedQuantities()
+onMounted(async () => {
+  loading.value = true
+  await Promise.all([
+    fetchDisposableTypes(),
+    fetchEstimatedQuantities()
+  ])
+  loading.value = false
 })
 
 // Add Disposable Type Modal
@@ -82,6 +88,7 @@ async function handleAddDisposable(data: { name: string; description: string; ic
   if (result !== null) {
     showAddDisposableModal.value = false
     await fetchDisposableTypes()
+    toast.success('Disposable type created successfully')
   }
 }
 
@@ -101,6 +108,7 @@ async function handleEditDisposable(data: { name: string; description: string; i
     showEditDisposableModal.value = false
     editDisposableTarget.value = null
     await fetchDisposableTypes()
+    toast.success('Disposable type updated successfully')
   }
 }
 
@@ -120,6 +128,7 @@ async function handleDeleteDisposable() {
     showDeleteDisposableModal.value = false
     deleteDisposableTarget.value = null
     await fetchDisposableTypes()
+    toast.success('Disposable type deleted successfully')
   }
 }
 
@@ -131,6 +140,7 @@ async function handleAddQuantity(data: { label: string; description: string; dis
   if (result !== null) {
     showAddQuantityModal.value = false
     await fetchEstimatedQuantities()
+    toast.success('Estimated quantity created successfully')
   }
 }
 
@@ -150,6 +160,7 @@ async function handleEditQuantity(data: { label: string; description: string; di
     showEditQuantityModal.value = false
     editQuantityTarget.value = null
     await fetchEstimatedQuantities()
+    toast.success('Estimated quantity updated successfully')
   }
 }
 
@@ -169,12 +180,59 @@ async function handleDeleteQuantity() {
     showDeleteQuantityModal.value = false
     deleteQuantityTarget.value = null
     await fetchEstimatedQuantities()
+    toast.success('Estimated quantity deleted successfully')
   }
 }
 </script>
 
 <template>
-  <div style="display:flex;flex-direction:column;gap:32px;font-family:'Manrope',sans-serif">
+  <!-- Loading skeleton -->
+  <div v-if="loading" style="display:flex;flex-direction:column;gap:32px;font-family:'Manrope',sans-serif">
+    <!-- Header skeleton -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="skeleton" style="height:28px;width:220px" />
+        <div class="skeleton" style="height:14px;width:320px" />
+      </div>
+      <div class="skeleton" style="height:40px;width:200px;border-radius:10px" />
+    </div>
+
+    <!-- Tabs skeleton -->
+    <div style="display:flex;gap:4px;background:#f3f4f6;border-radius:12px;padding:4px;width:fit-content">
+      <div class="skeleton" style="height:36px;width:160px;border-radius:9px" />
+      <div class="skeleton" style="height:36px;width:180px;border-radius:9px" />
+    </div>
+
+    <!-- Search skeleton -->
+    <div class="skeleton" style="height:38px;width:320px;border-radius:10px" />
+
+    <!-- Table skeleton -->
+    <div style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;overflow:hidden">
+      <!-- Header row -->
+      <div style="background:#f9fafb;border-bottom:1px solid #f0f0f0;padding:16px 24px;display:flex;gap:24px">
+        <div class="skeleton" style="height:12px;width:60px" />
+        <div class="skeleton" style="height:12px;width:100px" />
+        <div class="skeleton" style="height:12px;flex:1" />
+        <div class="skeleton" style="height:12px;width:60px" />
+        <div class="skeleton" style="height:12px;width:80px" />
+        <div class="skeleton" style="height:12px;width:120px" />
+      </div>
+      <!-- Data rows -->
+      <div v-for="i in 5" :key="i" style="padding:16px 24px;display:flex;gap:24px;align-items:center;border-bottom:1px solid #f0f0f0">
+        <div class="skeleton" style="width:36px;height:36px;border-radius:10px" />
+        <div class="skeleton" style="height:14px;width:120px" />
+        <div class="skeleton" style="height:14px;flex:1" />
+        <div class="skeleton" style="height:14px;width:40px" />
+        <div class="skeleton" style="height:20px;width:70px;border-radius:20px" />
+        <div style="display:flex;gap:8px">
+          <div class="skeleton" style="height:28px;width:60px;border-radius:8px" />
+          <div class="skeleton" style="height:28px;width:70px;border-radius:8px" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div v-else style="display:flex;flex-direction:column;gap:32px;font-family:'Manrope',sans-serif">
     
     <!-- Header -->
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
@@ -191,15 +249,15 @@ async function handleDeleteQuantity() {
     </div>
 
     <!-- Tabs -->
-    <div style="display:flex;gap:8px;border-bottom:2px solid #f0f0f0">
+    <div style="display:flex;gap:4px;background:#f3f4f6;border-radius:12px;padding:4px;width:fit-content">
       <button 
         @click="activeTab = 'disposable'"
-        :style="`padding:12px 24px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;border:none;background:none;cursor:pointer;border-bottom:2px solid ${activeTab === 'disposable' ? '#ffb400' : 'transparent'};color:${activeTab === 'disposable' ? '#ffb400' : '#6b7280'};margin-bottom:-2px`">
+        :style="`padding:8px 24px;border:none;border-radius:9px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer;transition:all 0.15s;${activeTab === 'disposable' ? 'background:#fff;color:#1a1a1a;box-shadow:0 1px 4px rgba(0,0,0,0.1)' : 'background:transparent;color:#6b7280'}`">
         Disposable Types
       </button>
       <button 
         @click="activeTab = 'quantity'"
-        :style="`padding:12px 24px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;border:none;background:none;cursor:pointer;border-bottom:2px solid ${activeTab === 'quantity' ? '#ffb400' : 'transparent'};color:${activeTab === 'quantity' ? '#ffb400' : '#6b7280'};margin-bottom:-2px`">
+        :style="`padding:8px 24px;border:none;border-radius:9px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer;transition:all 0.15s;${activeTab === 'quantity' ? 'background:#fff;color:#1a1a1a;box-shadow:0 1px 4px rgba(0,0,0,0.1)' : 'background:transparent;color:#6b7280'}`">
         Estimated Quantities
       </button>
     </div>

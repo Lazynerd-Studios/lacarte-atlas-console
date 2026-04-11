@@ -7,7 +7,7 @@ interface Zone {
   description: string
   color: string
   areas: string[]
-  assignedDrivers: number
+  driverCount: number
   customerCount: number
   isActive: boolean
 }
@@ -22,6 +22,12 @@ interface ZoneStats {
 const api = useApi()
 const zones = ref<Zone[]>([])
 const stats = ref<ZoneStats>({ totalZones: 0, activeZones: 0, totalCustomers: 0, assignedDrivers: 0 })
+const loading = ref(true)
+
+// Pagination
+const currentPage = ref(1)
+const perPage = 10
+const totalZones = ref(0)
 
 async function fetchStats() {
   const data = await api.get<ZoneStats>('/zone/admin/stats', 'Failed to load zone stats')
@@ -31,10 +37,18 @@ async function fetchStats() {
 async function fetchZones() {
   const data = await api.get<any>('/zone/admin/list')
   console.log('[fetchZones] response:', data)
-  if (data) zones.value = Array.isArray(data) ? data : (data.data ?? data.zones ?? data.results ?? [])
+  if (data) {
+    const allZones = Array.isArray(data) ? data : (data.data ?? data.zones ?? data.results ?? [])
+    zones.value = allZones
+    totalZones.value = allZones.length
+  }
 }
 
-onMounted(() => { fetchZones(); fetchStats() })
+onMounted(async () => {
+  loading.value = true
+  await Promise.all([fetchZones(), fetchStats()])
+  loading.value = false
+})
 
 const search = ref('')
 const filterStatus = ref<'all' | 'active' | 'inactive'>('all')
@@ -44,6 +58,18 @@ const filtered = computed(() => zones.value.filter(z => {
   const matchStatus = filterStatus.value === 'all' || (filterStatus.value === 'active' ? z.isActive : !z.isActive)
   return matchSearch && matchStatus
 }))
+
+// Paginated zones
+const paginatedZones = computed(() => {
+  const start = (currentPage.value - 1) * perPage
+  const end = start + perPage
+  return filtered.value.slice(start, end)
+})
+
+// Reset to page 1 when filters change
+watch([search, filterStatus], () => {
+  currentPage.value = 1
+})
 
 const totalCustomers = computed(() => stats.value.totalCustomers)
 const totalDrivers   = computed(() => stats.value.assignedDrivers)
@@ -109,7 +135,69 @@ async function toggleActive(z: Zone) {
 </script>
 
 <template>
-  <div style="display:flex;flex-direction:column;gap:32px;font-family:'Manrope',sans-serif">
+  <!-- Loading skeleton -->
+  <div v-if="loading" style="display:flex;flex-direction:column;gap:32px;font-family:'Manrope',sans-serif">
+    <!-- Header skeleton -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div>
+        <div class="skeleton" style="height:28px;width:220px;margin-bottom:6px" />
+        <div class="skeleton" style="height:14px;width:280px" />
+      </div>
+      <div class="skeleton" style="height:40px;width:120px;border-radius:10px" />
+    </div>
+
+    <!-- Stats skeleton -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px">
+      <div v-for="i in 3" :key="i" style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
+        <div class="skeleton" style="height:12px;width:80px;margin-bottom:6px" />
+        <div class="skeleton" style="height:28px;width:60px;margin-bottom:4px" />
+        <div class="skeleton" style="height:11px;width:100px" />
+      </div>
+    </div>
+
+    <!-- Filters skeleton -->
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+      <div class="skeleton" style="height:38px;flex:1;min-width:200px;max-width:320px;border-radius:10px" />
+      <div class="skeleton" style="height:38px;width:130px;border-radius:10px" />
+    </div>
+
+    <!-- Zone cards skeleton -->
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div v-for="i in 3" :key="i" style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;padding:24px;display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap">
+        <!-- Left -->
+        <div style="display:flex;align-items:flex-start;gap:16px;flex:1;min-width:220px">
+          <div class="skeleton" style="width:48px;height:48px;border-radius:14px" />
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+              <div class="skeleton" style="height:16px;width:140px" />
+              <div class="skeleton" style="height:20px;width:60px;border-radius:20px" />
+            </div>
+            <div class="skeleton" style="height:13px;width:80%;margin-bottom:12px" />
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              <div class="skeleton" style="height:24px;width:80px;border-radius:6px" />
+              <div class="skeleton" style="height:24px;width:100px;border-radius:6px" />
+              <div class="skeleton" style="height:24px;width:90px;border-radius:6px" />
+            </div>
+          </div>
+        </div>
+        <!-- Middle -->
+        <div style="display:flex;gap:28px;align-items:center;flex-shrink:0">
+          <div v-for="j in 3" :key="j" style="text-align:center">
+            <div class="skeleton" style="height:11px;width:60px;margin:0 auto 4px" />
+            <div class="skeleton" style="height:20px;width:40px;margin:0 auto" />
+          </div>
+        </div>
+        <!-- Right -->
+        <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+          <div class="skeleton" style="height:36px;width:100px;border-radius:8px" />
+          <div class="skeleton" style="height:36px;width:70px;border-radius:8px" />
+          <div class="skeleton" style="height:36px;width:80px;border-radius:8px" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div v-else style="display:flex;flex-direction:column;gap:32px;font-family:'Manrope',sans-serif">
 
     <!-- Header -->
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
@@ -161,7 +249,7 @@ async function toggleActive(z: Zone) {
 
     <!-- Zone cards -->
     <div style="display:flex;flex-direction:column;gap:16px">
-      <div v-for="zone in filtered" :key="zone.id"
+      <div v-for="zone in paginatedZones" :key="zone.id"
         style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;padding:24px;display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap">
 
         <!-- Left: icon + info -->
@@ -196,7 +284,7 @@ async function toggleActive(z: Zone) {
           </div>
           <div style="text-align:center">
             <p style="font-size:11px;color:#9ca3af;margin:0 0 4px;font-weight:500;text-transform:uppercase;letter-spacing:0.5px">Drivers</p>
-            <p style="font-size:20px;font-weight:700;color:#1a1a1a;margin:0">{{ zone.assignedDrivers }}</p>
+            <p style="font-size:20px;font-weight:700;color:#1a1a1a;margin:0">{{ zone.driverCount }}</p>
           </div>
           <div style="text-align:center">
             <p style="font-size:11px;color:#9ca3af;margin:0 0 4px;font-weight:500;text-transform:uppercase;letter-spacing:0.5px">Areas</p>
@@ -231,6 +319,15 @@ async function toggleActive(z: Zone) {
       <p style="font-size:13px;color:#6b7280;margin:0 0 20px">Try adjusting your filters or create a new zone.</p>
       <button @click="openAdd" style="background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Add Zone</button>
     </div>
+
+    <!-- Pagination -->
+    <AppPagination
+      v-if="filtered.length > 0"
+      :page="currentPage"
+      :total="filtered.length"
+      :per-page="perPage"
+      @update:page="currentPage = $event"
+    />
 
     <!-- ── ADD MODAL ── -->
     <AddZoneModal v-if="showAddModal" @close="showAddModal = false" @submit="handleAdd" />

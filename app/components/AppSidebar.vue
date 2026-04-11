@@ -108,9 +108,9 @@ function toggleGroup(group: 'reports' | 'management' | 'comms') {
     <div style="height:64px;padding:0 12px;display:flex;align-items:center;border-bottom:1px solid #ececec;flex-shrink:0;gap:8px">
       <img
         v-if="!collapsed"
-        src="https://www.figma.com/api/mcp/asset/f733ef86-dfb4-4f16-b178-19d3757b9227"
+        src="/logo.png"
         alt="LaCarte"
-        style="height:40px;width:auto;flex:1;min-width:0"
+        style="height:100px;width:auto;flex:1;min-width:0"
       />
       <button
         :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
