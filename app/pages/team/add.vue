@@ -185,7 +185,104 @@ function inputStyle(focused = false) {
 
 <template>
   <div v-if="loading" style="display:flex;flex-direction:column;gap:28px">
-    <PageSkeleton type="dashboard" />
+    <!-- Back link skeleton -->
+    <div style="display:inline-flex;align-items:center;gap:8px;width:fit-content">
+      <div class="skeleton" style="width:16px;height:16px;border-radius:4px" />
+      <div class="skeleton" style="width:100px;height:14px" />
+    </div>
+
+    <!-- Header skeleton -->
+    <div>
+      <div class="skeleton" style="height:32px;width:240px;margin-bottom:8px" />
+      <div class="skeleton" style="height:14px;width:320px" />
+    </div>
+
+    <!-- Main layout skeleton -->
+    <div style="display:grid;grid-template-columns:1fr 344px;gap:24px;align-items:start">
+      
+      <!-- Left column -->
+      <div style="display:flex;flex-direction:column;gap:24px">
+        
+        <!-- Personal Information card -->
+        <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+          <div class="skeleton" style="height:20px;width:180px;margin-bottom:24px" />
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <!-- First + Last name row -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+              <div>
+                <div class="skeleton" style="height:14px;width:80px;margin-bottom:8px" />
+                <div class="skeleton" style="height:40px;width:100%;border-radius:12px" />
+              </div>
+              <div>
+                <div class="skeleton" style="height:14px;width:80px;margin-bottom:8px" />
+                <div class="skeleton" style="height:40px;width:100%;border-radius:12px" />
+              </div>
+            </div>
+            <!-- Email -->
+            <div>
+              <div class="skeleton" style="height:14px;width:100px;margin-bottom:8px" />
+              <div class="skeleton" style="height:40px;width:100%;border-radius:12px" />
+            </div>
+            <!-- Phone -->
+            <div>
+              <div class="skeleton" style="height:14px;width:100px;margin-bottom:8px" />
+              <div class="skeleton" style="height:40px;width:100%;border-radius:12px" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Role & Access card -->
+        <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+          <div class="skeleton" style="height:20px;width:140px;margin-bottom:24px" />
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <!-- Role select -->
+            <div>
+              <div class="skeleton" style="height:14px;width:60px;margin-bottom:8px" />
+              <div class="skeleton" style="height:42px;width:100%;border-radius:12px" />
+              <div class="skeleton" style="height:12px;width:240px;margin-top:6px" />
+            </div>
+            <!-- Status select -->
+            <div>
+              <div class="skeleton" style="height:14px;width:60px;margin-bottom:8px" />
+              <div class="skeleton" style="height:42px;width:100%;border-radius:12px" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Action buttons -->
+        <div style="display:flex;gap:12px">
+          <div class="skeleton" style="flex:1;height:40px;border-radius:20px" />
+          <div class="skeleton" style="flex:1;height:40px;border-radius:20px" />
+        </div>
+      </div>
+
+      <!-- Right column -->
+      <div style="display:flex;flex-direction:column;gap:24px">
+        
+        <!-- Role Information card -->
+        <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+          <div class="skeleton" style="height:16px;width:140px;margin-bottom:16px" />
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div v-for="i in 4" :key="i" style="background:#f9fafb;border-radius:12px;padding:12px">
+              <div class="skeleton" style="height:14px;width:120px;margin-bottom:4px" />
+              <div class="skeleton" style="height:12px;width:100%" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Security card -->
+        <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+          <div class="skeleton" style="height:16px;width:80px;margin-bottom:16px" />
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div v-for="i in 3" :key="i" style="display:flex;align-items:flex-start;gap:10px">
+              <div class="skeleton" style="width:6px;height:6px;border-radius:50%;margin-top:8px" />
+              <div class="skeleton" style="height:14px;flex:1" />
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
   </div>
 
   <div v-else style="display:flex;flex-direction:column;gap:28px">
@@ -339,5 +436,15 @@ function inputStyle(focused = false) {
   to {
     transform: rotate(360deg);
   }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: pulse 1.5s ease-in-out infinite;
+  border-radius: 8px;
 }
 </style>

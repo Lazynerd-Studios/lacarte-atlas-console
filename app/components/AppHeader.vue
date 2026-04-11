@@ -15,7 +15,9 @@ const showNotifications = ref(false)
 const search = ref('')
 
 async function logout() {
+  const toast = useAppToast()
   await authStore.logout()
+  toast.success('Logged out successfully')
   router.push('/login')
 }
 </script>

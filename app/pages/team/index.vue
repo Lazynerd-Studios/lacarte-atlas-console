@@ -292,7 +292,95 @@ onMounted(async () => {
 
 <template>
   <div v-if="initialLoading" style="display:flex;flex-direction:column;gap:28px">
-    <PageSkeleton type="table" :rows="6" :cards="4" />
+    <!-- Header skeleton -->
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div class="skeleton" style="height:32px;width:240px;margin-bottom:8px" />
+        <div class="skeleton" style="height:14px;width:360px" />
+      </div>
+      <div style="display:flex;gap:12px">
+        <div class="skeleton" style="height:40px;width:110px;border-radius:20px" />
+        <div class="skeleton" style="height:40px;width:170px;border-radius:20px" />
+      </div>
+    </div>
+
+    <!-- Stat cards skeleton -->
+    <div class="grid-cols-4" style="gap:20px">
+      <div
+        v-for="i in 4"
+        :key="`skeleton-${i}`"
+        style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1);display:flex;flex-direction:column;gap:12px"
+      >
+        <div class="skeleton" style="width:40px;height:40px;border-radius:20px" />
+        <div class="skeleton" style="height:14px;width:120px" />
+        <div class="skeleton" style="height:28px;width:80px" />
+      </div>
+    </div>
+
+    <!-- Members table skeleton -->
+    <div class="table-scroll" style="background:white;border:1px solid #ececec;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
+            <th style="padding:14px 16px;text-align:left">
+              <div class="skeleton" style="height:14px;width:80px" />
+            </th>
+            <th style="padding:14px 16px;text-align:left">
+              <div class="skeleton" style="height:14px;width:60px" />
+            </th>
+            <th style="padding:14px 16px;text-align:left">
+              <div class="skeleton" style="height:14px;width:50px" />
+            </th>
+            <th style="padding:14px 16px;text-align:left">
+              <div class="skeleton" style="height:14px;width:60px" />
+            </th>
+            <th style="padding:14px 16px;text-align:left">
+              <div class="skeleton" style="height:14px;width:80px" />
+            </th>
+            <th style="padding:14px 16px;text-align:right">
+              <div class="skeleton" style="height:14px;width:70px;margin-left:auto" />
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="i in 6" :key="i" :style="`border-bottom:${i < 6 ? '1px solid #e5e7eb' : 'none'}`">
+            <!-- Member -->
+            <td style="padding:16px">
+              <div style="display:flex;align-items:center;gap:12px">
+                <div class="skeleton" style="width:40px;height:40px;border-radius:50%" />
+                <div class="skeleton" style="height:14px;width:140px" />
+              </div>
+            </td>
+            <!-- Email -->
+            <td style="padding:16px">
+              <div class="skeleton" style="height:14px;width:180px" />
+            </td>
+            <!-- Role -->
+            <td style="padding:16px">
+              <div class="skeleton" style="height:24px;width:100px;border-radius:16px" />
+            </td>
+            <!-- Status -->
+            <td style="padding:16px">
+              <div class="skeleton" style="height:22px;width:70px;border-radius:14px" />
+            </td>
+            <!-- Last Login -->
+            <td style="padding:16px">
+              <div style="display:flex;align-items:center;gap:6px">
+                <div class="skeleton" style="width:16px;height:16px;border-radius:4px" />
+                <div class="skeleton" style="height:14px;width:100px" />
+              </div>
+            </td>
+            <!-- Actions -->
+            <td style="padding:16px">
+              <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px">
+                <div class="skeleton" style="width:32px;height:32px;border-radius:20px" />
+                <div class="skeleton" style="width:32px;height:32px;border-radius:20px" />
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <div v-else style="display:flex;flex-direction:column;gap:28px">
@@ -498,3 +586,20 @@ onMounted(async () => {
     </div>
   </div>
 </template>
+
+<style scoped>
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: pulse 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+</style>

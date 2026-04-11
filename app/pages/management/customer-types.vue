@@ -176,30 +176,20 @@ async function handleDelete() {
   
   console.log('[CustomerTypes] Deleting customer type:', deleteTarget.value.id)
   
-  try {
-    await api.del(
-      `/customer/admin/types/${deleteTarget.value.id}`,
-      'Failed to delete customer type'
-    )
-    
+  const result = await api.del(
+    `/customer/admin/types/${deleteTarget.value.id}`,
+    'Failed to delete customer type'
+  )
+  
+  if (result !== null) {
     console.log('[CustomerTypes] Deleted successfully')
     toast.success('Customer type deleted successfully')
     showDeleteModal.value = false
     deleteTarget.value = null
     await fetchCustomerTypes()
-  } catch (err: any) {
-    console.error('[CustomerTypes] Failed to delete:', err)
-    const errorMessage = err?.message || 'Failed to delete customer type'
-    
-    if (errorMessage.toLowerCase().includes('customers') || 
-        errorMessage.toLowerCase().includes('assigned')) {
-      toast.error('Cannot delete', 'This customer type has customers assigned to it')
-    } else {
-      toast.error('Failed to delete customer type', errorMessage)
-    }
-  } finally {
-    deleting.value = false
   }
+  
+  deleting.value = false
 }
 
 const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444','#ffb400','#ec4899','#14b8a6']
@@ -213,11 +203,69 @@ onMounted(fetchCustomerTypes)
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: pulse 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
 </style>
 
 <template>
   <div style="display:flex;flex-direction:column;gap:32px;font-family:'Manrope',sans-serif">
 
+    <!-- Loading skeleton -->
+    <div v-if="loading && customerTypes.length === 0" style="display:flex;flex-direction:column;gap:32px">
+      <!-- Header skeleton -->
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+          <div class="skeleton" style="height:28px;width:200px;margin-bottom:6px" />
+          <div class="skeleton" style="height:14px;width:280px" />
+        </div>
+        <div class="skeleton" style="height:40px;width:180px;border-radius:10px" />
+      </div>
+
+      <!-- Stats row skeleton -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px">
+        <div v-for="i in 4" :key="i" style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <div class="skeleton" style="width:10px;height:10px;border-radius:50%" />
+            <div class="skeleton" style="height:12px;width:80px" />
+          </div>
+          <div class="skeleton" style="height:28px;width:60px;margin-bottom:4px" />
+          <div class="skeleton" style="height:11px;width:70px" />
+        </div>
+      </div>
+
+      <!-- Types list skeleton -->
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div v-for="i in 3" :key="i" style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;padding:24px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+          <!-- Left -->
+          <div style="display:flex;align-items:flex-start;gap:16px;flex:1;min-width:200px">
+            <div class="skeleton" style="width:44px;height:44px;border-radius:12px" />
+            <div style="flex:1">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+                <div class="skeleton" style="height:16px;width:140px" />
+                <div class="skeleton" style="height:20px;width:100px;border-radius:20px" />
+              </div>
+              <div class="skeleton" style="height:13px;width:70%;max-width:320px" />
+            </div>
+          </div>
+          <!-- Right -->
+          <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+            <div class="skeleton" style="height:36px;width:70px;border-radius:8px" />
+            <div class="skeleton" style="height:36px;width:80px;border-radius:8px" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <template v-else>
     <!-- Header -->
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
       <div>
@@ -397,6 +445,8 @@ onMounted(fetchCustomerTypes)
         </div>
       </div>
     </div>
+
+    </template>
 
   </div>
 </template>
