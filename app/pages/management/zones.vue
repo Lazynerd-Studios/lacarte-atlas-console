@@ -136,7 +136,12 @@ async function toggleActive(z: Zone) {
   console.log('[toggleActive] zone:', z.id, 'current isActive:', z.isActive)
   const result = await api.patch(`/zone/admin/${z.id}/toggle`, {}, 'Failed to update zone status')
   console.log('[toggleActive] result:', result)
-  if (result !== null) { await fetchZones(); await fetchStats() }
+  if (result !== null) {
+    await fetchZones()
+    await fetchStats()
+    const action = z.isActive ? 'deactivated' : 'activated'
+    useAppToast().success(`${z.name} ${action}`)
+  }
 }
 
 </script>

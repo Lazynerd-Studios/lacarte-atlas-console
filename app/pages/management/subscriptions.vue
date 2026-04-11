@@ -570,8 +570,66 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
 <template>
   <div style="display:flex;flex-direction:column;gap:32px;font-family:'Manrope',sans-serif">
 
-    <!-- Show PageSkeleton during initial load -->
-    <PageSkeleton v-if="loading && plans.length === 0" type="card-grid" :cards="3" />
+    <!-- Loading skeleton -->
+    <div v-if="loading && plans.length === 0" style="display:flex;flex-direction:column;gap:32px">
+      <!-- Header skeleton -->
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+          <div class="skeleton" style="height:28px;width:220px;margin-bottom:6px" />
+          <div class="skeleton" style="height:14px;width:280px" />
+        </div>
+        <div class="skeleton" style="height:40px;width:120px;border-radius:10px" />
+      </div>
+
+      <!-- Tabs skeleton -->
+      <div style="display:flex;gap:4px;background:#f3f4f6;border-radius:12px;padding:4px;width:fit-content">
+        <div class="skeleton" style="height:36px;width:100px;border-radius:9px" />
+        <div class="skeleton" style="height:36px;width:100px;border-radius:9px" />
+      </div>
+
+      <!-- Stats skeleton -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px">
+        <div v-for="i in 3" :key="i" style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
+          <div class="skeleton" style="height:12px;width:80px;margin-bottom:10px" />
+          <div class="skeleton" style="height:28px;width:60px;margin-bottom:8px" />
+          <div class="skeleton" style="height:11px;width:100px" />
+        </div>
+      </div>
+
+      <!-- Plan cards skeleton -->
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div v-for="i in 3" :key="i" style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;padding:24px;display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap">
+          <!-- Left -->
+          <div style="display:flex;align-items:flex-start;gap:16px;flex:1;min-width:220px">
+            <div class="skeleton" style="width:48px;height:48px;border-radius:14px" />
+            <div style="flex:1">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+                <div class="skeleton" style="height:16px;width:140px" />
+                <div class="skeleton" style="height:20px;width:100px;border-radius:20px" />
+                <div class="skeleton" style="height:20px;width:60px;border-radius:20px" />
+              </div>
+              <div class="skeleton" style="height:13px;width:80%;margin-bottom:14px" />
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                <div class="skeleton" style="height:28px;width:100px;border-radius:8px" />
+                <div class="skeleton" style="height:28px;width:90px;border-radius:8px" />
+              </div>
+            </div>
+          </div>
+          <!-- Middle -->
+          <div style="text-align:center;flex-shrink:0">
+            <div class="skeleton" style="height:24px;width:80px;margin:0 auto 4px" />
+            <div class="skeleton" style="height:11px;width:60px;margin:0 auto 4px" />
+            <div class="skeleton" style="height:11px;width:70px;margin:4px auto 0" />
+          </div>
+          <!-- Right -->
+          <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+            <div class="skeleton" style="height:36px;width:110px;border-radius:8px" />
+            <div class="skeleton" style="height:36px;width:70px;border-radius:8px" />
+            <div class="skeleton" style="height:36px;width:80px;border-radius:8px" />
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Main content (shown after initial load) -->
     <template v-else>
