@@ -25,8 +25,20 @@ const statusBadge = computed(() => {
   return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: 'Offline' }
 })
 
+const formattedLicenseExpiry = computed(() => {
+  const expiry = driver.value?.licenseExpiry
+  if (!expiry) return 'N/A'
+  
+  try {
+    const date = new Date(expiry)
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  } catch {
+    return expiry
+  }
+})
+
 const activeTab = ref('Current Route')
-const tabs = ['Current Route', 'Route History', 'Performance', 'Earnings', 'Assigned Pickups']
+const tabs = ['Current Route', 'Route History', 'Performance', 'Earnings']
 
 const routeProgress = { completed: 12, total: 28, estimatedCompletion: '3:30 PM' }
 const progressPct = computed(() => Math.round((routeProgress.completed / routeProgress.total) * 100))
@@ -140,13 +152,9 @@ const earningsHistory = [
   { period: 'Dec 23 – Jan 5, 2026',  basePay: 'GHS 2,000.00', tasks: '140/140', tasksColor: '#22c55e', deductions: '-GHS 0.00',  deductionsColor: '#6b7280', bonus: '+GHS 100.00', bonusColor: '#22c55e', total: 'GHS 2,100.00', status: 'paid' },
 ]
 
-const assignedBins = ref([
-  { type: 'Standard Waste Bin', quantity: 2, zone: 'Downtown', assigned: '2026-03-01' },
-  { type: 'Recycling Bin',      quantity: 1, zone: 'Downtown', assigned: '2026-03-01' },
-])
-
-const showAssignBinModal = ref(false)
 const showEditModal = ref(false)
+const showDeleteConfirm = ref(false)
+const deleting = ref(false)
 
 async function handleEditDriver(data: Record<string, unknown>) {
   const api = useApi()
@@ -161,9 +169,17 @@ async function handleEditDriver(data: Record<string, unknown>) {
   }
 }
 
-function handleAssignBin(data: { binType: string; quantity: number; zone: string; date: string; notes: string }) {
-  assignedBins.value.push({ type: data.binType, quantity: data.quantity, zone: data.zone, assigned: data.date })
-  showAssignBinModal.value = false
+async function handleDeleteDriver() {
+  deleting.value = true
+  const api = useApi()
+  const result = await api.del(`/drivers/admin/${route.params.id}`, 'Failed to delete driver')
+  deleting.value = false
+  
+  if (result !== null) {
+    showDeleteConfirm.value = false
+    toast.success('Driver deleted successfully')
+    await navigateTo('/drivers')
+  }
 }
 
 function stopBadge(status: string) {
@@ -223,12 +239,18 @@ function stopBadge(status: string) {
               </div>
               <div style="display:flex;align-items:center;gap:8px">
                 <UIcon name="i-lucide-package" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
-                <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ driver?.licenseNumber ?? 'N/A' }} | Exp: {{ driver?.licenseExpiry ?? 'N/A' }}</span>
+                <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ driver?.licenseNumber ?? 'N/A' }} | Exp: {{ formattedLicenseExpiry }}</span>
               </div>
             </div>
           </div>
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0">
+          <button
+            style="height:40px;padding:0 16px;background:#dc2626;border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:pointer"
+            @click="showDeleteConfirm = true"
+            @mouseover="($event.currentTarget as HTMLElement).style.background='#b91c1c'"
+            @mouseleave="($event.currentTarget as HTMLElement).style.background='#dc2626'"
+          >Delete Driver</button>
           <button
             style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
             @click="showEditModal = true"
@@ -516,80 +538,26 @@ function stopBadge(status: string) {
           </div>
         </div>
 
-        <!-- Assigned Pickups -->
-        <div v-else-if="activeTab === 'Assigned Pickups'" style="display:flex;flex-direction:column;gap:16px">
-          <!-- Header -->
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <div style="display:flex;flex-direction:column;gap:4px">
-              <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Assigned Pickups</p>
-              <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Pickups currently assigned to this driver</p>
-            </div>
-            <button
-              style="height:40px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
-              @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
-              @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
-              @click="showAssignBinModal = true"
-            >Assign More Bins</button>
-          </div>
-
-          <!-- Table -->
-          <div style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
-            <table style="width:100%;border-collapse:collapse">
-              <thead>
-                <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Bin Type</th>
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Quantity</th>
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Zone</th>
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Assigned Date</th>
-                  <th style="padding:14px 16px;text-align:right;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="(bin, i) in assignedBins"
-                  :key="i"
-                  style="border-bottom:1px solid #e5e7eb"
-                  @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
-                  @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
-                >
-                  <td style="padding:23px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ bin.type }}</td>
-                  <td style="padding:23px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ bin.quantity }}</td>
-                  <td style="padding:23px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ bin.zone }}</td>
-                  <td style="padding:23px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ bin.assigned }}</td>
-                  <td style="padding:23px 16px;text-align:right">
-                    <button
-                      style="height:32px;padding:0 16px;background:none;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
-                      @mouseover="($event.currentTarget as HTMLElement).style.background='#f3f4f6'"
-                      @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
-                      @click="assignedBins.splice(i, 1)"
-                    >Remove</button>
-                  </td>
-                </tr>
-                <tr v-if="assignedBins.length === 0">
-                  <td colspan="5" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No bins assigned</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
       </div>
     </div>
 
     </template><!-- end v-else -->
-
-  <AssignBinModal
-    v-if="showAssignBinModal"
-    :driverName="driver?.name || driver?.user?.name || ''"
-    @close="showAssignBinModal = false"
-    @submit="handleAssignBin"
-  />
 
   <EditDriverModal
     v-if="showEditModal"
     :driver="driver"
     @close="showEditModal = false"
     @submit="handleEditDriver"
+  />
+
+  <ConfirmDialog
+    v-if="showDeleteConfirm"
+    title="Delete Driver"
+    :message="`Are you sure you want to delete ${driver?.name || driver?.user?.name || 'this driver'}? This action cannot be undone.`"
+    confirm-text="Delete"
+    :loading="deleting"
+    @confirm="handleDeleteDriver"
+    @cancel="showDeleteConfirm = false"
   />
 
   </div>

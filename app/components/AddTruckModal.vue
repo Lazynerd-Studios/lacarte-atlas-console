@@ -3,7 +3,7 @@ const emit = defineEmits<{
   (e: 'close'): void
   (e: 'submit', data: {
     truckId: string; plateNumber: string; vinNumber: string; make: string; model: string
-    year: number; capacity: string; status: string; notes: string
+    year: number; capacity: string; status: string; gpsDeviceId?: string; registrationExpiry: string; notes?: string
   }): void
 }>()
 
@@ -16,6 +16,8 @@ const form = reactive({
   year: new Date().getFullYear(),
   capacity: '',
   status: 'active',
+  gpsDeviceId: '',
+  registrationExpiry: '',
   notes: '',
 })
 
@@ -26,6 +28,7 @@ const errors = reactive({
   make: '',
   model: '',
   capacity: '',
+  registrationExpiry: '',
 })
 
 const statuses = ['active', 'maintenance', 'inactive']
@@ -41,6 +44,7 @@ function validate(): boolean {
   errors.make = ''
   errors.model = ''
   errors.capacity = ''
+  errors.registrationExpiry = ''
   
   if (!form.truckId.trim()) {
     errors.truckId = 'Truck ID is required'
@@ -69,6 +73,11 @@ function validate(): boolean {
   
   if (!form.capacity.trim()) {
     errors.capacity = 'Capacity is required'
+    isValid = false
+  }
+  
+  if (!form.registrationExpiry) {
+    errors.registrationExpiry = 'Registration expiry is required'
     isValid = false
   }
   
@@ -174,6 +183,18 @@ function onBlur(e: Event)  { (e.target as HTMLElement).style.borderColor = '#e5e
           <select v-model="form.status" :style="selectStyle" @focus="onFocus" @blur="onBlur">
             <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
           </select>
+        </div>
+
+        <!-- GPS Device ID -->
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">GPS Device ID</label>
+          <input v-model="form.gpsDeviceId" type="text" placeholder="Optional" :style="inputStyle" @focus="onFocus" @blur="onBlur" />
+        </div>
+
+        <!-- Registration Expiry -->
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Registration Expiry <span style="color:#ef4444">*</span></label>
+          <input v-model="form.registrationExpiry" type="date" :style="inputStyle" @focus="onFocus" @blur="onBlur" />
         </div>
 
         <!-- Notes -->

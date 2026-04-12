@@ -5,6 +5,7 @@ const route = useRoute()
 const truck = ref<any>(null)
 const loading = ref(true)
 const notFound = ref(false)
+const toast = useAppToast()
 
 onMounted(async () => {
   console.log('[truck-detail] Component mounted, fetching truck:', route.params.id)
@@ -24,6 +25,8 @@ onMounted(async () => {
 const showEditModal = ref(false)
 const showMaintenanceModal = ref(false)
 const showAssignDriverModal = ref(false)
+const showDeleteConfirm = ref(false)
+const deleting = ref(false)
 
 function handleMaintenance(data: { type: string; technician: string; date: string; estimatedCost: string; notes: string }) {
   console.log('[truck-detail] Adding maintenance record:', data)
@@ -72,7 +75,21 @@ async function handleEdit(data: { plate: string; vin: string; make: string; mode
     truck.value.capacity = data.capacity
     truck.value.status = data.status
     showEditModal.value = false
+    toast.success('Truck updated successfully')
     console.log('[truck-detail] Truck updated successfully')
+  }
+}
+
+async function handleDeleteTruck() {
+  deleting.value = true
+  const api = useApi()
+  const result = await api.del(`/trucks/admin/${route.params.id}`, 'Failed to delete truck')
+  deleting.value = false
+  
+  if (result !== null) {
+    showDeleteConfirm.value = false
+    toast.success('Truck deleted successfully')
+    await navigateTo('/trucks')
   }
 }
 
@@ -169,6 +186,12 @@ const routeHistory = [
             </div>
           </div>
           <div style="display:flex;gap:8px;flex-shrink:0">
+            <button
+              style="height:40px;padding:0 16px;background:#dc2626;border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:pointer"
+              @click="showDeleteConfirm = true"
+              @mouseover="($event.currentTarget as HTMLElement).style.background='#b91c1c'"
+              @mouseleave="($event.currentTarget as HTMLElement).style.background='#dc2626'"
+            >Delete Truck</button>
             <button
               style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
               @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
@@ -273,11 +296,10 @@ const routeHistory = [
               <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">GPS &amp; Tracking</p>
               <div style="display:flex;flex-direction:column;gap:12px">
                 <div v-for="item in [
-                  { label: 'GPS Device ID',       value: truck.gpsDeviceId },
-                  { label: 'Last GPS Update',     value: truck.lastGpsUpdate },
+                  { label: 'GPS Device ID',       value: truck.gpsDeviceId ?? 'N/A' },
+                  { label: 'Last GPS Update',     value: truck.lastGpsUpdate ?? 'N/A' },
                   { label: 'Current Location',    value: truck.currentLocation ?? 'N/A' },
-                  { label: 'Registration Expiry', value: truck.registrationExpiry },
-                  { label: 'Insurance Expiry',    value: truck.insuranceExpiry ?? 'N/A' },
+                  { label: 'Registration Expiry', value: truck.registrationExpiry ?? 'N/A' },
                 ]" :key="item.label" style="display:flex;flex-direction:column;gap:2px">
                   <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ item.label }}</p>
                   <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ item.value }}</p>
@@ -386,5 +408,15 @@ const routeHistory = [
     :truck-id="truck.truckId"
     @close="showMaintenanceModal = false"
     @submit="handleMaintenance"
+  />
+
+  <ConfirmDialog
+    v-if="showDeleteConfirm"
+    title="Delete Truck"
+    :message="`Are you sure you want to delete truck ${truck?.truckId || 'this truck'}? This action cannot be undone.`"
+    confirm-text="Delete"
+    :loading="deleting"
+    @confirm="handleDeleteTruck"
+    @cancel="showDeleteConfirm = false"
   />
 </template>

@@ -2,7 +2,7 @@
 const props = defineProps<{
   truck: {
     id: string; plate: string; vin: string; make: string; model: string
-    year: number | string; capacity: string; status: string
+    year: number | string; capacity: string; status: string; gpsDeviceId?: string; registrationExpiry?: string; notes?: string
   }
 }>()
 
@@ -10,7 +10,7 @@ const emit = defineEmits<{
   (e: 'close'): void
   (e: 'submit', data: {
     plate: string; vin: string; make: string; model: string
-    year: number; capacity: string; status: string
+    year: number; capacity: string; status: string; gpsDeviceId?: string; registrationExpiry: string; notes?: string
   }): void
 }>()
 
@@ -22,6 +22,9 @@ const form = reactive({
   year:     Number(props.truck.year),
   capacity: props.truck.capacity,
   status:   props.truck.status,
+  gpsDeviceId: props.truck.gpsDeviceId || '',
+  registrationExpiry: props.truck.registrationExpiry || '',
+  notes: props.truck.notes || '',
 })
 
 const errors = reactive({
@@ -30,6 +33,7 @@ const errors = reactive({
   make: '',
   model: '',
   capacity: '',
+  registrationExpiry: '',
 })
 
 const statuses = ['active', 'maintenance', 'inactive']
@@ -43,6 +47,7 @@ function validate(): boolean {
   errors.make = ''
   errors.model = ''
   errors.capacity = ''
+  errors.registrationExpiry = ''
   
   if (!form.plate.trim()) {
     errors.plate = 'Plate number is required'
@@ -66,6 +71,11 @@ function validate(): boolean {
   
   if (!form.capacity.trim()) {
     errors.capacity = 'Capacity is required'
+    isValid = false
+  }
+  
+  if (!form.registrationExpiry) {
+    errors.registrationExpiry = 'Registration expiry is required'
     isValid = false
   }
   
@@ -173,6 +183,32 @@ function onBlur(e: Event)  { (e.target as HTMLElement).style.borderColor = '#e5e
           <select v-model="form.status" :style="selectStyle" @focus="onFocus" @blur="onBlur">
             <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
           </select>
+        </div>
+
+        <!-- GPS Device ID -->
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">GPS Device ID</label>
+          <input v-model="form.gpsDeviceId" type="text" placeholder="Optional" :style="inputStyle" @focus="onFocus" @blur="onBlur" />
+        </div>
+
+        <!-- Registration Expiry -->
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Registration Expiry <span style="color:#ef4444">*</span></label>
+          <input v-model="form.registrationExpiry" type="date" :style="inputStyle" @focus="onFocus" @blur="onBlur" />
+          <p v-if="errors.registrationExpiry" style="font-size:12px;color:#ef4444;margin:0">{{ errors.registrationExpiry }}</p>
+        </div>
+
+        <!-- Notes -->
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">Notes</label>
+          <textarea
+            v-model="form.notes"
+            placeholder="Any additional notes..."
+            rows="4"
+            style="width:100%;padding:8px 12px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;resize:none;box-sizing:border-box;line-height:1.5"
+            @focus="onFocus"
+            @blur="onBlur"
+          />
         </div>
 
       </div>
