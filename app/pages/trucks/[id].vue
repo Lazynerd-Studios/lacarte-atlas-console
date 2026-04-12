@@ -12,6 +12,7 @@ onMounted(async () => {
   const api = useApi()
   const data = await api.get<any>(`/trucks/admin/${route.params.id}`)
   console.log('[truck-detail] Truck response:', data)
+  console.log('[truck-detail] Registration Expiry from backend:', data?.registrationExpiry)
   if (data) {
     truck.value = data
     console.log('[truck-detail] Loaded truck:', truck.value.truckId)
@@ -26,11 +27,14 @@ const showEditModal = ref(false)
 const showMaintenanceModal = ref(false)
 const showAssignDriverModal = ref(false)
 const showDeleteConfirm = ref(false)
+const showEditMaintenanceModal = ref(false)
+const selectedMaintenance = ref<any>(null)
 const deleting = ref(false)
 
 function handleMaintenance(data: { type: string; technician: string; date: string; estimatedCost: string; notes: string }) {
   console.log('[truck-detail] Adding maintenance record:', data)
   maintenanceHistory.unshift({
+    id: `temp-${Date.now()}`, // Temporary ID until backend returns proper UUID
     date: data.date,
     type: data.type,
     technician: data.technician,
@@ -59,7 +63,7 @@ async function handleAssignDriver(driverId: string) {
   }
 }
 
-async function handleEdit(data: { plate: string; vin: string; make: string; model: string; year: number; capacity: string; status: string }) {
+async function handleEdit(data: { plate: string; vin: string; make: string; model: string; year: number; capacity: string; status: string; gpsDeviceId?: string; registrationExpiry: string; notes?: string }) {
   console.log('[truck-detail] Updating truck, payload:', data)
   const api = useApi()
   const result = await api.patch(`/trucks/admin/${route.params.id}`, data, 'Failed to update truck')
@@ -74,6 +78,9 @@ async function handleEdit(data: { plate: string; vin: string; make: string; mode
     truck.value.year = String(data.year)
     truck.value.capacity = data.capacity
     truck.value.status = data.status
+    truck.value.gpsDeviceId = data.gpsDeviceId
+    truck.value.registrationExpiry = data.registrationExpiry
+    truck.value.notes = data.notes
     showEditModal.value = false
     toast.success('Truck updated successfully')
     console.log('[truck-detail] Truck updated successfully')
@@ -93,11 +100,55 @@ async function handleDeleteTruck() {
   }
 }
 
+function openEditMaintenance(maintenance: any) {
+  selectedMaintenance.value = maintenance
+  showEditMaintenanceModal.value = true
+}
+
+async function handleUpdateMaintenance(maintenanceId: string, data: Record<string, unknown>) {
+  const api = useApi()
+  console.log('[truck-detail] Updating maintenance:', maintenanceId, data)
+  const result = await api.patch(`/trucks/admin/${route.params.id}/maintenance/${maintenanceId}`, data, 'Failed to update maintenance')
+  
+  if (result !== null) {
+    showEditMaintenanceModal.value = false
+    toast.success('Maintenance updated successfully')
+    
+    // Update local maintenance history
+    const index = maintenanceHistory.findIndex((m: any) => m.id === maintenanceId)
+    if (index !== -1) {
+      const existingCost = maintenanceHistory[index]?.cost || 'GHS 0.00'
+      maintenanceHistory[index] = {
+        id: maintenanceId,
+        date: data.scheduledDate as string,
+        type: data.maintenanceType as string,
+        technician: data.serviceCentre as string,
+        cost: data.estimatedCost ? `GHS ${parseFloat(data.estimatedCost as string).toFixed(2)}` : existingCost,
+        status: data.status as string,
+        notes: data.notes as string || '',
+      }
+    }
+    
+    console.log('[truck-detail] Maintenance updated successfully')
+  }
+}
+
 const statusBadge = computed(() => {
   const s = truck.value?.status
   if (s === 'active')      return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e',  label: 'Active' }
   if (s === 'maintenance') return { bg: 'rgba(255,180,0,0.1)',  border: 'rgba(255,180,0,0.2)',  color: '#d49a00',  label: 'Maintenance' }
   return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: 'Inactive' }
+})
+
+const formattedRegistrationExpiry = computed(() => {
+  if (!truck.value?.registrationExpiry) return 'N/A'
+  try {
+    const date = new Date(truck.value.registrationExpiry)
+    if (isNaN(date.getTime())) return 'N/A'
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  } catch {
+    return 'N/A'
+  }
 })
 
 const activeTab = ref('Vehicle Details')
@@ -116,11 +167,11 @@ watch(showMaintenanceModal, (isOpen) => {
 })
 
 const maintenanceHistory = reactive([
-  { date: '2026-02-15', type: 'Oil Change',          technician: 'AutoCare Ltd',    cost: 'GHS 320.00',  status: 'completed', notes: 'Full synthetic 10W-30' },
-  { date: '2026-01-10', type: 'Tire Rotation',        technician: 'AutoCare Ltd',    cost: 'GHS 150.00',  status: 'completed', notes: 'All 4 tires rotated' },
-  { date: '2025-12-05', type: 'Brake Inspection',     technician: 'FleetPro Service', cost: 'GHS 480.00', status: 'completed', notes: 'Front pads replaced' },
-  { date: '2025-11-20', type: 'Annual Inspection',    technician: 'FleetPro Service', cost: 'GHS 200.00', status: 'completed', notes: 'Passed all checks' },
-  { date: '2025-10-08', type: 'Engine Tune-up',       technician: 'AutoCare Ltd',    cost: 'GHS 750.00',  status: 'completed', notes: 'Spark plugs & filters' },
+  { id: '1', date: '2026-02-15', type: 'Oil Change',          technician: 'AutoCare Ltd',    cost: 'GHS 320.00',  status: 'completed', notes: 'Full synthetic 10W-30' },
+  { id: '2', date: '2026-01-10', type: 'Tire Rotation',        technician: 'AutoCare Ltd',    cost: 'GHS 150.00',  status: 'completed', notes: 'All 4 tires rotated' },
+  { id: '3', date: '2025-12-05', type: 'Brake Inspection',     technician: 'FleetPro Service', cost: 'GHS 480.00', status: 'completed', notes: 'Front pads replaced' },
+  { id: '4', date: '2025-11-20', type: 'Annual Inspection',    technician: 'FleetPro Service', cost: 'GHS 200.00', status: 'completed', notes: 'Passed all checks' },
+  { id: '5', date: '2025-10-08', type: 'Engine Tune-up',       technician: 'AutoCare Ltd',    cost: 'GHS 750.00',  status: 'completed', notes: 'Spark plugs & filters' },
 ])
 
 const routeHistory = [
@@ -299,7 +350,7 @@ const routeHistory = [
                   { label: 'GPS Device ID',       value: truck.gpsDeviceId ?? 'N/A' },
                   { label: 'Last GPS Update',     value: truck.lastGpsUpdate ?? 'N/A' },
                   { label: 'Current Location',    value: truck.currentLocation ?? 'N/A' },
-                  { label: 'Registration Expiry', value: truck.registrationExpiry ?? 'N/A' },
+                  { label: 'Registration Expiry', value: formattedRegistrationExpiry },
                 ]" :key="item.label" style="display:flex;flex-direction:column;gap:2px">
                   <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ item.label }}</p>
                   <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ item.value }}</p>
@@ -321,6 +372,7 @@ const routeHistory = [
                     <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Cost</th>
                     <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Notes</th>
                     <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Status</th>
+                    <th style="padding:14px 16px;text-align:right;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -340,6 +392,16 @@ const routeHistory = [
                       <span style="font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;color:#22c55e;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2)">
                         {{ row.status }}
                       </span>
+                    </td>
+                    <td style="padding:17px 16px;text-align:right">
+                      <button
+                        v-if="!row.id.startsWith('temp-')"
+                        style="height:32px;padding:0 12px;background:#ececec;border:none;border-radius:16px;font-size:13px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
+                        @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
+                        @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
+                        @click="openEditMaintenance(row)"
+                      >Edit</button>
+                      <span v-else style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Pending sync</span>
                     </td>
                   </tr>
                 </tbody>
@@ -390,7 +452,7 @@ const routeHistory = [
 
   <EditTruckModal
     v-if="showEditModal && truck"
-    :truck="{ id: truck.truckId, plate: truck.plateNumber, vin: truck.vinNumber, make: truck.make, model: truck.model, year: truck.year, capacity: truck.capacity, status: truck.status }"
+    :truck="{ id: truck.truckId, plate: truck.plateNumber, vin: truck.vinNumber, make: truck.make, model: truck.model, year: truck.year, capacity: truck.capacity, status: truck.status, gpsDeviceId: truck.gpsDeviceId, registrationExpiry: truck.registrationExpiry, notes: truck.notes }"
     @close="showEditModal = false"
     @submit="handleEdit"
   />
@@ -408,6 +470,14 @@ const routeHistory = [
     :truck-id="truck.truckId"
     @close="showMaintenanceModal = false"
     @submit="handleMaintenance"
+  />
+
+  <EditMaintenanceModal
+    v-if="showEditMaintenanceModal && selectedMaintenance"
+    :truck-id="truck.truckId"
+    :maintenance="selectedMaintenance"
+    @close="showEditMaintenanceModal = false"
+    @submit="handleUpdateMaintenance"
   />
 
   <ConfirmDialog
