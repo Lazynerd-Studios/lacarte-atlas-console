@@ -12,21 +12,16 @@ const form = reactive({
   licenseNumber: '',
   licenseExpiry: '',
   zoneId: '',
-  truckId: '',
   status: 'active',
 })
 
 const zones = ref<{ id: string; name: string; color: string }[]>([])
-const trucks = ref<{ id: string; truckId: string; plateNumber: string }[]>([])
+const submitting = ref(false)
 
 onMounted(async () => {
   const api = useApi()
-  const [zoneData, truckData] = await Promise.all([
-    api.get<{ id: string; name: string; color: string }[]>('/zone/public/list'),
-    api.get<{ data: any[] }>('/trucks/admin/'),
-  ])
+  const zoneData = await api.get<{ id: string; name: string; color: string }[]>('/zone/public/list')
   if (zoneData) zones.value = zoneData
-  if (truckData) trucks.value = truckData.data
 })
 
 const errors = reactive<Record<string, string>>({})
@@ -44,6 +39,7 @@ function validate() {
 
 function submit() {
   if (!validate()) return
+  submitting.value = true
   emit('submit', {
     email: form.email,
     name: `${form.firstName.trim()} ${form.lastName.trim()}`,
@@ -141,7 +137,7 @@ function onBlur(e: Event, field: string) {
           <span v-if="errors.licenseExpiry" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.licenseExpiry }}</span>
         </div>
 
-        <!-- Zone / Truck -->
+        <!-- Zone / Status -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
           <div style="display:flex;flex-direction:column;gap:6px">
             <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Zone</label>
@@ -156,15 +152,16 @@ function onBlur(e: Event, field: string) {
             </select>
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Assigned Truck</label>
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Status</label>
             <select
-              v-model="form.truckId"
-              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:${form.truckId ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+              v-model="form.status"
+              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
               @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
               @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
             >
-              <option value="" disabled>Select truck</option>
-              <option v-for="t in trucks" :key="t.id" :value="t.id">{{ t.truckId }} – {{ t.plateNumber }}</option>
+              <option value="active">Active</option>
+              <option value="on_leave">On Leave</option>
+              <option value="inactive">Inactive</option>
             </select>
           </div>
         </div>
@@ -175,12 +172,17 @@ function onBlur(e: Event, field: string) {
       <div style="padding:17px 24px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:8px;flex-shrink:0">
         <button
           style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
+          :disabled="submitting"
           @click="emit('close')"
         >Cancel</button>
         <button
-          style="height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
+          style="height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2);display:flex;align-items:center;gap:8px"
+          :disabled="submitting"
           @click="submit"
-        >Add Driver</button>
+        >
+          <UIcon v-if="submitting" name="i-lucide-loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
+          {{ submitting ? 'Adding...' : 'Add Driver' }}
+        </button>
       </div>
     </div>
   </div>

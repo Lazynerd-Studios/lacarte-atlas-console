@@ -3,11 +3,10 @@ definePageMeta({ layout: 'dashboard' })
 
 const { format } = useCurrency()
 
-const showAssignPickupModal = ref(false)
 const showAddDriverModal = ref(false)
-const selectedDriver = ref<any>(null)
 const drivers = ref<any[]>([])
 const loading = ref(false)
+const toast = useAppToast()
 
 async function fetchDrivers() {
   loading.value = true
@@ -19,17 +18,6 @@ async function fetchDrivers() {
 
 onMounted(fetchDrivers)
 
-function openAssignPickup(d: any) {
-  selectedDriver.value = d
-  showAssignPickupModal.value = true
-}
-
-function handleAssignPickup(data: Record<string, unknown>) {
-  console.log('Assigned pickup:', data)
-  showAssignPickupModal.value = false
-  selectedDriver.value = null
-}
-
 async function handleAddDriver(payload: Record<string, any>) {
   console.log('[handleAddDriver] payload:', JSON.stringify(payload, null, 2))
   const api = useApi()
@@ -37,6 +25,7 @@ async function handleAddDriver(payload: Record<string, any>) {
   console.log('[handleAddDriver] result:', result)
   if (result !== null) {
     showAddDriverModal.value = false
+    toast.success('Driver added successfully')
     await fetchDrivers()
   }
 }
@@ -133,23 +122,10 @@ function statusStyle(s: string) {
             @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
           >View Details</NuxtLink>
-          <button
-            style="height:40px;padding:0 16px;background:none;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
-            @click="openAssignPickup(d)"
-            @mouseover="($event.currentTarget as HTMLElement).style.background='#f3f4f6'"
-            @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
-          >Assign Pickups</button>
         </div>
       </div>
     </div>
   </div>
-
-  <AssignPickupModal
-    v-if="showAssignPickupModal && selectedDriver"
-    :driver-name="selectedDriver.name || selectedDriver.user?.name || ''"
-    @close="showAssignPickupModal = false"
-    @submit="handleAssignPickup"
-  />
 
   <AddDriverModal
     v-if="showAddDriverModal"

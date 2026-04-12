@@ -9,6 +9,7 @@ const emit = defineEmits<{
 }>()
 
 const zones = ref<{ id: string; name: string }[]>([])
+const submitting = ref(false)
 
 // Split name into first/last
 const nameParts = (props.driver?.user?.name ?? '').trim().split(' ')
@@ -21,12 +22,6 @@ const form = reactive({
   licenseExpiry: props.driver?.licenseExpiry ?? '',
   zoneId:        props.driver?.zone?.id ?? '',
   status:        props.driver?.status ?? 'active',
-})
-
-const assignedTruckDisplay = computed(() => {
-  const truck = props.driver?.assignedTruck
-  if (!truck) return 'Unassigned'
-  return `${truck.truckId ?? 'N/A'} — ${truck.plateNumber ?? 'N/A'}`
 })
 
 onMounted(async () => {
@@ -49,6 +44,7 @@ function validate() {
 
 function submit() {
   if (!validate()) return
+  submitting.value = true
   emit('submit', {
     name:          `${form.firstName.trim()} ${form.lastName.trim()}`,
     email:         form.email,
@@ -144,17 +140,8 @@ function onBlur(e: Event, field: string) {
           </div>
         </div>
 
-        <!-- Truck / Zone -->
+        <!-- Zone / Status -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-          <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Assigned Truck</label>
-            <input
-              :value="assignedTruckDisplay"
-              type="text"
-              readonly
-              style="width:100%;height:39px;padding:0 12px;background:#f8f9fa;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;cursor:default"
-            />
-          </div>
           <div style="display:flex;flex-direction:column;gap:6px">
             <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Zone</label>
             <select
@@ -167,6 +154,19 @@ function onBlur(e: Event, field: string) {
               <option v-for="z in zones" :key="z.id" :value="z.id">{{ z.name }}</option>
             </select>
           </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Status</label>
+            <select
+              v-model="form.status"
+              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+              @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+              @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
+            >
+              <option value="active">Active</option>
+              <option value="on_leave">On Leave</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
         </div>
 
       </div>
@@ -175,12 +175,17 @@ function onBlur(e: Event, field: string) {
       <div style="padding:17px 24px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:8px;flex-shrink:0">
         <button
           style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
+          :disabled="submitting"
           @click="emit('close')"
         >Cancel</button>
         <button
-          style="height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer"
+          style="height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px"
+          :disabled="submitting"
           @click="submit"
-        >Save Changes</button>
+        >
+          <Icon v-if="submitting" name="lucide:loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
+          {{ submitting ? 'Saving...' : 'Save Changes' }}
+        </button>
       </div>
     </div>
   </div>

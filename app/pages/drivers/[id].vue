@@ -5,6 +5,7 @@ const route = useRoute()
 const driver = ref<any>(null)
 const loading = ref(true)
 const notFound = ref(false)
+const toast = useAppToast()
 
 onMounted(async () => {
   const api = useApi()
@@ -154,6 +155,7 @@ async function handleEditDriver(data: Record<string, unknown>) {
   console.log('[handleEditDriver] result:', result)
   if (result !== null) {
     showEditModal.value = false
+    toast.success('Driver updated successfully')
     const updated = await api.get<any>(`/drivers/admin/${route.params.id}`)
     if (updated) driver.value = updated
   }
