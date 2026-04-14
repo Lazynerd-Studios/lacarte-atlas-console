@@ -12,6 +12,7 @@ interface CustomerType {
 interface ApiCustomerType {
   id: string
   name: string
+  customerCount?: number
   createdAt: string
   updatedAt: string
 }
@@ -40,7 +41,7 @@ async function fetchCustomerTypes() {
       name: ct.name,
       description: '',  // Not in API
       color: getColorForIndex(index),  // Assign colors cyclically
-      customerCount: 0,  // Not in API (would need separate endpoint)
+      customerCount: ct.customerCount ?? 0,  // Use API value if available
     }))
   }
   

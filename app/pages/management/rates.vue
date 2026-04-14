@@ -90,7 +90,8 @@ async function fetchStats() {
     totalRates: number
     activeRates: number
     upcomingRates: number
-    customerTypes: number
+    customerTypes?: number
+    customerTypesWithRates?: number
   }>(
     '/rates/admin/stats',
     'Failed to load statistics'
@@ -102,7 +103,7 @@ async function fetchStats() {
       totalRates: response.totalRates ?? 0,
       activeRates: response.activeRates ?? 0,
       upcomingRates: response.upcomingRates ?? 0,
-      customerTypes: response.customerTypes ?? 0,
+      customerTypes: response.customerTypesWithRates ?? response.customerTypes ?? 0,
     }
   } else {
     console.error('[Rates] Failed to fetch stats')
