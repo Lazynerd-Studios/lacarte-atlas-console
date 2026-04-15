@@ -52,7 +52,12 @@ async function fetchMaintenanceHistory() {
       date: item.scheduledDate ? new Date(item.scheduledDate).toISOString().split('T')[0] : '',
       type: item.maintenanceType,
       technician: item.serviceCentre || 'N/A',
-      cost: item.estimatedCost ? `GHS ${parseFloat(item.estimatedCost).toFixed(2)}` : 'GHS 0.00',
+      // Use actualCost only when status is completed, otherwise use estimatedCost
+      cost: item.status === 'completed' && item.actualCost
+        ? `GHS ${parseFloat(item.actualCost).toFixed(2)}` 
+        : item.estimatedCost 
+          ? `GHS ${parseFloat(item.estimatedCost).toFixed(2)}` 
+          : 'GHS 0.00',
       status: item.status || 'scheduled',
       notes: item.notes || '',
     }))
@@ -90,7 +95,12 @@ async function handleMaintenance(data: { type: string; technician: string; date:
       date: result.scheduledDate ? new Date(result.scheduledDate).toISOString().split('T')[0] : '',
       type: result.maintenanceType,
       technician: result.serviceCentre || 'N/A',
-      cost: result.estimatedCost ? `GHS ${parseFloat(result.estimatedCost).toFixed(2)}` : 'GHS 0.00',
+      // Use actualCost only when status is completed, otherwise use estimatedCost
+      cost: result.status === 'completed' && result.actualCost
+        ? `GHS ${parseFloat(result.actualCost).toFixed(2)}` 
+        : result.estimatedCost 
+          ? `GHS ${parseFloat(result.estimatedCost).toFixed(2)}` 
+          : 'GHS 0.00',
       status: result.status || 'scheduled',
       notes: result.notes || '',
     })
@@ -172,14 +182,19 @@ async function handleUpdateMaintenance(maintenanceId: string, data: Record<strin
     // Update local maintenance history
     const index = maintenanceHistory.value.findIndex((m: any) => m.id === maintenanceId)
     if (index !== -1) {
-      const existingCost = maintenanceHistory.value[index]?.cost || 'GHS 0.00'
+      const status = data.status as string
       maintenanceHistory.value[index] = {
         id: maintenanceId,
         date: data.scheduledDate ? new Date(data.scheduledDate as string).toISOString().split('T')[0] : '',
         type: data.maintenanceType as string,
         technician: data.serviceCentre as string || 'N/A',
-        cost: data.estimatedCost ? `GHS ${parseFloat(data.estimatedCost as string).toFixed(2)}` : existingCost,
-        status: data.status as string,
+        // Use actualCost only when status is completed, otherwise use estimatedCost
+        cost: status === 'completed' && data.actualCost
+          ? `GHS ${parseFloat(data.actualCost as string).toFixed(2)}` 
+          : data.estimatedCost 
+            ? `GHS ${parseFloat(data.estimatedCost as string).toFixed(2)}` 
+            : maintenanceHistory.value[index]?.cost || 'GHS 0.00',
+        status: status,
         notes: data.notes as string || '',
       }
     }
@@ -460,13 +475,13 @@ const routeHistory = [
                     </td>
                     <td style="padding:17px 16px;text-align:right">
                       <button
-                        v-if="!row.id.startsWith('temp-')"
+                        v-if="row.status !== 'completed'"
                         style="height:32px;padding:0 12px;background:#ececec;border:none;border-radius:16px;font-size:13px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
                         @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
                         @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
                         @click="openEditMaintenance(row)"
                       >Edit</button>
-                      <span v-else style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Pending sync</span>
+                      <span v-else style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Completed</span>
                     </td>
                   </tr>
                 </tbody>
