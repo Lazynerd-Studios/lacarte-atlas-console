@@ -16,6 +16,9 @@ onMounted(async () => {
   if (data) {
     truck.value = data
     console.log('[truck-detail] Loaded truck:', truck.value.truckId)
+    
+    // Fetch maintenance history after truck data is loaded
+    await fetchMaintenanceHistory()
   } else {
     console.log('[truck-detail] Truck not found')
     notFound.value = true
@@ -30,20 +33,72 @@ const showDeleteConfirm = ref(false)
 const showEditMaintenanceModal = ref(false)
 const selectedMaintenance = ref<any>(null)
 const deleting = ref(false)
+const maintenanceHistory = ref<any[]>([])
+const loadingMaintenance = ref(false)
 
-function handleMaintenance(data: { type: string; technician: string; date: string; estimatedCost: string; notes: string }) {
-  console.log('[truck-detail] Adding maintenance record:', data)
-  maintenanceHistory.unshift({
-    id: `temp-${Date.now()}`, // Temporary ID until backend returns proper UUID
-    date: data.date,
-    type: data.type,
-    technician: data.technician,
-    cost: `GHS ${parseFloat(data.estimatedCost || '0').toFixed(2)}`,
-    status: 'scheduled',
-    notes: data.notes,
-  })
-  showMaintenanceModal.value = false
-  console.log('[truck-detail] Maintenance record added, total records:', maintenanceHistory.length)
+async function fetchMaintenanceHistory() {
+  loadingMaintenance.value = true
+  const api = useApi()
+  
+  console.log('[truck-detail] Fetching maintenance history for truck:', route.params.id)
+  const response = await api.get<{ data: any[] }>(`/trucks/${route.params.id}/maintenance`)
+  
+  if (response && response.data) {
+    console.log('[truck-detail] Maintenance history response:', response)
+    
+    // Transform API response to match local format
+    maintenanceHistory.value = response.data.map((item: any) => ({
+      id: item.id,
+      date: item.scheduledDate ? new Date(item.scheduledDate).toISOString().split('T')[0] : '',
+      type: item.maintenanceType,
+      technician: item.serviceCentre || 'N/A',
+      cost: item.estimatedCost ? `GHS ${parseFloat(item.estimatedCost).toFixed(2)}` : 'GHS 0.00',
+      status: item.status || 'scheduled',
+      notes: item.notes || '',
+    }))
+    
+    console.log('[truck-detail] Loaded maintenance records:', maintenanceHistory.value.length)
+  } else {
+    console.log('[truck-detail] No maintenance history found')
+    maintenanceHistory.value = []
+  }
+  
+  loadingMaintenance.value = false
+}
+
+async function handleMaintenance(data: { type: string; technician: string; date: string; estimatedCost: string; notes: string }) {
+  console.log('[truck-detail] Scheduling maintenance:', data)
+  const api = useApi()
+  
+  const payload = {
+    maintenanceType: data.type,
+    serviceCentre: data.technician,
+    scheduledDate: data.date,
+    estimatedCost: data.estimatedCost || undefined,
+    notes: data.notes || undefined,
+  }
+  
+  console.log('[truck-detail] API payload:', payload)
+  const result = await api.post<any>(`/trucks/admin/${route.params.id}/maintenance`, payload, 'Failed to schedule maintenance')
+  
+  if (result) {
+    console.log('[truck-detail] Maintenance scheduled successfully:', result)
+    
+    // Add to local maintenance history
+    maintenanceHistory.value.unshift({
+      id: result.id,
+      date: result.scheduledDate ? new Date(result.scheduledDate).toISOString().split('T')[0] : '',
+      type: result.maintenanceType,
+      technician: result.serviceCentre || 'N/A',
+      cost: result.estimatedCost ? `GHS ${parseFloat(result.estimatedCost).toFixed(2)}` : 'GHS 0.00',
+      status: result.status || 'scheduled',
+      notes: result.notes || '',
+    })
+    
+    showMaintenanceModal.value = false
+    toast.success('Maintenance scheduled successfully')
+    console.log('[truck-detail] Maintenance record added, total records:', maintenanceHistory.value.length)
+  }
 }
 
 async function handleAssignDriver(driverId: string) {
@@ -115,14 +170,14 @@ async function handleUpdateMaintenance(maintenanceId: string, data: Record<strin
     toast.success('Maintenance updated successfully')
     
     // Update local maintenance history
-    const index = maintenanceHistory.findIndex((m: any) => m.id === maintenanceId)
+    const index = maintenanceHistory.value.findIndex((m: any) => m.id === maintenanceId)
     if (index !== -1) {
-      const existingCost = maintenanceHistory[index]?.cost || 'GHS 0.00'
-      maintenanceHistory[index] = {
+      const existingCost = maintenanceHistory.value[index]?.cost || 'GHS 0.00'
+      maintenanceHistory.value[index] = {
         id: maintenanceId,
-        date: data.scheduledDate as string,
+        date: data.scheduledDate ? new Date(data.scheduledDate as string).toISOString().split('T')[0] : '',
         type: data.maintenanceType as string,
-        technician: data.serviceCentre as string,
+        technician: data.serviceCentre as string || 'N/A',
         cost: data.estimatedCost ? `GHS ${parseFloat(data.estimatedCost as string).toFixed(2)}` : existingCost,
         status: data.status as string,
         notes: data.notes as string || '',
@@ -165,14 +220,6 @@ watch(showEditModal, (isOpen) => {
 watch(showMaintenanceModal, (isOpen) => {
   if (isOpen) console.log('[truck-detail] Opening maintenance modal')
 })
-
-const maintenanceHistory = reactive([
-  { id: '1', date: '2026-02-15', type: 'Oil Change',          technician: 'AutoCare Ltd',    cost: 'GHS 320.00',  status: 'completed', notes: 'Full synthetic 10W-30' },
-  { id: '2', date: '2026-01-10', type: 'Tire Rotation',        technician: 'AutoCare Ltd',    cost: 'GHS 150.00',  status: 'completed', notes: 'All 4 tires rotated' },
-  { id: '3', date: '2025-12-05', type: 'Brake Inspection',     technician: 'FleetPro Service', cost: 'GHS 480.00', status: 'completed', notes: 'Front pads replaced' },
-  { id: '4', date: '2025-11-20', type: 'Annual Inspection',    technician: 'FleetPro Service', cost: 'GHS 200.00', status: 'completed', notes: 'Passed all checks' },
-  { id: '5', date: '2025-10-08', type: 'Engine Tune-up',       technician: 'AutoCare Ltd',    cost: 'GHS 750.00',  status: 'completed', notes: 'Spark plugs & filters' },
-])
 
 const routeHistory = [
   { date: '2026-03-07', driver: 'John Smith', stops: 28, distance: '42 mi', duration: '6h 20m', zone: 'Downtown' },
@@ -362,7 +409,25 @@ const routeHistory = [
 
           <!-- Maintenance History -->
           <div v-else-if="activeTab === 'Maintenance History'">
-            <div style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
+            <!-- Loading state -->
+            <div v-if="loadingMaintenance" style="padding:40px;text-align:center">
+              <UIcon name="i-lucide-loader-2" style="width:32px;height:32px;color:#6b7280;animation:spin 1s linear infinite;margin-bottom:12px" />
+              <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Loading maintenance history...</p>
+            </div>
+            
+            <!-- Empty state -->
+            <div v-else-if="maintenanceHistory.length === 0" style="padding:60px;text-align:center">
+              <UIcon name="i-lucide-wrench" style="width:40px;height:40px;color:#d1d5db;margin-bottom:12px" />
+              <p style="font-size:15px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0 0 6px">No maintenance records</p>
+              <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0 0 20px">Schedule maintenance to start tracking service history.</p>
+              <button
+                style="height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer"
+                @click="showMaintenanceModal = true"
+              >Schedule Maintenance</button>
+            </div>
+            
+            <!-- Table with data -->
+            <div v-else style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
               <table style="width:100%;border-collapse:collapse">
                 <thead>
                   <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">

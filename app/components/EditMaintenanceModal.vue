@@ -51,8 +51,8 @@ function submit() {
     serviceCentre: form.serviceCentre,
     scheduledDate: form.scheduledDate,
     completedDate: form.completedDate || undefined,
-    estimatedCost: form.estimatedCost || undefined,
-    actualCost: form.actualCost || undefined,
+    estimatedCost: form.estimatedCost ? String(form.estimatedCost) : undefined,
+    actualCost: form.actualCost ? String(form.actualCost) : undefined,
     status: form.status,
     notes: form.notes || undefined,
   })

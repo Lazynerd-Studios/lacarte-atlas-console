@@ -24,11 +24,23 @@ const maintenanceTypes = [
   'Other',
 ]
 
+const errors = reactive<Record<string, string>>({})
+
+function validate() {
+  Object.keys(errors).forEach(k => delete errors[k])
+  
+  if (!form.type) errors.type = 'Maintenance type is required'
+  if (!form.date) errors.date = 'Scheduled date is required'
+  
+  return Object.keys(errors).length === 0
+}
+
 const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
 const selectStyle = `width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`
 const inputStyle = `width:100%;height:39px;padding:0 12px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box`
 
 function submit() {
+  if (!validate()) return
   emit('submit', { ...form })
 }
 </script>
@@ -71,11 +83,14 @@ function submit() {
 
         <!-- Maintenance Type -->
         <div style="display:flex;flex-direction:column;gap:6px">
-          <label style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">Maintenance Type</label>
+          <label style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">
+            Maintenance Type <span style="color:#ef4444">*</span>
+          </label>
           <select v-model="form.type" :style="selectStyle">
             <option value="" disabled>Select type</option>
             <option v-for="t in maintenanceTypes" :key="t" :value="t">{{ t }}</option>
           </select>
+          <span v-if="errors.type" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.type }}</span>
         </div>
 
         <!-- Technician -->
@@ -94,7 +109,9 @@ function submit() {
         <!-- Date / Estimated Cost -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
           <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">Scheduled Date</label>
+            <label style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">
+              Scheduled Date <span style="color:#ef4444">*</span>
+            </label>
             <input
               v-model="form.date"
               type="date"
@@ -102,6 +119,7 @@ function submit() {
               @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
               @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
             />
+            <span v-if="errors.date" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.date }}</span>
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
             <label style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">Estimated Cost (GHS)</label>
@@ -109,6 +127,7 @@ function submit() {
               v-model="form.estimatedCost"
               type="number"
               min="0"
+              step="0.01"
               placeholder="0.00"
               :style="inputStyle"
               @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
