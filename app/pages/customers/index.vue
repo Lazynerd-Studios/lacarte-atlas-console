@@ -22,7 +22,7 @@ const planFilter = ref('all')
 
 const customers = ref<any[]>([])
 const total = ref(0)
-const loading = ref(false)
+const loading = ref(true)
 const page = ref(1)
 const perPage = 20
 
@@ -69,6 +69,12 @@ function statusBadge(status: string) {
 
 <template>
   <div style="display:flex;flex-direction:column;gap:24px">
+    
+    <!-- Loading skeleton -->
+    <PageSkeleton v-if="loading" type="table" :rows="8" :cards="0" />
+
+    <!-- Content -->
+    <template v-else>
     <!-- Header -->
     <div style="display:flex;align-items:center;justify-content:space-between">
       <div>
@@ -209,6 +215,8 @@ function statusBadge(status: string) {
 
     <!-- Pagination -->
     <AppPagination :page="page" :total="total" :per-page="perPage" @update:page="page = $event" />
+    
+    </template><!-- end content -->
   </div>
 
   <!-- Add Customer Modal -->
