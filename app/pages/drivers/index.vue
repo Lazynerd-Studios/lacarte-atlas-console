@@ -31,6 +31,8 @@ async function handleAddDriver(payload: Record<string, any>) {
 }
 
 function statusStyle(s: string) {
+  if (s === 'active')   return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e' }
+  if (s === 'inactive') return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280' }
   if (s === 'on-route') return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e' }
   if (s === 'online')   return { bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)', color: '#3b82f6' }
   return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280' }
@@ -81,27 +83,36 @@ function statusStyle(s: string) {
 
         <div style="display:flex;flex-direction:column;gap:12px">
           <div style="display:flex;align-items:center;gap:8px">
+            <UIcon name="i-lucide-mail" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
+            <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ d.email || 'No email' }}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
             <UIcon name="i-lucide-phone" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
-            <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ d.phoneNumber }}</span>
+            <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ d.phoneNumber || 'No phone' }}</span>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
             <UIcon name="i-lucide-truck" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
-            <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Truck {{ d.assignedTruck?.truckId ?? 'Unassigned' }}</span>
+            <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">
+              {{ d.assignedTruck ? `${d.assignedTruck.truckId} (${d.assignedTruck.plateNumber})` : 'Unassigned' }}
+            </span>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
             <UIcon name="i-lucide-map-pin" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
-            <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ d.zone?.name ?? 'No Zone' }}</span>
+            <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">
+              <span v-if="d.zone" :style="`display:inline-block;width:8px;height:8px;border-radius:50%;background:${d.zone.color};margin-right:6px`"></span>
+              {{ d.zone?.name ?? 'No Zone' }}
+            </span>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
             <UIcon name="i-lucide-package" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
-            <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ d.bins ?? 0 }} Assigned Pickups</span>
+            <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ d.assignedPickups ?? 0 }} Assigned Pickups</span>
           </div>
         </div>
 
         <div style="background:#f8f9fa;border-radius:16px;padding:12px">
           <div style="display:flex;align-items:center;justify-content:space-between">
-            <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Today's Pickups</span>
-            <span style="font-size:18px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ d.todayPickups ?? 0 }}</span>
+            <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Total Trips</span>
+            <span style="font-size:18px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ d.totalTrips ?? 0 }}</span>
           </div>
         </div>
 

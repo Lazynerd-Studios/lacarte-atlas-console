@@ -6,12 +6,79 @@ const driver = ref<any>(null)
 const loading = ref(true)
 const notFound = ref(false)
 const toast = useAppToast()
+const todayPickups = ref<any[]>([])
+const loadingPickups = ref(false)
+const pickupHistory = ref<any[]>([])
+const loadingHistory = ref(false)
+const routeProgress = ref({ completed: 0, inProgress: 0, pending: 0, total: 0, percentage: 0 })
+const estimatedCompletion = ref('N/A')
+
+async function fetchTodayPickups() {
+  loadingPickups.value = true
+  const api = useApi()
+  
+  console.log('[driver-detail] Fetching current route for driver:', route.params.id)
+  const data = await api.get<any>(`/drivers/admin/${route.params.id}/route`)
+  
+  if (data) {
+    console.log('[driver-detail] Current route response:', data)
+    todayPickups.value = data.stops || []
+    routeProgress.value = data.progress || { completed: 0, inProgress: 0, pending: 0, total: 0, percentage: 0 }
+    estimatedCompletion.value = data.estimatedCompletion || 'N/A'
+    console.log('[driver-detail] Loaded stops:', todayPickups.value.length)
+  } else {
+    console.log('[driver-detail] No route found')
+    todayPickups.value = []
+    routeProgress.value = { completed: 0, inProgress: 0, pending: 0, total: 0, percentage: 0 }
+    estimatedCompletion.value = 'N/A'
+  }
+  
+  loadingPickups.value = false
+}
+
+async function fetchPickupHistory() {
+  loadingHistory.value = true
+  const api = useApi()
+  
+  console.log('[driver-detail] Fetching pickup history for driver:', route.params.id)
+  const response = await api.get<{ data: any[], pagination: any }>(`/drivers/admin/${route.params.id}/pickups/history`)
+  
+  if (response && response.data) {
+    console.log('[driver-detail] Pickup history response:', response)
+    pickupHistory.value = response.data
+    console.log('[driver-detail] Loaded history:', pickupHistory.value.length)
+  } else {
+    console.log('[driver-detail] No history found')
+    pickupHistory.value = []
+  }
+  
+  loadingHistory.value = false
+}
+
+function formatDate(dateString: string): string {
+  if (!dateString) return 'N/A'
+  try {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  } catch {
+    return 'N/A'
+  }
+}
+
+function getStatusBadgeStyle(status: string) {
+  if (status === 'completed') return { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#22c55e' }
+  if (status === 'cancelled') return { bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)', color: '#ef4444' }
+  if (status === 'in_progress' || status === 'in-progress') return { bg: 'rgba(255,180,0,0.1)', border: 'rgba(255,180,0,0.2)', color: '#d49a00' }
+  return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280' }
+}
 
 onMounted(async () => {
   const api = useApi()
   const data = await api.get<any>(`/drivers/admin/${route.params.id}`)
   if (data) {
     driver.value = data
+    // Fetch today's pickups and history after driver data is loaded
+    await Promise.all([fetchTodayPickups(), fetchPickupHistory()])
   } else {
     notFound.value = true
   }
@@ -20,6 +87,8 @@ onMounted(async () => {
 
 const statusBadge = computed(() => {
   const s = driver.value?.status
+  if (s === 'active')   return { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#22c55e', label: 'Active' }
+  if (s === 'inactive') return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: 'Inactive' }
   if (s === 'on-route') return { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#22c55e', label: 'On Route' }
   if (s === 'online')   return { bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)', color: '#3b82f6', label: 'Online' }
   return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: 'Offline' }
@@ -40,24 +109,18 @@ const formattedLicenseExpiry = computed(() => {
 const activeTab = ref('Current Route')
 const tabs = ['Current Route', 'Route History', 'Performance', 'Earnings']
 
-const routeProgress = { completed: 12, total: 28, estimatedCompletion: '3:30 PM' }
-const progressPct = computed(() => Math.round((routeProgress.completed / routeProgress.total) * 100))
+const progressPct = computed(() => {
+  return routeProgress.value.percentage || 0
+})
 
-const currentRoute = [
-  { customer: 'Sarah Johnson',  address: '123 Oak Street',  time: '9:00 AM',  status: 'completed' },
-  { customer: 'Michael Chen',   address: '456 Maple Ave',   time: '9:15 AM',  status: 'completed' },
-  { customer: 'Emma Williams',  address: '789 Pine Road',   time: '9:30 AM',  status: 'in-progress' },
-  { customer: 'James Martinez', address: '321 Birch Lane',  time: '9:45 AM',  status: 'pending' },
-  { customer: 'Olivia Brown',   address: '654 Cedar Court', time: '10:00 AM', status: 'pending' },
-]
+function getPickupStatus(stop: any): string {
+  const status = stop.status
+  if (status === 'completed') return 'completed'
+  if (status === 'in_progress' || status === 'in-progress') return 'in-progress'
+  return 'pending'
+}
 
-const routeHistory = [
-  { date: '2026-03-01', stops: 28, completed: 28, duration: '6h 20m', zone: 'Downtown' },
-  { date: '2026-02-28', stops: 32, completed: 31, duration: '7h 10m', zone: 'Downtown' },
-  { date: '2026-02-27', stops: 27, completed: 27, duration: '6h 05m', zone: 'Downtown' },
-  { date: '2026-02-26', stops: 30, completed: 30, duration: '6h 45m', zone: 'Downtown' },
-  { date: '2026-02-25', stops: 25, completed: 24, duration: '5h 50m', zone: 'Downtown' },
-]
+// Performance tab charts
 
 const monthlyPickups = [
   { month: 'Sep', value: 480 },
@@ -231,15 +294,20 @@ function stopBadge(status: string) {
               </div>
               <div style="display:flex;align-items:center;gap:8px">
                 <UIcon name="i-lucide-truck" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
-                <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Truck {{ driver?.assignedTruck?.truckId ?? 'Unassigned' }}</span>
+                <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">
+                  {{ driver?.assignedTruck ? `${driver.assignedTruck.truckId} (${driver.assignedTruck.plateNumber})` : 'Unassigned' }}
+                </span>
               </div>
               <div style="display:flex;align-items:center;gap:8px">
                 <UIcon name="i-lucide-map-pin" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
-                <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ driver?.zone?.name ?? 'No Zone' }} Zone</span>
+                <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">
+                  <span v-if="driver?.zone" :style="`display:inline-block;width:8px;height:8px;border-radius:50%;background:${driver.zone.color};margin-right:6px`"></span>
+                  {{ driver?.zone?.name ?? 'No Zone' }}
+                </span>
               </div>
               <div style="display:flex;align-items:center;gap:8px">
-                <UIcon name="i-lucide-package" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
-                <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ driver?.licenseNumber ?? 'N/A' }} | Exp: {{ formattedLicenseExpiry }}</span>
+                <UIcon name="i-lucide-credit-card" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
+                <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">License: {{ driver?.licenseNumber ?? 'N/A' }} | Exp: {{ formattedLicenseExpiry }}</span>
               </div>
             </div>
           </div>
@@ -268,10 +336,10 @@ function stopBadge(status: string) {
     <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:24px">
       <div
         v-for="stat in [
-          { label: `Today's Pickups`, value: driver?.totalTrips ?? 0, color: '#1a1a1a' },
-          { label: 'This Week',       value: driver?.weekPickups ?? 0,  color: '#1a1a1a' },
-          { label: 'Completion Rate', value: driver?.completionRate ?? 'N/A', color: '#22c55e' },
-          { label: 'Avg Time/Stop',   value: driver?.avgTimePerStop ?? 'N/A', color: '#1a1a1a' },
+          { label: `Today's Pickups`, value: driver?.stats?.todayPickups ?? 0, color: '#1a1a1a' },
+          { label: 'This Week',       value: driver?.stats?.thisWeekPickups ?? 0,  color: '#1a1a1a' },
+          { label: 'Completion Rate', value: driver?.stats?.completionRate ? `${driver.stats.completionRate}%` : 'N/A', color: '#22c55e' },
+          { label: 'Avg Time/Stop',   value: driver?.stats?.avgTimePerStop ? `${driver.stats.avgTimePerStop} min` : 'N/A', color: '#1a1a1a' },
         ]"
         :key="stat.label"
         style="background:white;border:1px solid #ececec;border-radius:16px;padding:10px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)"
@@ -284,7 +352,7 @@ function stopBadge(status: string) {
           <UIcon name="i-lucide-dollar-sign" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
           <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Period Earnings</p>
         </div>
-        <p style="font-size:20px;font-weight:700;color:#22c55e;font-family:'Manrope',sans-serif">{{ driver?.periodEarnings ?? 'N/A' }}</p>
+        <p style="font-size:20px;font-weight:700;color:#22c55e;font-family:'Manrope',sans-serif">{{ driver?.stats?.periodEarnings ?? 'N/A' }}</p>
       </div>
     </div>
 
@@ -303,79 +371,144 @@ function stopBadge(status: string) {
 
         <!-- Current Route -->
         <div v-if="activeTab === 'Current Route'" style="display:flex;flex-direction:column;gap:24px">
-          <div style="display:flex;flex-direction:column;gap:16px">
-            <div style="display:flex;align-items:center;justify-content:space-between">
-              <div>
-                <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Route Progress</p>
-                <p style="font-size:24px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ routeProgress.completed }} of {{ routeProgress.total }} stops completed</p>
-              </div>
-              <div style="text-align:right">
-                <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Estimated Completion</p>
-                <p style="font-size:18px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ routeProgress.estimatedCompletion }}</p>
-              </div>
-            </div>
-            <div style="background:#e5e7eb;border-radius:9999px;height:12px;overflow:hidden">
-              <div :style="`background:#ffb400;height:100%;border-radius:9999px;width:${progressPct}%`" />
-            </div>
+          <!-- Loading state -->
+          <div v-if="loadingPickups" style="padding:40px;text-align:center">
+            <UIcon name="i-lucide-loader-2" style="width:32px;height:32px;color:#6b7280;animation:spin 1s linear infinite;margin-bottom:12px" />
+            <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Loading current route...</p>
           </div>
-          <div style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
+          
+          <!-- Empty state -->
+          <div v-else-if="todayPickups.length === 0" style="padding:60px;text-align:center">
+            <UIcon name="i-lucide-package" style="width:40px;height:40px;color:#d1d5db;margin-bottom:12px" />
+            <p style="font-size:15px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0 0 6px">No route assigned for today</p>
+            <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">This driver has no route assigned for today.</p>
+          </div>
+          
+          <!-- Route data -->
+          <template v-else>
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <div>
+                  <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Route Progress</p>
+                  <p style="font-size:24px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ routeProgress.completed }} of {{ routeProgress.total }} stops completed</p>
+                </div>
+                <div style="text-align:right">
+                  <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Estimated Completion</p>
+                  <p style="font-size:18px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ estimatedCompletion }}</p>
+                </div>
+              </div>
+              <div style="background:#e5e7eb;border-radius:9999px;height:12px;overflow:hidden">
+                <div :style="`background:#ffb400;height:100%;border-radius:9999px;width:${progressPct}%`" />
+              </div>
+              <div style="display:flex;gap:16px;font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">
+                <span>Completed: <strong style="color:#22c55e">{{ routeProgress.completed }}</strong></span>
+                <span>In Progress: <strong style="color:#d49a00">{{ routeProgress.inProgress }}</strong></span>
+                <span>Pending: <strong style="color:#6b7280">{{ routeProgress.pending }}</strong></span>
+              </div>
+            </div>
+            <div style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
+              <table style="width:100%;border-collapse:collapse">
+                <thead>
+                  <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
+                    <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Order</th>
+                    <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Customer</th>
+                    <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Address</th>
+                    <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Time Slot</th>
+                    <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Priority</th>
+                    <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="stop in todayPickups"
+                    :key="stop.id"
+                    style="border-bottom:1px solid #e5e7eb"
+                    @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
+                    @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
+                  >
+                    <td style="padding:18px 16px;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">
+                      #{{ stop.order }}
+                    </td>
+                    <td style="padding:18px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">
+                      {{ stop.customer?.name || 'Unknown' }}
+                      <div style="font-size:12px;color:#6b7280;margin-top:2px">{{ stop.customer?.phoneNumber || '' }}</div>
+                    </td>
+                    <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">
+                      {{ stop.customer?.address || 'N/A' }}
+                      <div v-if="stop.customer?.placeName" style="font-size:12px;color:#6b7280;margin-top:2px">{{ stop.customer.placeName }}</div>
+                    </td>
+                    <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ stop.timeSlot || 'N/A' }}</td>
+                    <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">
+                      <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;${stop.priorityLevel === 'high' ? 'color:#dc2626;background:rgba(220,38,38,0.1);border:1px solid rgba(220,38,38,0.2)' : stop.priorityLevel === 'urgent' ? 'color:#dc2626;background:rgba(220,38,38,0.15);border:1px solid rgba(220,38,38,0.3)' : 'color:#6b7280;background:#e5e7eb;border:1px solid #e5e7eb'}`">
+                        {{ stop.priorityLevel || 'normal' }}
+                      </span>
+                    </td>
+                    <td style="padding:18px 16px">
+                      <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;color:${stopBadge(getPickupStatus(stop)).color};background:${stopBadge(getPickupStatus(stop)).bg};border:1px solid ${stopBadge(getPickupStatus(stop)).border}`">
+                        {{ getPickupStatus(stop) }}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </template>
+        </div>
+
+        <!-- Route History -->
+        <div v-else-if="activeTab === 'Route History'">
+          <!-- Loading state -->
+          <div v-if="loadingHistory" style="padding:40px;text-align:center">
+            <UIcon name="i-lucide-loader-2" style="width:32px;height:32px;color:#6b7280;animation:spin 1s linear infinite;margin-bottom:12px" />
+            <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Loading pickup history...</p>
+          </div>
+          
+          <!-- Empty state -->
+          <div v-else-if="pickupHistory.length === 0" style="padding:60px;text-align:center">
+            <UIcon name="i-lucide-history" style="width:40px;height:40px;color:#d1d5db;margin-bottom:12px" />
+            <p style="font-size:15px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0 0 6px">No pickup history</p>
+            <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">This driver has no completed pickups yet.</p>
+          </div>
+          
+          <!-- History table -->
+          <div v-else style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
             <table style="width:100%;border-collapse:collapse">
               <thead>
                 <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Date</th>
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Customer</th>
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Address</th>
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Scheduled Time</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Item Type</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Time Slot</th>
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Status</th>
                 </tr>
               </thead>
               <tbody>
                 <tr
-                  v-for="(stop, i) in currentRoute"
-                  :key="i"
+                  v-for="pickup in pickupHistory"
+                  :key="pickup.id"
                   style="border-bottom:1px solid #e5e7eb"
                   @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
                   @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
                 >
-                  <td style="padding:18px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ stop.customer }}</td>
-                  <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ stop.address }}</td>
-                  <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ stop.time }}</td>
-                  <td style="padding:18px 16px">
-                    <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;color:${stopBadge(stop.status).color};background:${stopBadge(stop.status).bg};border:1px solid ${stopBadge(stop.status).border}`">
-                      {{ stop.status }}
+                  <td style="padding:17px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ formatDate(pickup.scheduledDate) }}</td>
+                  <td style="padding:17px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">
+                    {{ pickup.customer?.name || 'Unknown' }}
+                    <div style="font-size:12px;color:#6b7280;margin-top:2px">{{ pickup.customer?.phoneNumber || '' }}</div>
+                  </td>
+                  <td style="padding:17px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">
+                    {{ pickup.customer?.placeName || pickup.customer?.address || 'N/A' }}
+                  </td>
+                  <td style="padding:17px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">
+                    {{ pickup.disposableItemType?.name || 'N/A' }}
+                    <div v-if="pickup.estimatedQuantity" style="font-size:12px;color:#6b7280;margin-top:2px">{{ pickup.estimatedQuantity.label }}</div>
+                  </td>
+                  <td style="padding:17px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ pickup.timeSlot || 'N/A' }}</td>
+                  <td style="padding:17px 16px">
+                    <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;color:${getStatusBadgeStyle(pickup.pickupRequest?.status).color};background:${getStatusBadgeStyle(pickup.pickupRequest?.status).bg};border:1px solid ${getStatusBadgeStyle(pickup.pickupRequest?.status).border}`">
+                      {{ pickup.pickupRequest?.status || 'unknown' }}
                     </span>
                   </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Route History -->
-        <div v-else-if="activeTab === 'Route History'">
-          <div style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
-            <table style="width:100%;border-collapse:collapse">
-              <thead>
-                <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Date</th>
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Total Stops</th>
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Completed</th>
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Duration</th>
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Zone</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="(row, i) in routeHistory"
-                  :key="i"
-                  style="border-bottom:1px solid #e5e7eb"
-                  @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
-                  @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
-                >
-                  <td style="padding:17px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.date }}</td>
-                  <td style="padding:17px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.stops }}</td>
-                  <td style="padding:17px 16px;font-size:14px;font-family:'Manrope',sans-serif" :style="`color:${row.completed === row.stops ? '#22c55e' : '#ffb400'}`">{{ row.completed }}</td>
-                  <td style="padding:17px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.duration }}</td>
-                  <td style="padding:17px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.zone }}</td>
                 </tr>
               </tbody>
             </table>
