@@ -23,4 +23,15 @@ export default defineNuxtConfig({
       apiBase: process.env.NUXT_PUBLIC_API_BASE || 'https://lacarte.lazynerdstudios.com/api',
     },
   },
+  router: {
+    options: {
+      strict: false,
+    },
+  },
+  // Apply auth middleware globally to all routes
+  routeRules: {
+    '/login': { ssr: false },
+    '/forgot-password': { ssr: false },
+    '/pay/**': { ssr: false },
+  },
 })

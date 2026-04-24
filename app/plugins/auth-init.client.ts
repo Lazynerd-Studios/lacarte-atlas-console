@@ -1,6 +1,10 @@
-export default defineNuxtPlugin(async () => {
+export default defineNuxtPlugin(async (nuxtApp) => {
   const authStore = useAuthStore()
   const router = useRouter()
+
+  // Add loading state
+  const isCheckingAuth = ref(true)
+  nuxtApp.provide('isCheckingAuth', isCheckingAuth)
 
   // Check session on app load if user is authenticated
   if (authStore.isAuthenticated) {
@@ -14,4 +18,7 @@ export default defineNuxtPlugin(async () => {
       console.log('[auth-init] Session valid')
     }
   }
+
+  // Mark auth check as complete
+  isCheckingAuth.value = false
 })

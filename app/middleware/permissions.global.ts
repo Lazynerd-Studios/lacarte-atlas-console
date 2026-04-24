@@ -1,20 +1,18 @@
 export default defineNuxtRouteMiddleware((to) => {
-  // Skip middleware for public routes
-  const publicRoutes = ['/login', '/forgot-password']
-  if (publicRoutes.includes(to.path)) {
+  // Skip middleware for public routes, payment pages, and unauthorized page
+  const publicRoutes = ['/login', '/forgot-password', '/unauthorized']
+  const isPublicRoute = publicRoutes.includes(to.path) || to.path.startsWith('/pay')
+  
+  if (isPublicRoute) {
     return
   }
 
   const authStore = useAuthStore()
 
-  // If not authenticated, redirect to login
-  if (!authStore.isAuthenticated) {
-    return navigateTo('/login')
-  }
-
-  // Check if user exists and has necessary data
-  if (!authStore.user) {
-    return navigateTo('/login')
+  // Auth middleware handles authentication, so we only check permissions here
+  if (!authStore.isAuthenticated || !authStore.user) {
+    // Let auth middleware handle this
+    return
   }
 
   // Admin and Super Admin have access to everything (case-insensitive, handle underscores)
@@ -50,8 +48,9 @@ export default defineNuxtRouteMiddleware((to) => {
   for (const [route, permission] of Object.entries(routePermissions)) {
     if (to.path.startsWith(route)) {
       if (!hasPermission(permission)) {
-        // Redirect to dashboard with error message
-        return navigateTo('/')
+        console.log(`[permissions] Access denied to ${to.path} - missing permission: ${permission}`)
+        // Redirect to unauthorized page
+        return navigateTo('/unauthorized')
       }
     }
   }

@@ -4,8 +4,7 @@ import { validateTeamMemberForm } from '~/utils/teamValidation'
 import { formToCreateMemberPayload } from '~/utils/teamTransform'
 
 definePageMeta({ 
-  layout: 'dashboard',
-  middleware: 'auth'
+  layout: 'dashboard'
 })
 
 const authStore = useAuthStore()

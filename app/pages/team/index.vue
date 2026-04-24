@@ -9,8 +9,7 @@ interface TeamStats {
 }
 
 definePageMeta({ 
-  layout: 'dashboard',
-  middleware: 'auth'
+  layout: 'dashboard'
 })
 
 const authStore = useAuthStore()

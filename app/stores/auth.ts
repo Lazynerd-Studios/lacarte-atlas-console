@@ -2,7 +2,11 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<Record<string, any> | null>(null)
   const token = ref<string | null>(null)
   const teamMember = ref<Record<string, any> | null>(null)
+  const sessionExpiresAt = ref<number | null>(null)
+  const showSessionWarning = ref(false)
+  const sessionWarningTime = ref(0)
   let sessionCheckInterval: NodeJS.Timeout | null = null
+  let sessionWarningInterval: NodeJS.Timeout | null = null
 
   const isAuthenticated = computed(() => !!token.value)
 
@@ -40,10 +44,45 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = userData
     token.value = authToken
     
+    // Set session expiry (30 minutes from now)
+    sessionExpiresAt.value = Date.now() + (30 * 60 * 1000)
+    
     // Fetch team member profile to get role and permissions
     await fetchTeamMemberProfile()
     
     startSessionCheck()
+    startSessionWarningCheck()
+  }
+
+  async function refreshSession() {
+    if (!token.value) return false
+    
+    try {
+      // Use the existing get-session endpoint to refresh
+      const isValid = await checkSession()
+      
+      if (isValid) {
+        // Reset session expiry
+        sessionExpiresAt.value = Date.now() + (30 * 60 * 1000)
+        showSessionWarning.value = false
+        console.log('[auth] Session refreshed successfully')
+        return true
+      } else {
+        console.log('[auth] Session refresh failed')
+        return false
+      }
+    } catch (error) {
+      console.error('[auth] Session refresh error:', error)
+      return false
+    }
+  }
+
+  function extendSession() {
+    refreshSession()
+  }
+
+  function dismissSessionWarning() {
+    showSessionWarning.value = false
   }
 
   async function checkSession() {
@@ -63,6 +102,8 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = data.user
         // Refresh team member profile
         await fetchTeamMemberProfile()
+        // Update session expiry
+        sessionExpiresAt.value = Date.now() + (30 * 60 * 1000)
         return true
       } else {
         console.log('[auth] Session expired or invalid')
@@ -74,6 +115,32 @@ export const useAuthStore = defineStore('auth', () => {
       await logout()
       return false
     }
+  }
+
+  function startSessionWarningCheck() {
+    // Clear any existing interval
+    if (sessionWarningInterval) {
+      clearInterval(sessionWarningInterval)
+    }
+    
+    // Check every second if we should show warning
+    sessionWarningInterval = setInterval(() => {
+      if (!sessionExpiresAt.value) return
+      
+      const timeRemaining = Math.floor((sessionExpiresAt.value - Date.now()) / 1000)
+      
+      // Show warning 2 minutes before expiry
+      if (timeRemaining <= 120 && timeRemaining > 0) {
+        showSessionWarning.value = true
+        sessionWarningTime.value = timeRemaining
+      } else if (timeRemaining <= 0) {
+        // Session expired
+        showSessionWarning.value = false
+        logout()
+      } else {
+        showSessionWarning.value = false
+      }
+    }, 1000)
   }
 
   function startSessionCheck() {
@@ -97,6 +164,10 @@ export const useAuthStore = defineStore('auth', () => {
     if (sessionCheckInterval) {
       clearInterval(sessionCheckInterval)
       sessionCheckInterval = null
+    }
+    if (sessionWarningInterval) {
+      clearInterval(sessionWarningInterval)
+      sessionWarningInterval = null
     }
   }
 
@@ -122,16 +193,35 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     token.value = null
     teamMember.value = null
+    sessionExpiresAt.value = null
+    showSessionWarning.value = false
+    sessionWarningTime.value = 0
   }
 
   // Initialize session check if already authenticated
   if (token.value) {
     startSessionCheck()
+    startSessionWarningCheck()
     // Fetch team member profile on store initialization
     fetchTeamMemberProfile()
   }
 
-  return { user, token, teamMember, isAuthenticated, setAuth, checkSession, logout, fetchTeamMemberProfile }
+  return { 
+    user, 
+    token, 
+    teamMember, 
+    sessionExpiresAt,
+    showSessionWarning,
+    sessionWarningTime,
+    isAuthenticated, 
+    setAuth, 
+    checkSession, 
+    refreshSession,
+    extendSession,
+    dismissSessionWarning,
+    logout, 
+    fetchTeamMemberProfile 
+  }
 }, {
   persist: true,
 })
