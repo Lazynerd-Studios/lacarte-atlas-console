@@ -131,7 +131,7 @@ function planBadge(p: string) {
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
         <p style="font-size:18px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Customer Growth</p>
         <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin:4px 0 16px">Total active customers over time</p>
-        <svg :width="chartW" :height="chartH" style="overflow:visible;width:100%;height:auto">
+        <svg :viewBox="`0 0 ${chartW} ${chartH}`" style="overflow:visible;width:100%;height:auto">
           <line v-for="i in 5" :key="i" :x1="padL" :x2="chartW-padR" :y1="padT+(innerH/4)*(i-1)" :y2="padT+(innerH/4)*(i-1)" stroke="#f0f0f0" stroke-width="1"/>
           <text v-for="l in yLabels(growthMax)" :key="l.val" :x="padL-8" :y="l.y" text-anchor="end" font-size="11" fill="#6b7280" font-family="Manrope,sans-serif">{{ fmtY(l.val) }}</text>
           <polygon :points="areaPoints(growthData, growthMax)" fill="rgba(59,130,246,0.08)"/>
@@ -149,7 +149,7 @@ function planBadge(p: string) {
           <div style="display:flex;align-items:center;gap:6px"><div style="width:10px;height:10px;border-radius:3px;background:#22c55e"></div><span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">New</span></div>
           <div style="display:flex;align-items:center;gap:6px"><div style="width:10px;height:10px;border-radius:3px;background:#ef4444"></div><span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Churned</span></div>
         </div>
-        <svg :width="chartW" :height="chartH" style="overflow:visible;width:100%;height:auto">
+        <svg :viewBox="`0 0 ${chartW} ${chartH}`" style="overflow:visible;width:100%;height:auto">
           <line v-for="i in 5" :key="i" :x1="padL" :x2="chartW-padR" :y1="padT+(innerH/4)*(i-1)" :y2="padT+(innerH/4)*(i-1)" stroke="#f0f0f0" stroke-width="1"/>
           <text v-for="l in yLabels(nvcMax)" :key="l.val" :x="padL-8" :y="l.y" text-anchor="end" font-size="11" fill="#6b7280" font-family="Manrope,sans-serif">{{ l.val }}</text>
           <!-- New bars (left half) -->

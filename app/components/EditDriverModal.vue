@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import type { Driver, Zone } from '~/types/driver'
+
 const props = defineProps<{
-  driver: Record<string, any>
+  driver: Driver
 }>()
 
 const emit = defineEmits<{
@@ -26,7 +28,7 @@ const form = reactive({
 
 onMounted(async () => {
   const api = useApi()
-  const zoneData = await api.get<any>('/zone/public/list')
+  const zoneData = await api.get<Zone[] | { data: Zone[] }>('/zone/public/list')
   if (zoneData) zones.value = Array.isArray(zoneData) ? zoneData : (zoneData.data ?? [])
 })
 

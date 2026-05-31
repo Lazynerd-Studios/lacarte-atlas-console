@@ -1,17 +1,19 @@
 <script setup lang="ts">
+import type { Truck, CreateTruckPayload } from '~/types/driver'
+
 definePageMeta({ layout: 'dashboard' })
 
 const showAddTruckModal = ref(false)
 const showDeleteModal = ref(false)
-const deleteTarget = ref<any>(null)
-const trucks = ref<any[]>([])
+const deleteTarget = ref<Truck | null>(null)
+const trucks = ref<Truck[]>([])
 const loading = ref(false)
 
 async function fetchTrucks() {
   console.log('[trucks] Fetching trucks list')
   loading.value = true
   const api = useApi()
-  const data = await api.get<{ data: any[] }>('/trucks/admin/')
+  const data = await api.get<{ data: Truck[] }>('/trucks/admin/')
   console.log('[trucks] Trucks response:', data)
   if (data) {
     trucks.value = data.data
@@ -20,7 +22,7 @@ async function fetchTrucks() {
   loading.value = false
 }
 
-async function handleAddTruck(formData: Record<string, any>) {
+async function handleAddTruck(formData: CreateTruckPayload) {
   console.log('[trucks] Adding truck, payload:', JSON.stringify(formData, null, 2))
   const api = useApi()
   const result = await api.post('/trucks/admin/', formData, 'Failed to create truck')
@@ -31,7 +33,7 @@ async function handleAddTruck(formData: Record<string, any>) {
   }
 }
 
-function openDelete(truck: any) {
+function openDelete(truck: Truck) {
   console.log('[trucks] Opening delete modal for:', truck.truckId)
   deleteTarget.value = truck
   showDeleteModal.value = true

@@ -1,18 +1,20 @@
+import type { AuthUser, AuthTeamMember, ProfileResponse, SessionResponse } from '~/types/auth'
+
 export const useAuthStore = defineStore('auth', () => {
-  const user = ref<Record<string, any> | null>(null)
+  const user = ref<AuthUser | null>(null)
   const token = ref<string | null>(null)
-  const teamMember = ref<Record<string, any> | null>(null)
+  const teamMember = ref<AuthTeamMember | null>(null)
   const sessionExpiresAt = ref<number | null>(null)
   const showSessionWarning = ref(false)
   const sessionWarningTime = ref(0)
-  let sessionCheckInterval: NodeJS.Timeout | null = null
-  let sessionWarningInterval: NodeJS.Timeout | null = null
+  let sessionCheckInterval: ReturnType<typeof setInterval> | null = null
+  let sessionWarningInterval: ReturnType<typeof setInterval> | null = null
 
   const isAuthenticated = computed(() => !!token.value)
 
   async function fetchTeamMemberProfile() {
     if (!token.value || !user.value) return
-    
+
     try {
       const config = useRuntimeConfig()
       const res = await fetch(`${config.public.apiBase}/user/profile`, {
@@ -21,18 +23,18 @@ export const useAuthStore = defineStore('auth', () => {
           'Content-Type': 'application/json',
         },
       })
-      
+
       if (res.ok) {
-        const response = await res.json()
+        const response = (await res.json()) as ProfileResponse
         const data = response.data
-        
+
         // Store the full profile data
         teamMember.value = data.admin
-        
+
         // Merge admin role and permissions into user object
         if (user.value && data.admin) {
-          user.value.role = data.admin.role?.name || user.value.role
-          user.value.permissions = data.admin.permissions || []
+          user.value.role = data.admin.role?.name ?? user.value.role
+          user.value.permissions = data.admin.permissions ?? []
         }
       }
     } catch (error) {
@@ -40,27 +42,27 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function setAuth(userData: Record<string, any>, authToken: string) {
+  async function setAuth(userData: AuthUser, authToken: string) {
     user.value = userData
     token.value = authToken
-    
+
     // Set session expiry (30 minutes from now)
     sessionExpiresAt.value = Date.now() + (30 * 60 * 1000)
-    
+
     // Fetch team member profile to get role and permissions
     await fetchTeamMemberProfile()
-    
+
     startSessionCheck()
     startSessionWarningCheck()
   }
 
   async function refreshSession() {
     if (!token.value) return false
-    
+
     try {
       // Use the existing get-session endpoint to refresh
       const isValid = await checkSession()
-      
+
       if (isValid) {
         // Reset session expiry
         sessionExpiresAt.value = Date.now() + (30 * 60 * 1000)
@@ -87,7 +89,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function checkSession() {
     if (!token.value) return false
-    
+
     try {
       const config = useRuntimeConfig()
       const res = await fetch(`${config.public.apiBase}/auth/get-session`, {
@@ -96,9 +98,9 @@ export const useAuthStore = defineStore('auth', () => {
           'Content-Type': 'application/json',
         },
       })
-      
+
       if (res.ok) {
-        const data = await res.json()
+        const data = (await res.json()) as SessionResponse
         user.value = data.user
         // Refresh team member profile
         await fetchTeamMemberProfile()
@@ -122,13 +124,13 @@ export const useAuthStore = defineStore('auth', () => {
     if (sessionWarningInterval) {
       clearInterval(sessionWarningInterval)
     }
-    
+
     // Check every second if we should show warning
     sessionWarningInterval = setInterval(() => {
       if (!sessionExpiresAt.value) return
-      
+
       const timeRemaining = Math.floor((sessionExpiresAt.value - Date.now()) / 1000)
-      
+
       // Show warning 2 minutes before expiry
       if (timeRemaining <= 120 && timeRemaining > 0) {
         showSessionWarning.value = true
@@ -148,7 +150,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (sessionCheckInterval) {
       clearInterval(sessionCheckInterval)
     }
-    
+
     // Check session every 5 minutes
     sessionCheckInterval = setInterval(async () => {
       console.log('[auth] Periodic session check')
@@ -173,7 +175,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function logout() {
     stopSessionCheck()
-    
+
     if (token.value) {
       try {
         const config = useRuntimeConfig()
@@ -189,7 +191,7 @@ export const useAuthStore = defineStore('auth', () => {
         console.error('[auth] Sign out failed:', error)
       }
     }
-    
+
     user.value = null
     token.value = null
     teamMember.value = null
@@ -206,21 +208,21 @@ export const useAuthStore = defineStore('auth', () => {
     fetchTeamMemberProfile()
   }
 
-  return { 
-    user, 
-    token, 
-    teamMember, 
+  return {
+    user,
+    token,
+    teamMember,
     sessionExpiresAt,
     showSessionWarning,
     sessionWarningTime,
-    isAuthenticated, 
-    setAuth, 
-    checkSession, 
+    isAuthenticated,
+    setAuth,
+    checkSession,
     refreshSession,
     extendSession,
     dismissSessionWarning,
-    logout, 
-    fetchTeamMemberProfile 
+    logout,
+    fetchTeamMemberProfile,
   }
 }, {
   persist: true,

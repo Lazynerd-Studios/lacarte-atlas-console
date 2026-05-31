@@ -30,8 +30,8 @@ async function onSubmit() {
     const api = useApi()
     await api.post('/auth/forgot-password', { email: email.value })
     submitted.value = true
-  } catch (e: any) {
-    error.value = e.message || 'Something went wrong. Please try again.'
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'Something went wrong. Please try again.'
   } finally {
     loading.value = false
   }

@@ -100,7 +100,7 @@ const drivers = [
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
         <p style="font-size:18px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Pickup Volume</p>
         <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin:4px 0 16px">Monthly pickups completed</p>
-        <svg :width="chartW" :height="chartH" style="overflow:visible;width:100%;height:auto">
+        <svg :viewBox="`0 0 ${chartW} ${chartH}`" style="overflow:visible;width:100%;height:auto">
           <line v-for="i in 5" :key="i" :x1="padL" :x2="chartW-padR" :y1="padT+(innerH/4)*(i-1)" :y2="padT+(innerH/4)*(i-1)" stroke="#f0f0f0" stroke-width="1"/>
           <text v-for="l in yLabels(pickupMax)" :key="l.val" :x="padL-8" :y="l.y" text-anchor="end" font-size="11" fill="#6b7280" font-family="Manrope,sans-serif">{{ fmtY(l.val) }}</text>
           <rect v-for="(d,i) in pickupVolume" :key="i" :x="barX(i,pickupVolume.length)" :y="barY(d.value,pickupMax)" :width="barW(pickupVolume.length)" :height="barH(d.value,pickupMax)" rx="6" fill="#ffb400"/>
@@ -112,7 +112,7 @@ const drivers = [
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
         <p style="font-size:18px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Completion Rate</p>
         <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin:4px 0 16px">Monthly pickup completion %</p>
-        <svg :width="chartW" :height="chartH" style="overflow:visible;width:100%;height:auto">
+        <svg :viewBox="`0 0 ${chartW} ${chartH}`" style="overflow:visible;width:100%;height:auto">
           <line v-for="i in 5" :key="i" :x1="padL" :x2="chartW-padR" :y1="padT+(innerH/4)*(i-1)" :y2="padT+(innerH/4)*(i-1)" stroke="#f0f0f0" stroke-width="1"/>
           <text v-for="l in yLabels(completionMax)" :key="l.val" :x="padL-8" :y="l.y" text-anchor="end" font-size="11" fill="#6b7280" font-family="Manrope,sans-serif">{{ l.val }}%</text>
           <polygon :points="areaPoints(completionRate, completionMax)" fill="rgba(34,197,94,0.08)"/>

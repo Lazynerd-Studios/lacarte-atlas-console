@@ -52,15 +52,12 @@ async function onSubmit() {
   try {
     const api = useApi()
     const toast = useAppToast()
-    const data = await api.request<{ token: string; user: any }>('/auth/sign-in/email', {
-      method: 'POST',
-      body: JSON.stringify({ email: form.email, password: form.password, rememberMe: form.remember }),
-    })
+    const data = await api.signIn(form.email, form.password, form.remember)
     authStore.setAuth(data.user, data.token)
     toast.success('Welcome back!')
     router.push('/')
-  } catch (e: any) {
-    error.value = e.message || 'Invalid email or password'
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'Invalid email or password'
   } finally {
     loading.value = false
   }

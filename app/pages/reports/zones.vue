@@ -127,7 +127,7 @@ function completionColor(v: number) {
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
         <p style="font-size:16px;font-weight:600;color:#111;margin:0">Pickups by Zone</p>
         <p style="font-size:13px;color:#6b7280;margin:4px 0 16px">Total pickups completed per zone</p>
-        <svg :width="chartW" :height="chartH" style="overflow:visible;width:100%;height:auto">
+        <svg :viewBox="`0 0 ${chartW} ${chartH}`" style="overflow:visible;width:100%;height:auto">
           <line v-for="i in 5" :key="i" :x1="padL" :x2="chartW-padR" :y1="padT+(innerH/4)*(i-1)" :y2="padT+(innerH/4)*(i-1)" stroke="#f0f0f0" stroke-width="1"/>
           <text v-for="l in yLabels(pickupMax)" :key="l.val" :x="padL-8" :y="l.y" text-anchor="end" font-size="11" fill="#6b7280" font-family="Manrope,sans-serif">{{ fmtY(l.val) }}</text>
           <rect v-for="(z,i) in zones" :key="z.name"
@@ -146,7 +146,7 @@ function completionColor(v: number) {
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
         <p style="font-size:16px;font-weight:600;color:#111;margin:0">Revenue by Zone</p>
         <p style="font-size:13px;color:#6b7280;margin:4px 0 16px">Estimated revenue per zone (GHS)</p>
-        <svg :width="chartW" :height="chartH" style="overflow:visible;width:100%;height:auto">
+        <svg :viewBox="`0 0 ${chartW} ${chartH}`" style="overflow:visible;width:100%;height:auto">
           <line v-for="i in 5" :key="i" :x1="padL" :x2="chartW-padR" :y1="padT+(innerH/4)*(i-1)" :y2="padT+(innerH/4)*(i-1)" stroke="#f0f0f0" stroke-width="1"/>
           <text v-for="l in yLabels(revenueMax)" :key="l.val" :x="padL-8" :y="l.y" text-anchor="end" font-size="11" fill="#6b7280" font-family="Manrope,sans-serif">{{ fmtY(l.val) }}</text>
           <rect v-for="(z,i) in zones" :key="z.name"
@@ -176,7 +176,7 @@ function completionColor(v: number) {
           <Icon name="lucide:chevron-down" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:13px;height:13px;color:#6b7280;pointer-events:none" />
         </div>
       </div>
-      <svg :width="chartW" :height="chartH" style="overflow:visible;width:100%;height:auto">
+      <svg :viewBox="`0 0 ${chartW} ${chartH}`" style="overflow:visible;width:100%;height:auto">
         <line v-for="i in 5" :key="i" :x1="padL" :x2="chartW-padR" :y1="padT+(innerH/4)*(i-1)" :y2="padT+(innerH/4)*(i-1)" stroke="#f0f0f0" stroke-width="1"/>
         <text v-for="l in yLabelsRange(80, 100)" :key="l.val" :x="padL-8" :y="l.y" text-anchor="end" font-size="11" fill="#6b7280" font-family="Manrope,sans-serif">{{ l.val }}%</text>
         <polygon :points="areaPoints(trendData, 80, 100)" fill="rgba(59,130,246,0.08)"/>

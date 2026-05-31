@@ -1,24 +1,26 @@
 <script setup lang="ts">
+import type { Driver, CreateDriverPayload } from '~/types/driver'
+
 definePageMeta({ layout: 'dashboard' })
 
 const { format } = useCurrency()
 
 const showAddDriverModal = ref(false)
-const drivers = ref<any[]>([])
+const drivers = ref<Driver[]>([])
 const loading = ref(false)
 const toast = useAppToast()
 
 async function fetchDrivers() {
   loading.value = true
   const api = useApi()
-  const data = await api.get<{ data: any[] }>('/drivers/admin/')
+  const data = await api.get<{ data: Driver[] }>('/drivers/admin/')
   if (data) drivers.value = data.data
   loading.value = false
 }
 
 onMounted(fetchDrivers)
 
-async function handleAddDriver(payload: Record<string, any>) {
+async function handleAddDriver(payload: CreateDriverPayload) {
   console.log('[handleAddDriver] payload:', JSON.stringify(payload, null, 2))
   const api = useApi()
   const result = await api.post('/drivers/admin/', payload, 'Failed to create driver')

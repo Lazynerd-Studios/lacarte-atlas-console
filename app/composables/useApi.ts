@@ -1,3 +1,5 @@
+import type { SignInResponse } from '~/types/auth'
+
 export function useApi() {
   const config = useRuntimeConfig()
   const authStore = useAuthStore()
@@ -43,7 +45,7 @@ export function useApi() {
 
     // Treat 200, 201, and 204 as success responses
     const isSuccess = res.status === 200 || res.status === 201 || res.status === 204
-    
+
     if (!isSuccess) {
       let detail: string | undefined
       try { detail = (await res.clone().json()).message } catch {}
@@ -76,6 +78,12 @@ export function useApi() {
       run(() => request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }), title ?? 'Update failed'),
     del:  <T>(path: string, title?: string) =>
       run(() => request<T>(path, { method: 'DELETE' }), title ?? 'Delete failed'),
+    // Typed auth helper
+    signIn: (email: string, password: string, rememberMe = false) =>
+      request<SignInResponse>('/auth/sign-in/email', {
+        method: 'POST',
+        body: JSON.stringify({ email, password, rememberMe }),
+      }),
     // Raw request for cases where the caller wants to handle errors themselves
     request,
   }

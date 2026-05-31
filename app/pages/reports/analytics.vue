@@ -206,7 +206,7 @@ function fmtY(v: number) {
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1),0 1px 2px rgba(0,0,0,0.1)">
         <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Revenue Trend</p>
         <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin:4px 0 16px">Monthly revenue for the past 6 months</p>
-        <svg :width="chartW" :height="chartH" style="overflow:visible;width:100%;height:auto">
+        <svg :viewBox="`0 0 ${chartW} ${chartH}`" style="overflow:visible;width:100%;height:auto">
           <!-- Grid lines -->
           <line v-for="i in 5" :key="i" :x1="padL" :x2="chartW - padR" :y1="padT + (innerH / 4) * (i-1)" :y2="padT + (innerH / 4) * (i-1)" stroke="#f0f0f0" stroke-width="1" />
           <!-- Y labels -->
@@ -226,7 +226,7 @@ function fmtY(v: number) {
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1),0 1px 2px rgba(0,0,0,0.1)">
         <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Pickup Frequency</p>
         <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin:4px 0 16px">Total pickups per month</p>
-        <svg :width="chartW" :height="chartH" style="overflow:visible;width:100%;height:auto">
+        <svg :viewBox="`0 0 ${chartW} ${chartH}`" style="overflow:visible;width:100%;height:auto">
           <line v-for="i in 5" :key="i" :x1="padL" :x2="chartW - padR" :y1="padT + (innerH / 4) * (i-1)" :y2="padT + (innerH / 4) * (i-1)" stroke="#f0f0f0" stroke-width="1" />
           <text v-for="lbl in yLabels(pickupMax)" :key="lbl.val" :x="padL - 8" :y="lbl.y" text-anchor="end" font-size="11" fill="#6b7280" font-family="Manrope,sans-serif">{{ fmtY(lbl.val) }}</text>
           <rect v-for="(d, i) in pickupData" :key="i"
@@ -242,7 +242,7 @@ function fmtY(v: number) {
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1),0 1px 2px rgba(0,0,0,0.1)">
         <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Customer Growth</p>
         <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin:4px 0 16px">Total active customers over time</p>
-        <svg :width="chartW" :height="chartH" style="overflow:visible;width:100%;height:auto">
+        <svg :viewBox="`0 0 ${chartW} ${chartH}`" style="overflow:visible;width:100%;height:auto">
           <line v-for="i in 5" :key="i" :x1="padL" :x2="chartW - padR" :y1="padT + (innerH / 4) * (i-1)" :y2="padT + (innerH / 4) * (i-1)" stroke="#f0f0f0" stroke-width="1" />
           <text v-for="lbl in yLabels(customerMax)" :key="lbl.val" :x="padL - 8" :y="lbl.y" text-anchor="end" font-size="11" fill="#6b7280" font-family="Manrope,sans-serif">{{ fmtY(lbl.val) }}</text>
           <polygon :points="areaPoints(customerData, customerMax)" fill="rgba(59,130,246,0.08)" />
@@ -256,7 +256,7 @@ function fmtY(v: number) {
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1),0 1px 2px rgba(0,0,0,0.1)">
         <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Shop Sales</p>
         <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin:4px 0 16px">Monthly shop revenue</p>
-        <svg :width="chartW" :height="chartH" style="overflow:visible;width:100%;height:auto">
+        <svg :viewBox="`0 0 ${chartW} ${chartH}`" style="overflow:visible;width:100%;height:auto">
           <line v-for="i in 5" :key="i" :x1="padL" :x2="chartW - padR" :y1="padT + (innerH / 4) * (i-1)" :y2="padT + (innerH / 4) * (i-1)" stroke="#f0f0f0" stroke-width="1" />
           <text v-for="lbl in yLabels(shopMax)" :key="lbl.val" :x="padL - 8" :y="lbl.y" text-anchor="end" font-size="11" fill="#6b7280" font-family="Manrope,sans-serif">{{ fmtY(lbl.val) }}</text>
           <rect v-for="(d, i) in shopData" :key="i"
