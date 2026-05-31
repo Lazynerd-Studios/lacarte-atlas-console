@@ -95,7 +95,7 @@ function planBadge(p: string) {
   <div style="display:flex;flex-direction:column;gap:28px">
 
     <!-- Header -->
-    <div style="display:flex;align-items:center;justify-content:space-between">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
       <div>
         <h1 style="font-size:32px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;line-height:1.3;margin:0">Customer Analytics</h1>
         <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:8px;margin-bottom:0">Growth, retention, payment behaviour and customer insights</p>
@@ -111,7 +111,7 @@ function planBadge(p: string) {
     </div>
 
     <!-- Stat cards -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px">
+    <div class="grid-cols-4" style="gap:20px">
       <div v-for="s in stats" :key="s.label" style="background:white;border:1px solid #ececec;border-radius:16px;padding:20px 22px;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
           <div :style="`width:38px;height:38px;background:${s.iconBg};border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0`">
@@ -125,7 +125,7 @@ function planBadge(p: string) {
     </div>
 
     <!-- Charts row -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+    <div class="grid-cols-2" style="gap:24px">
 
       <!-- Customer Growth line -->
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
@@ -168,7 +168,7 @@ function planBadge(p: string) {
     </div>
 
     <!-- Plan distribution + Payment status -->
-    <div style="display:grid;grid-template-columns:220px 1fr;gap:24px">
+    <div class="grid-cols-2" style="gap:24px">
 
       <!-- Plan donut -->
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
@@ -223,7 +223,8 @@ function planBadge(p: string) {
     <!-- Top customers table -->
     <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
       <p style="font-size:18px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0 0 16px">Top Customers</p>
-      <table style="width:100%;border-collapse:collapse">
+      <div class="table-scroll">
+      <table style="width:100%;border-collapse:collapse;min-width:640px">
         <thead>
           <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
             <th style="padding:12px 16px;text-align:left;font-size:13px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Customer</th>
@@ -253,6 +254,7 @@ function planBadge(p: string) {
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
 
   </div>

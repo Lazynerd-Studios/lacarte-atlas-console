@@ -102,7 +102,7 @@ function completionColor(v: number) {
     </div>
 
     <!-- Summary stats -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px">
+    <div class="grid-cols-4" style="gap:20px">
       <div v-for="s in [
         { icon: 'lucide:map-pin',     iconBg: '#eff6ff', iconColor: '#3b82f6', label: 'Active Zones',      value: zones.length,              sub: 'all operational' },
         { icon: 'lucide:users',       iconBg: '#f0fdf4', iconColor: '#22c55e', label: 'Total Customers',   value: totalCustomers,            sub: 'across all zones' },
@@ -121,7 +121,7 @@ function completionColor(v: number) {
     </div>
 
     <!-- Charts row -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+    <div class="grid-cols-2" style="gap:24px">
 
       <!-- Pickups by zone bar -->
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
@@ -190,7 +190,8 @@ function completionColor(v: number) {
     <!-- Zone breakdown table -->
     <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
       <p style="font-size:16px;font-weight:600;color:#111;margin:0 0 16px">Zone Breakdown</p>
-      <table style="width:100%;border-collapse:collapse">
+      <div class="table-scroll">
+      <table style="width:100%;border-collapse:collapse;min-width:720px">
         <thead>
           <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
             <th style="padding:12px 16px;text-align:left;font-size:13px;font-weight:600;color:#374151">Zone</th>
@@ -236,6 +237,7 @@ function completionColor(v: number) {
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
 
   </div>
