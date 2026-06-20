@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SupportTicket } from '~/types/support'
+import type { SupportTicket, SupportTicketDetail, SupportTicketMessage, SupportTicketStatus } from '~/types/support'
 
 const props = defineProps<{
   ticket: SupportTicket
@@ -10,35 +10,49 @@ const emit = defineEmits<{
   (e: 'update', id: string, status: string): void
 }>()
 
+const api = useApi()
+
+const detail = ref<SupportTicketDetail | null>(null)
+const loading = ref(false)
 const reply = ref('')
 const newStatus = ref(apiStatusToModal(props.ticket.status))
+const sending = ref(false)
 
-const customerName = computed(() => props.ticket.customer?.name ?? 'Unknown')
-const customerEmail = computed(() => props.ticket.customer?.email ?? '')
-const customerPhone = computed(() => props.ticket.customer?.phoneNumber ?? '')
-const createdAt = computed(() => formatTicketDate(props.ticket.createdAt))
+const ticket = computed(() => detail.value ?? props.ticket)
 
-const messages = ref([
-  {
-    author: customerName.value,
-    initials: customerName.value.split(' ').map((n: string) => n[0]).join(''),
-    avatarBg: '#eff6ff',
-    avatarColor: '#3b82f6',
-    time: createdAt.value,
-    text: 'Hello, my waste bin was not picked up this morning as scheduled. My pickup was supposed to happen at 8 AM. Can someone please help?',
-    isStaff: false,
-  },
-])
+const customerName = computed(() => ticket.value.customer?.name ?? 'Unknown')
+const customerEmail = computed(() => ticket.value.customer?.email ?? '')
+const customerPhone = computed(() => ticket.value.customer?.phoneNumber ?? '')
+const createdAt = computed(() => formatTicketDate(ticket.value.createdAt))
+
+const messages = computed<SupportTicketMessage[]>(() => {
+  if (!detail.value?.messages || detail.value.messages.length === 0) return []
+  return detail.value.messages
+})
 
 function apiStatusToModal(status: string): string {
   return status === 'in_progress' ? 'in-progress' : status
 }
 
-function modalStatusToApi(status: string): string {
-  return status === 'in-progress' ? 'in_progress' : status
+function modalStatusToApi(status: string): SupportTicketStatus {
+  return (status === 'in-progress' ? 'in_progress' : status) as SupportTicketStatus
 }
 
 function formatTicketDate(dateString: string | null): string {
+  if (!dateString) return '—'
+  const date = new Date(dateString)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
+
+function formatMessageTime(dateString: string | null): string {
   if (!dateString) return ''
   const date = new Date(dateString)
   if (Number.isNaN(date.getTime())) return ''
@@ -59,19 +73,75 @@ function categoryLabel(category: string): string {
     .join(' ')
 }
 
-function sendReply() {
-  if (!reply.value.trim()) return
-  messages.value.push({
-    author: 'Admin',
-    initials: 'A',
-    avatarBg: '#fff9e6',
-    avatarColor: '#ffb400',
-    time: new Date().toLocaleString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
-    text: reply.value.trim(),
-    isStaff: true,
-  })
-  emit('update', props.ticket.id, modalStatusToApi(newStatus.value))
-  reply.value = ''
+function authorInitials(name: string): string {
+  return name
+    .split(' ')
+    .map(n => n[0])
+    .filter(Boolean)
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+}
+
+function isStaffMessage(message: SupportTicketMessage): boolean {
+  return message.authorType === 'staff' || message.authorType === 'admin'
+}
+
+function avatarStyle(message: SupportTicketMessage) {
+  return isStaffMessage(message)
+    ? { bg: '#fff9e6', color: '#ffb400' }
+    : { bg: '#eff6ff', color: '#3b82f6' }
+}
+
+async function fetchTicketDetail(silent = false) {
+  if (!silent) loading.value = true
+  const data = await api.get<SupportTicketDetail>(`/support/admin/tickets/${props.ticket.id}`, 'Failed to load ticket details')
+  if (data) {
+    detail.value = data
+    newStatus.value = apiStatusToModal(data.status)
+  }
+  if (!silent) loading.value = false
+}
+
+async function updateStatus() {
+  const previousStatus = ticket.value.status
+  const apiStatus = modalStatusToApi(newStatus.value)
+  const result = await api.patch<SupportTicket>(
+    `/support/admin/tickets/${ticket.value.id}/status`,
+    { status: apiStatus },
+    'Failed to update ticket status'
+  )
+  if (result) {
+    if (detail.value) detail.value.status = apiStatus
+    emit('update', ticket.value.id, apiStatus)
+  } else {
+    // Revert on failure to keep UI in sync with server
+    newStatus.value = apiStatusToModal(previousStatus)
+  }
+}
+
+async function sendReply() {
+  if (!reply.value.trim() || sending.value) return
+
+  sending.value = true
+  try {
+    const result = await api.post<SupportTicketMessage>(
+      `/support/admin/tickets/${ticket.value.id}/messages`,
+      {
+        message: reply.value.trim(),
+        status: modalStatusToApi(newStatus.value),
+      },
+      'Failed to send reply'
+    )
+
+    if (result) {
+      reply.value = ''
+      emit('update', ticket.value.id, modalStatusToApi(newStatus.value))
+      await fetchTicketDetail(true)
+    }
+  } finally {
+    sending.value = false
+  }
 }
 
 function priorityStyle(p: string) {
@@ -94,6 +164,10 @@ function statusLabel(s: string) {
 }
 
 const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
+
+onMounted(() => {
+  fetchTicketDetail()
+})
 </script>
 
 <template>
@@ -134,101 +208,101 @@ const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/
       <!-- Scrollable body -->
       <div style="flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:24px">
 
-        <!-- Customer Information -->
-        <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-          <p style="font-size:16px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0 0 12px">Customer Information</p>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-
-            <div style="display:flex;align-items:center;gap:12px">
-              <div style="width:40px;height:40px;border-radius:20px;background:#f9fafb;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                <UIcon name="i-lucide-user" style="width:20px;height:20px;color:#6b7280" />
-              </div>
-              <div>
-                <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0 0 2px">Name</p>
-                <p style="font-size:16px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ customerName }}</p>
-              </div>
-            </div>
-
-            <div style="display:flex;align-items:center;gap:12px">
-              <div style="width:40px;height:40px;border-radius:20px;background:#f9fafb;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                <UIcon name="i-lucide-mail" style="width:20px;height:20px;color:#6b7280" />
-              </div>
-              <div>
-                <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0 0 2px">Email</p>
-                <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ customerEmail || '—' }}</p>
-              </div>
-            </div>
-
-            <div style="display:flex;align-items:center;gap:12px">
-              <div style="width:40px;height:40px;border-radius:20px;background:#f9fafb;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                <UIcon name="i-lucide-phone" style="width:20px;height:20px;color:#6b7280" />
-              </div>
-              <div>
-                <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0 0 2px">Phone</p>
-                <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ customerPhone || '—' }}</p>
-              </div>
-            </div>
-
-            <div style="display:flex;align-items:center;gap:12px">
-              <div style="width:40px;height:40px;border-radius:20px;background:#f9fafb;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                <UIcon name="i-lucide-tag" style="width:20px;height:20px;color:#6b7280" />
-              </div>
-              <div>
-                <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0 0 2px">Category</p>
-                <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ categoryLabel(ticket.category) }}</p>
-              </div>
-            </div>
-
-          </div>
+        <!-- Loading -->
+        <div v-if="loading" style="padding:24px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">
+          Loading ticket details...
         </div>
 
-        <!-- Conversation -->
-        <div style="display:flex;flex-direction:column;gap:16px">
-          <p style="font-size:16px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Conversation</p>
+        <template v-else>
+          <!-- Customer Information -->
+          <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+            <p style="font-size:16px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0 0 12px">Customer Information</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
 
-          <div v-for="(msg, i) in messages" :key="i" style="display:flex;gap:12px;align-items:flex-start">
-            <div :style="`width:40px;height:40px;border-radius:20px;background:${msg.avatarBg};display:flex;align-items:center;justify-content:center;flex-shrink:0`">
-              <span :style="`font-size:16px;font-weight:500;color:${msg.avatarColor};font-family:'Manrope',sans-serif`">{{ msg.initials }}</span>
-            </div>
-            <div style="flex:1;background:#f9fafb;border-radius:16px;padding:16px">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                <span style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">{{ msg.author }}</span>
-                <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ msg.time }}</span>
+              <div style="display:flex;align-items:center;gap:12px">
+                <div style="width:40px;height:40px;border-radius:20px;background:#f9fafb;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                  <UIcon name="i-lucide-user" style="width:20px;height:20px;color:#6b7280" />
+                </div>
+                <div>
+                  <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0 0 2px">Name</p>
+                  <p style="font-size:16px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ customerName }}</p>
+                </div>
               </div>
-              <p style="font-size:14px;color:#111;font-family:'Manrope',sans-serif;line-height:1.6;margin:0">{{ msg.text }}</p>
+
+              <div style="display:flex;align-items:center;gap:12px">
+                <div style="width:40px;height:40px;border-radius:20px;background:#f9fafb;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                  <UIcon name="i-lucide-mail" style="width:20px;height:20px;color:#6b7280" />
+                </div>
+                <div>
+                  <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0 0 2px">Email</p>
+                  <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ customerEmail || '—' }}</p>
+                </div>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:12px">
+                <div style="width:40px;height:40px;border-radius:20px;background:#f9fafb;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                  <UIcon name="i-lucide-phone" style="width:20px;height:20px;color:#6b7280" />
+                </div>
+                <div>
+                  <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0 0 2px">Phone</p>
+                  <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ customerPhone || '—' }}</p>
+                </div>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:12px">
+                <div style="width:40px;height:40px;border-radius:20px;background:#f9fafb;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                  <UIcon name="i-lucide-tag" style="width:20px;height:20px;color:#6b7280" />
+                </div>
+                <div>
+                  <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0 0 2px">Category</p>
+                  <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ categoryLabel(ticket.category) }}</p>
+                </div>
+              </div>
+
             </div>
           </div>
-        </div>
 
-        <!-- Send Reply -->
-        <div style="display:flex;flex-direction:column;gap:12px">
-          <p style="font-size:16px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Send Reply</p>
+          <!-- Conversation -->
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <p style="font-size:16px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Conversation</p>
 
-          <textarea
-            v-model="reply"
-            placeholder="Type your response here..."
-            rows="4"
-            style="width:100%;padding:12px 16px;background:white;border:1px solid #ececec;border-radius:20px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;resize:none;box-sizing:border-box;line-height:1.6"
-            @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
-            @blur="($event.target as HTMLElement).style.borderColor='#ececec'"
-          />
+            <div v-if="messages.length === 0" style="padding:16px;background:#f9fafb;border-radius:16px;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;text-align:center">
+              No messages yet.
+            </div>
 
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <!-- Attach file (decorative) -->
-            <button
-              style="height:32px;padding:0 12px;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;border-radius:20px"
-              @mouseover="($event.currentTarget as HTMLElement).style.background='#f3f4f6'"
-              @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
-            >
-              <UIcon name="i-lucide-paperclip" style="width:16px;height:16px;color:#6b7280" />
-              Attach File
-            </button>
+            <div v-for="msg in messages" :key="msg.id" style="display:flex;gap:12px;align-items:flex-start">
+              <div :style="`width:40px;height:40px;border-radius:20px;background:${avatarStyle(msg).bg};display:flex;align-items:center;justify-content:center;flex-shrink:0`">
+                <span :style="`font-size:16px;font-weight:500;color:${avatarStyle(msg).color};font-family:'Manrope',sans-serif`">{{ authorInitials(msg.authorName) }}</span>
+              </div>
+              <div style="flex:1;background:#f9fafb;border-radius:16px;padding:16px">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                  <span style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">{{ msg.authorName }}</span>
+                  <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ formatMessageTime(msg.createdAt) }}</span>
+                </div>
+                <p style="font-size:14px;color:#111;font-family:'Manrope',sans-serif;line-height:1.6;margin:0;white-space:pre-wrap">{{ msg.message }}</p>
+              </div>
+            </div>
+          </div>
 
-            <div style="display:flex;align-items:center;gap:8px">
+          <!-- Send Reply -->
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <p style="font-size:16px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Send Reply</p>
+
+            <textarea
+              v-model="reply"
+              placeholder="Type your response here..."
+              rows="4"
+              style="width:100%;padding:12px 16px;background:white;border:1px solid #ececec;border-radius:20px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;resize:none;box-sizing:border-box;line-height:1.6"
+              @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+              @blur="($event.target as HTMLElement).style.borderColor='#ececec'"
+            />
+
+            <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px">
               <!-- Status change -->
               <select
                 v-model="newStatus"
                 :style="`height:42px;padding:0 32px 0 14px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 10px center;min-width:150px`"
+                @change="updateStatus"
               >
                 <option value="open">Mark Open</option>
                 <option value="in-progress">Mark In Progress</option>
@@ -238,18 +312,24 @@ const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/
 
               <!-- Send -->
               <button
-                :style="`height:42px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 1px 3px rgba(255,180,0,0.2);opacity:${reply.trim() ? '1' : '0.5'}`"
-                :disabled="!reply.trim()"
+                :style="`height:42px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 1px 3px rgba(255,180,0,0.2);opacity:${reply.trim() && !sending ? '1' : '0.5'}`"
+                :disabled="!reply.trim() || sending"
                 @click="sendReply"
               >
-                <UIcon name="i-lucide-send" style="width:16px;height:16px;color:white" />
-                Send Reply
+                <UIcon v-if="!sending" name="i-lucide-send" style="width:16px;height:16px;color:white" />
+                <span v-else style="width:16px;height:16px;border:2px solid rgba(255,255,255,0.4);border-top-color:white;border-radius:50%;display:inline-block;animation:spin 1s linear infinite"></span>
+                {{ sending ? 'Sending...' : 'Send Reply' }}
               </button>
             </div>
           </div>
-        </div>
-
+        </template>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+</style>

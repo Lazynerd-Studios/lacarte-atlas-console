@@ -132,6 +132,13 @@ async function fetchTickets() {
 }
 
 function applyFilters() {
+  // Keep tab indicator in sync with the status dropdown when it maps to a tab
+  if (statusFilter.value === 'all') activeTab.value = 'all'
+  else if (statusFilter.value === 'open') activeTab.value = 'open'
+  else if (statusFilter.value === 'in_progress') activeTab.value = 'in-progress'
+  else if (statusFilter.value === 'resolved') activeTab.value = 'resolved'
+  else activeTab.value = 'all'
+
   pagination.value.page = 1
   fetchTickets()
 }

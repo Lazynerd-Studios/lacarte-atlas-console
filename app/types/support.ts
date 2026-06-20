@@ -57,6 +57,22 @@ export interface Pagination {
   hasPreviousPage: boolean
 }
 
+/** Message within a support ticket conversation */
+export interface SupportTicketMessage {
+  id: string
+  ticketId: string
+  authorId: string
+  authorType: 'customer' | 'staff' | string
+  authorName: string
+  message: string
+  createdAt: string | null
+}
+
+/** Full ticket detail returned by /support/admin/tickets/{id} */
+export interface SupportTicketDetail extends SupportTicket {
+  messages: SupportTicketMessage[]
+}
+
 /** Paginated list response for /support/admin/tickets */
 export interface TicketListResponse {
   data: SupportTicket[]
