@@ -14,6 +14,32 @@ const connected = ref(false)
 
 let map: any = null
 let abortController: AbortController | null = null
+let iconsLoaded = false
+
+function truckIconSvg(color: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11.5" fill="${color}" stroke="white" stroke-width="1"/><path fill="white" d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zM18 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>`
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+}
+
+function loadTruckIcons(mapLibreMap: any): Promise<void> {
+  return new Promise((resolve) => {
+    const onlineImg = new Image()
+    const offlineImg = new Image()
+    let loaded = 0
+    const onLoad = () => {
+      if (++loaded === 2) {
+        mapLibreMap.addImage('truck-online', onlineImg, { pixelRatio: 2 })
+        mapLibreMap.addImage('truck-offline', offlineImg, { pixelRatio: 2 })
+        iconsLoaded = true
+        resolve()
+      }
+    }
+    onlineImg.onload = onLoad
+    offlineImg.onload = onLoad
+    onlineImg.src = truckIconSvg('#22c55e')
+    offlineImg.src = truckIconSvg('#9ca3af')
+  })
+}
 
 const driversList = computed(() => Array.from(drivers.value.values()))
 const onlineCount = computed(() => driversList.value.filter(d => d.isOnline).length)
@@ -57,8 +83,9 @@ async function initMap() {
 
     console.log('[Map] TomTomMap instance created')
 
-    map.mapLibreMap.on('load', () => {
+    map.mapLibreMap.on('load', async () => {
       console.log('[Map] Map loaded successfully')
+      await loadTruckIcons(map.mapLibreMap)
       loading.value = false
       updateMarkers()
     })
@@ -219,7 +246,7 @@ function connectSSE() {
         if (line.startsWith('data: ')) {
           try {
             const data = JSON.parse(line.slice(6))
-            if (data.driverId) {
+            if (data && data.driverId) {
               drivers.value.set(data.driverId, data)
               if (map?.mapLibreMap?.isStyleLoaded()) {
                 updateMarkers()

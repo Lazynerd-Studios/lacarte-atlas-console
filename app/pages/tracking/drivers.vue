@@ -221,7 +221,7 @@ function connectSSE() {
         if (line.startsWith('data: ')) {
           try {
             const data = JSON.parse(line.slice(6))
-            if (data.driverId) {
+            if (data && data.driverId) {
               drivers.value.set(data.driverId, data)
               if (map?.mapLibreMap?.isStyleLoaded()) {
                 updateMarkers()
