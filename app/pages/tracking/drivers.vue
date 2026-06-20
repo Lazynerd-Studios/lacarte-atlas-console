@@ -13,6 +13,7 @@ const mapError = ref('')
 const connected = ref(false)
 
 let map: any = null
+let eventSource: EventSource | null = null
 let abortController: AbortController | null = null
 
 const driversList = computed(() => Array.from(drivers.value.values()))
@@ -22,17 +23,18 @@ const offlineCount = computed(() => driversList.value.filter(d => !d.isOnline).l
 async function initMap() {
   const apiKey = config.public.tomtomApiKey
   console.log('[Map] API Key:', apiKey ? 'present' : 'missing')
-
+  
   if (!apiKey) {
     mapError.value = 'TomTom API key not configured. Set NUXT_PUBLIC_TOMTOM_API_KEY environment variable.'
     return
   }
 
+  // Wait for DOM to be ready
   await nextTick()
-
+  
   const container = document.getElementById('driver-map')
   console.log('[Map] Container:', container ? 'found' : 'not found')
-
+  
   if (!container) {
     mapError.value = 'Map container not found in DOM'
     return
@@ -264,7 +266,7 @@ onUnmounted(() => {
 
     <!-- Header -->
     <div>
-      <h1 style="font-size:32px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;line-height:1.3">Live Tracking</h1>
+      <h1 style="font-size:32px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;line-height:1.3">Driver Tracking</h1>
       <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:8px">Real-time location of all drivers on the map</p>
     </div>
 

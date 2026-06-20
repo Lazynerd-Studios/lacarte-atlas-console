@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Agent(Explore)"
+      "Agent(Explore)",
+      "Skill(tomtom-maps-sdk-js)",
+      "Bash(bun *)",
+      "Bash(dir *)",
+      "Bash(npx *)",
+      "Bash(findstr *)"
     ]
-  }
+  },
+  "$version": 4
 }

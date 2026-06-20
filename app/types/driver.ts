@@ -79,6 +79,17 @@ export interface Truck {
   notes?: string
 }
 
+export interface DriverTracking {
+  driverId: string
+  lng: number
+  lat: number
+  accuracy: number
+  speed: number
+  heading: number
+  recordedAt: string
+  isOnline: boolean
+}
+
 export interface CreateTruckPayload {
   truckId: string
   plateNumber: string

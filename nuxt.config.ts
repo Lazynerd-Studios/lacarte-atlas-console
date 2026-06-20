@@ -21,6 +21,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiBase: process.env.NUXT_PUBLIC_API_BASE || 'https://lacarte.lazynerdstudios.com/api',
+      tomtomApiKey: process.env.NUXT_PUBLIC_TOMTOM_API_KEY || '',
     },
   },
   router: {
@@ -28,10 +29,14 @@ export default defineNuxtConfig({
       strict: false,
     },
   },
-  // Apply auth middleware globally to all routes
+  vite: {
+    build: { target: 'esnext' },
+    optimizeDeps: { esbuildOptions: { target: 'esnext' } },
+  },
   routeRules: {
     '/login': { ssr: false },
     '/forgot-password': { ssr: false },
     '/pay/**': { ssr: false },
+    '/tracking/**': { ssr: false },
   },
 })
