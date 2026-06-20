@@ -1,16 +1,8 @@
 <script setup lang="ts">
+import type { SupportTicket } from '~/types/support'
+
 const props = defineProps<{
-  ticket: {
-    id: string
-    subject: string
-    customer: string
-    email: string
-    category: string
-    priority: string
-    status: string
-    created: string
-    phone?: string
-  }
+  ticket: SupportTicket
 }>()
 
 const emit = defineEmits<{
@@ -19,19 +11,53 @@ const emit = defineEmits<{
 }>()
 
 const reply = ref('')
-const newStatus = ref(props.ticket.status)
+const newStatus = ref(apiStatusToModal(props.ticket.status))
+
+const customerName = computed(() => props.ticket.customer?.name ?? 'Unknown')
+const customerEmail = computed(() => props.ticket.customer?.email ?? '')
+const customerPhone = computed(() => props.ticket.customer?.phoneNumber ?? '')
+const createdAt = computed(() => formatTicketDate(props.ticket.createdAt))
 
 const messages = ref([
   {
-    author: props.ticket.customer,
-    initials: props.ticket.customer.split(' ').map((n: string) => n[0]).join(''),
+    author: customerName.value,
+    initials: customerName.value.split(' ').map((n: string) => n[0]).join(''),
     avatarBg: '#eff6ff',
     avatarColor: '#3b82f6',
-    time: props.ticket.created,
+    time: createdAt.value,
     text: 'Hello, my waste bin was not picked up this morning as scheduled. My pickup was supposed to happen at 8 AM. Can someone please help?',
     isStaff: false,
   },
 ])
+
+function apiStatusToModal(status: string): string {
+  return status === 'in_progress' ? 'in-progress' : status
+}
+
+function modalStatusToApi(status: string): string {
+  return status === 'in-progress' ? 'in_progress' : status
+}
+
+function formatTicketDate(dateString: string | null): string {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
+
+function categoryLabel(category: string): string {
+  return category
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
 
 function sendReply() {
   if (!reply.value.trim()) return
@@ -44,7 +70,7 @@ function sendReply() {
     text: reply.value.trim(),
     isStaff: true,
   })
-  emit('update', props.ticket.id, newStatus.value)
+  emit('update', props.ticket.id, modalStatusToApi(newStatus.value))
   reply.value = ''
 }
 
@@ -57,13 +83,13 @@ function priorityStyle(p: string) {
 
 function statusStyle(s: string) {
   if (s === 'open')        return { bg: '#e5e7eb',             border: '#e5e7eb',             color: '#6b7280' }
-  if (s === 'in-progress') return { bg: 'rgba(255,180,0,0.1)', border: 'rgba(255,180,0,0.2)', color: '#d49a00' }
+  if (s === 'in-progress' || s === 'in_progress') return { bg: 'rgba(255,180,0,0.1)', border: 'rgba(255,180,0,0.2)', color: '#d49a00' }
   if (s === 'resolved')    return { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#22c55e' }
   return                          { bg: 'white',               border: '#ececec',             color: '#1a1a1a' }
 }
 
 function statusLabel(s: string) {
-  if (s === 'in-progress') return 'In Progress'
+  if (s === 'in_progress' || s === 'in-progress') return 'In Progress'
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
@@ -82,7 +108,7 @@ const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
           <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:0">
             <p style="font-size:20px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0;line-height:1.4">{{ ticket.subject }}</p>
-            <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">{{ ticket.id }} · Created {{ ticket.created }}</p>
+            <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">{{ ticket.ticketId }} · Created {{ createdAt }}</p>
           </div>
           <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
             <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 11px;background:${statusStyle(ticket.status).bg};border:1px solid ${statusStyle(ticket.status).border};color:${statusStyle(ticket.status).color};white-space:nowrap`">
@@ -119,7 +145,7 @@ const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/
               </div>
               <div>
                 <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0 0 2px">Name</p>
-                <p style="font-size:16px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ ticket.customer }}</p>
+                <p style="font-size:16px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ customerName }}</p>
               </div>
             </div>
 
@@ -129,7 +155,7 @@ const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/
               </div>
               <div>
                 <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0 0 2px">Email</p>
-                <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ ticket.email }}</p>
+                <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ customerEmail || '—' }}</p>
               </div>
             </div>
 
@@ -139,7 +165,7 @@ const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/
               </div>
               <div>
                 <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0 0 2px">Phone</p>
-                <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ ticket.phone || '(555) 123-4567' }}</p>
+                <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ customerPhone || '—' }}</p>
               </div>
             </div>
 
@@ -149,7 +175,7 @@ const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/
               </div>
               <div>
                 <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0 0 2px">Category</p>
-                <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ ticket.category }}</p>
+                <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ categoryLabel(ticket.category) }}</p>
               </div>
             </div>
 

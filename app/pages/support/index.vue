@@ -1,48 +1,173 @@
 <script setup lang="ts">
+import type { SupportTicket, SupportTicketStatus, SupportTicketPriority, SupportTicketCategory, TicketStats, TicketListResponse, Pagination } from '~/types/support'
+
 definePageMeta({ layout: 'dashboard' })
 
-const tickets = ref([
-  { id: 'TICK-001', subject: 'Missed Pickup - Urgent',              customer: 'John Doe',       email: 'john.doe@email.com',       category: 'Missed Pickup',    priority: 'urgent',  status: 'open',        created: '2026-03-02 09:30 AM' },
-  { id: 'TICK-002', subject: 'Billing Question - Invoice #INV-234', customer: 'Sarah Williams', email: 'sarah.w@email.com',        category: 'Billing',          priority: 'medium',  status: 'in-progress', created: '2026-03-01 02:15 PM' },
-  { id: 'TICK-003', subject: 'Request Additional Waste Bin',         customer: 'Michael Brown',  email: 'm.brown@email.com',        category: 'Service Request',  priority: 'low',     status: 'in-progress', created: '2026-02-28 11:00 AM' },
-  { id: 'TICK-004', subject: 'Damaged Bin Replacement',              customer: 'Emma Davis',     email: 'emma.davis@email.com',     category: 'Equipment Issue',  priority: 'high',    status: 'resolved',    created: '2026-02-27 04:45 PM' },
-  { id: 'TICK-005', subject: 'Change Pickup Schedule',               customer: 'David Wilson',   email: 'd.wilson@email.com',       category: 'Schedule Change',  priority: 'medium',  status: 'closed',      created: '2026-02-25 01:20 PM' },
-  { id: 'TICK-006', subject: 'Overcharged on Last Invoice',          customer: 'Ama Owusu',      email: 'ama.owusu@email.com',      category: 'Billing',          priority: 'high',    status: 'open',        created: '2026-03-03 08:10 AM' },
-  { id: 'TICK-007', subject: 'Bin Not Collected on Friday',          customer: 'Kwame Mensah',   email: 'kwame.m@email.com',        category: 'Missed Pickup',    priority: 'urgent',  status: 'in-progress', created: '2026-03-04 10:00 AM' },
-  { id: 'TICK-008', subject: 'Request for Larger Bin Size',          customer: 'Kofi Asante',    email: 'kofi.a@email.com',         category: 'Service Request',  priority: 'low',     status: 'resolved',    created: '2026-02-20 03:30 PM' },
+const api = useApi()
+
+// ── Filters ──
+const search = ref('')
+const statusFilter = ref<'all' | SupportTicketStatus>('all')
+const priorityFilter = ref<'all' | SupportTicketPriority>('all')
+const categoryFilter = ref<'all' | SupportTicketCategory>('all')
+const activeTab = ref<'all' | 'open' | 'in-progress' | 'resolved'>('all')
+
+const statusOptions: { label: string; value: 'all' | SupportTicketStatus }[] = [
+  { label: 'All Status', value: 'all' },
+  { label: 'Open', value: 'open' },
+  { label: 'In Progress', value: 'in_progress' },
+  { label: 'Resolved', value: 'resolved' },
+  { label: 'Closed', value: 'closed' },
+]
+
+const priorityOptions: { label: string; value: 'all' | SupportTicketPriority }[] = [
+  { label: 'All Priorities', value: 'all' },
+  { label: 'Low', value: 'low' },
+  { label: 'Medium', value: 'medium' },
+  { label: 'High', value: 'high' },
+  { label: 'Urgent', value: 'urgent' },
+]
+
+const categoryOptions: { label: string; value: 'all' | SupportTicketCategory }[] = [
+  { label: 'All Categories', value: 'all' },
+  { label: 'Missed Pickup', value: 'missed_pickup' },
+  { label: 'Billing', value: 'billing' },
+  { label: 'Service Request', value: 'service_request' },
+  { label: 'Equipment Issue', value: 'equipment_issue' },
+  { label: 'Schedule Change', value: 'schedule_change' },
+  { label: 'Other', value: 'other' },
+]
+
+// ── Data ──
+const tickets = ref<SupportTicket[]>([])
+const pagination = ref<Pagination>({
+  page: 1,
+  limit: 20,
+  total: 0,
+  totalPages: 0,
+  hasNextPage: false,
+  hasPreviousPage: false,
+})
+const loading = ref(false)
+const initialLoading = ref(true)
+
+// ── Stats ──
+const ticketStats = ref<TicketStats>({
+  openTickets: 0,
+  inProgressTickets: 0,
+  resolvedToday: 0,
+  avgResponseHours: 0,
+})
+const statsLoading = ref(false)
+
+// ── Tabs ──
+const tabs = computed(() => [
+  { key: 'all', label: 'All Tickets', count: pagination.value.total },
+  { key: 'open', label: 'Open', count: ticketStats.value.openTickets },
+  { key: 'in-progress', label: 'In Progress', count: ticketStats.value.inProgressTickets },
+  { key: 'resolved', label: 'Resolved', count: activeTab.value === 'resolved' ? pagination.value.total : undefined },
 ])
 
-const search = ref('')
-const statusFilter = ref('All Status')
-const activeTab = ref('All Tickets')
+function setTab(key: 'all' | 'open' | 'in-progress' | 'resolved') {
+  activeTab.value = key
+  statusFilter.value = key === 'all' ? 'all' : key === 'in-progress' ? 'in_progress' : key
+  pagination.value.page = 1
+  fetchTickets()
+}
 
-const statuses = ['All Status', 'Open', 'In Progress', 'Resolved', 'Closed']
+function isTabActive(key: string) {
+  return activeTab.value === key
+}
 
-const tabCounts = computed(() => ({
-  all: tickets.value.length,
-  open: tickets.value.filter(t => t.status === 'open').length,
-  inProgress: tickets.value.filter(t => t.status === 'in-progress').length,
-  resolved: tickets.value.filter(t => t.status === 'resolved').length,
-}))
+// ── Fetching ──
+async function fetchTicketStats() {
+  statsLoading.value = true
+  const data = await api.get<TicketStats>('/support/admin/tickets/stats', 'Failed to load ticket stats')
+  if (data) {
+    ticketStats.value = {
+      openTickets: data.openTickets ?? 0,
+      inProgressTickets: data.inProgressTickets ?? 0,
+      resolvedToday: data.resolvedToday ?? 0,
+      avgResponseHours: data.avgResponseHours ?? 0,
+    }
+  }
+  statsLoading.value = false
+}
 
-const filtered = computed(() => {
-  return tickets.value.filter(t => {
-    const q = search.value.toLowerCase()
-    const matchSearch = !q || t.subject.toLowerCase().includes(q) || t.customer.toLowerCase().includes(q) || t.id.toLowerCase().includes(q)
-    const matchStatus = statusFilter.value === 'All Status' || t.status === statusFilter.value.toLowerCase().replace(' ', '-')
-    const matchTab =
-      activeTab.value === 'All Tickets' ||
-      (activeTab.value === 'Open' && t.status === 'open') ||
-      (activeTab.value === 'In Progress' && t.status === 'in-progress') ||
-      (activeTab.value === 'Resolved' && t.status === 'resolved')
-    return matchSearch && matchStatus && matchTab
-  })
+async function fetchTickets() {
+  loading.value = true
+  try {
+    const params = new URLSearchParams({
+      page: pagination.value.page.toString(),
+      limit: pagination.value.limit.toString(),
+    })
+
+    if (statusFilter.value !== 'all') {
+      params.append('status', statusFilter.value)
+    }
+    if (priorityFilter.value !== 'all') {
+      params.append('priority', priorityFilter.value)
+    }
+    if (categoryFilter.value !== 'all') {
+      params.append('category', categoryFilter.value)
+    }
+    if (search.value.trim()) {
+      params.append('search', search.value.trim())
+    }
+
+    const data = await api.get<TicketListResponse>(
+      `/support/admin/tickets?${params.toString()}`,
+      'Failed to load tickets'
+    )
+
+    if (data) {
+      tickets.value = data.data || []
+      if (data.pagination) {
+        pagination.value = data.pagination
+      }
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
+function applyFilters() {
+  pagination.value.page = 1
+  fetchTickets()
+}
+
+function goToPage(page: number) {
+  pagination.value.page = page
+  fetchTickets()
+}
+
+onMounted(async () => {
+  initialLoading.value = true
+  await Promise.all([fetchTicketStats(), fetchTickets()])
+  initialLoading.value = false
 })
 
-// Stat cards
-const openCount = computed(() => tickets.value.filter(t => t.status === 'open').length)
-const inProgressCount = computed(() => tickets.value.filter(t => t.status === 'in-progress').length)
-const resolvedTodayCount = computed(() => tickets.value.filter(t => t.status === 'resolved').length)
+// ── Display helpers ──
+function formatDate(dateString: string | null): string {
+  if (!dateString) return '—'
+  const date = new Date(dateString)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
+
+function categoryLabel(category: string): string {
+  return category
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
 
 function priorityStyle(p: string) {
   if (p === 'urgent') return { bg: '#fef2f2', color: '#dc2626' }
@@ -53,50 +178,43 @@ function priorityStyle(p: string) {
 
 function statusStyle(s: string) {
   if (s === 'open')        return { bg: '#e5e7eb',              border: '#e5e7eb',              color: '#6b7280' }
-  if (s === 'in-progress') return { bg: 'rgba(255,180,0,0.1)',  border: 'rgba(255,180,0,0.2)',  color: '#d49a00' }
+  if (s === 'in_progress') return { bg: 'rgba(255,180,0,0.1)',  border: 'rgba(255,180,0,0.2)',  color: '#d49a00' }
   if (s === 'resolved')    return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e' }
   return                          { bg: 'white',                border: '#ececec',              color: '#1a1a1a' }
 }
 
 function statusLabel(s: string) {
-  if (s === 'in-progress') return 'In Progress'
+  if (s === 'in_progress') return 'In Progress'
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
 
-const tabs = computed(() => [
-  `All Tickets (${tabCounts.value.all})`,
-  `Open (${tabCounts.value.open})`,
-  `In Progress (${tabCounts.value.inProgress})`,
-  `Resolved (${tabCounts.value.resolved})`,
-])
+// ── Stats cards ──
+const openCount = computed(() => (statsLoading.value ? undefined : ticketStats.value.openTickets))
+const inProgressCount = computed(() => (statsLoading.value ? undefined : ticketStats.value.inProgressTickets))
+const resolvedTodayCount = computed(() => (statsLoading.value ? undefined : ticketStats.value.resolvedToday))
+const avgResponseHours = computed(() => {
+  if (statsLoading.value) return undefined
+  const hours = ticketStats.value.avgResponseHours
+  if (hours === undefined || hours === null || Number.isNaN(hours)) return '—'
+  return `${Number(hours).toFixed(1)} hours`
+})
 
-function setTab(label: string) {
-  if (label.startsWith('All')) activeTab.value = 'All Tickets'
-  else if (label.startsWith('Open')) activeTab.value = 'Open'
-  else if (label.startsWith('In')) activeTab.value = 'In Progress'
-  else activeTab.value = 'Resolved'
-}
-
-function isTabActive(label: string) {
-  if (label.startsWith('All')) return activeTab.value === 'All Tickets'
-  if (label.startsWith('Open')) return activeTab.value === 'Open'
-  if (label.startsWith('In')) return activeTab.value === 'In Progress'
-  return activeTab.value === 'Resolved'
-}
-
+// ── Modal ──
 const showTicketModal = ref(false)
-const selectedTicket = ref<typeof tickets.value[0] | null>(null)
+const selectedTicket = ref<SupportTicket | null>(null)
 
-function openTicket(t: typeof tickets.value[0]) {
+function openTicket(t: SupportTicket) {
   selectedTicket.value = t
   showTicketModal.value = true
 }
 
 function handleTicketUpdate(id: string, status: string) {
   const t = tickets.value.find(t => t.id === id)
-  if (t) t.status = status
+  if (t) {
+    t.status = status as SupportTicketStatus
+  }
 }
 </script>
 
@@ -118,7 +236,7 @@ function handleTicketUpdate(id: string, status: string) {
             <UIcon name="i-lucide-ticket" style="width:20px;height:20px;color:#3b82f6" />
           </div>
           <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0 0 4px">Open Tickets</p>
-          <p style="font-size:24px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ openCount }}</p>
+          <p style="font-size:24px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ statsLoading ? '...' : openCount }}</p>
         </div>
       </div>
 
@@ -128,7 +246,7 @@ function handleTicketUpdate(id: string, status: string) {
             <UIcon name="i-lucide-clock" style="width:20px;height:20px;color:#ffb400" />
           </div>
           <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0 0 4px">In Progress</p>
-          <p style="font-size:24px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ inProgressCount }}</p>
+          <p style="font-size:24px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ statsLoading ? '...' : inProgressCount }}</p>
         </div>
       </div>
 
@@ -138,7 +256,7 @@ function handleTicketUpdate(id: string, status: string) {
             <UIcon name="i-lucide-check-circle" style="width:20px;height:20px;color:#22c55e" />
           </div>
           <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0 0 4px">Resolved Today</p>
-          <p style="font-size:24px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ resolvedTodayCount }}</p>
+          <p style="font-size:24px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ statsLoading ? '...' : resolvedTodayCount }}</p>
         </div>
       </div>
 
@@ -148,7 +266,7 @@ function handleTicketUpdate(id: string, status: string) {
             <UIcon name="i-lucide-timer" style="width:20px;height:20px;color:#8b5cf6" />
           </div>
           <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0 0 4px">Avg Response</p>
-          <p style="font-size:24px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;margin:0">2.5 hours</p>
+          <p style="font-size:24px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;margin:0">{{ statsLoading ? '...' : avgResponseHours }}</p>
         </div>
       </div>
 
@@ -156,7 +274,7 @@ function handleTicketUpdate(id: string, status: string) {
 
     <!-- Search + filter bar -->
     <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-      <div style="display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center">
+      <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:12px;align-items:center">
         <div style="position:relative">
           <UIcon name="i-lucide-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#6b7280" />
           <input
@@ -166,13 +284,29 @@ function handleTicketUpdate(id: string, status: string) {
             style="width:100%;height:42px;padding:0 16px 0 40px;background:#f9fafb;border:1px solid #ececec;border-radius:20px;font-size:14px;color:#111;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box"
             @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
             @blur="($event.target as HTMLElement).style.borderColor='#ececec'"
+            @keyup.enter="applyFilters"
           />
         </div>
         <select
           v-model="statusFilter"
-          :style="`height:42px;padding:0 36px 0 14px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;min-width:180px`"
+          :style="`height:42px;padding:0 36px 0 14px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;min-width:150px`"
+          @change="applyFilters"
         >
-          <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
+          <option v-for="s in statusOptions" :key="s.value" :value="s.value">{{ s.label }}</option>
+        </select>
+        <select
+          v-model="priorityFilter"
+          :style="`height:42px;padding:0 36px 0 14px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;min-width:150px`"
+          @change="applyFilters"
+        >
+          <option v-for="p in priorityOptions" :key="p.value" :value="p.value">{{ p.label }}</option>
+        </select>
+        <select
+          v-model="categoryFilter"
+          :style="`height:42px;padding:0 36px 0 14px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;min-width:170px`"
+          @change="applyFilters"
+        >
+          <option v-for="c in categoryOptions" :key="c.value" :value="c.value">{{ c.label }}</option>
         </select>
       </div>
     </div>
@@ -184,10 +318,13 @@ function handleTicketUpdate(id: string, status: string) {
       <div style="padding:24px 24px 0;border-bottom:1px solid #e5e7eb;display:flex;gap:0">
         <button
           v-for="tab in tabs"
-          :key="tab"
-          :style="`padding:12px 16px 14px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:500;font-family:'Manrope',sans-serif;white-space:nowrap;border-bottom:2px solid ${isTabActive(tab) ? '#ffb400' : 'transparent'};color:${isTabActive(tab) ? '#1a1a1a' : '#6b7280'};margin-bottom:-1px`"
-          @click="setTab(tab)"
-        >{{ tab }}</button>
+          :key="tab.key"
+          :style="`padding:12px 16px 14px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:500;font-family:'Manrope',sans-serif;white-space:nowrap;border-bottom:2px solid ${isTabActive(tab.key) ? '#ffb400' : 'transparent'};color:${isTabActive(tab.key) ? '#1a1a1a' : '#6b7280'};margin-bottom:-1px`"
+          @click="setTab(tab.key as any)"
+        >
+          {{ tab.label }}
+          <span v-if="typeof tab.count === 'number'" style="margin-left:6px;padding:2px 8px;background:#f3f4f6;border-radius:12px;font-size:12px;color:#6b7280">{{ tab.count }}</span>
+        </button>
       </div>
 
       <!-- Table -->
@@ -206,47 +343,62 @@ function handleTicketUpdate(id: string, status: string) {
             </tr>
           </thead>
           <tbody>
-            <tr
-              v-for="t in filtered"
-              :key="t.id"
-              style="border-bottom:1px solid #e5e7eb"
-              @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
-              @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
-            >
-              <td style="padding:18px 14px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ t.id }}</td>
-              <td style="padding:18px 16px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.subject }}</td>
-              <td style="padding:18px 16px">
-                <div style="display:flex;flex-direction:column;gap:2px">
-                  <span style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;white-space:nowrap">{{ t.customer }}</span>
-                  <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;white-space:nowrap">{{ t.email }}</span>
-                </div>
-              </td>
-              <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ t.category }}</td>
-              <td style="padding:18px 16px">
-                <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:16px;padding:4px 8px;white-space:nowrap;background:${priorityStyle(t.priority).bg};color:${priorityStyle(t.priority).color}`">
-                  {{ t.priority.charAt(0).toUpperCase() + t.priority.slice(1) }}
-                </span>
-              </td>
-              <td style="padding:18px 16px">
-                <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;background:${statusStyle(t.status).bg};border:1px solid ${statusStyle(t.status).border};color:${statusStyle(t.status).color}`">
-                  {{ statusLabel(t.status) }}
-                </span>
-              </td>
-              <td style="padding:18px 16px;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;white-space:nowrap">{{ t.created }}</td>
-              <td style="padding:18px 16px;text-align:right">
-                <button
-                  style="height:32px;padding:0 14px;background:#ececec;border:none;border-radius:20px;font-size:13px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer;white-space:nowrap"
-                  @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
-                  @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
-                  @click="openTicket(t)"
-                >View Details</button>
-              </td>
+            <tr v-if="loading || initialLoading">
+              <td colspan="8" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Loading tickets...</td>
             </tr>
-            <tr v-if="filtered.length === 0">
-              <td colspan="8" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No tickets found</td>
-            </tr>
+            <template v-else>
+              <tr
+                v-for="t in tickets"
+                :key="t.id"
+                style="border-bottom:1px solid #e5e7eb"
+                @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
+                @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
+              >
+                <td style="padding:18px 14px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ t.ticketId }}</td>
+                <td style="padding:18px 16px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.subject }}</td>
+                <td style="padding:18px 16px">
+                  <div style="display:flex;flex-direction:column;gap:2px">
+                    <span style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;white-space:nowrap">{{ t.customer?.name || '—' }}</span>
+                    <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;white-space:nowrap">{{ t.customer?.email || '—' }}</span>
+                  </div>
+                </td>
+                <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ categoryLabel(t.category) }}</td>
+                <td style="padding:18px 16px">
+                  <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:16px;padding:4px 8px;white-space:nowrap;background:${priorityStyle(t.priority).bg};color:${priorityStyle(t.priority).color}`">
+                    {{ t.priority.charAt(0).toUpperCase() + t.priority.slice(1) }}
+                  </span>
+                </td>
+                <td style="padding:18px 16px">
+                  <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;background:${statusStyle(t.status).bg};border:1px solid ${statusStyle(t.status).border};color:${statusStyle(t.status).color}`">
+                    {{ statusLabel(t.status) }}
+                  </span>
+                </td>
+                <td style="padding:18px 16px;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;white-space:nowrap">{{ formatDate(t.createdAt) }}</td>
+                <td style="padding:18px 16px;text-align:right">
+                  <button
+                    style="height:32px;padding:0 14px;background:#ececec;border:none;border-radius:20px;font-size:13px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer;white-space:nowrap"
+                    @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
+                    @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
+                    @click="openTicket(t)"
+                  >View Details</button>
+                </td>
+              </tr>
+              <tr v-if="tickets.length === 0">
+                <td colspan="8" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No tickets found</td>
+              </tr>
+            </template>
           </tbody>
         </table>
+      </div>
+
+      <!-- Pagination -->
+      <div v-if="!loading && !initialLoading && tickets.length > 0" style="padding:16px 24px;border-top:1px solid #e5e7eb">
+        <AppPagination
+          :page="pagination.page"
+          :total="pagination.total"
+          :per-page="pagination.limit"
+          @update:page="goToPage"
+        />
       </div>
     </div>
 
