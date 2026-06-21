@@ -31,7 +31,10 @@ export default defineNuxtConfig({
   },
   vite: {
     build: { target: 'esnext' },
-    optimizeDeps: { esbuildOptions: { target: 'esnext' } },
+    optimizeDeps: {
+      include: ['xlsx'],
+      esbuildOptions: { target: 'esnext' },
+    },
   },
   routeRules: {
     '/login': { ssr: false },

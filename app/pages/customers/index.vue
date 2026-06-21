@@ -1,19 +1,74 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'dashboard' })
 
+const toast = useAppToast()
+const api = useApi()
+
 const showModal = ref(false)
 const showSuspendModal = ref(false)
+const showUnsuspendConfirm = ref(false)
 const selectedCustomer = ref<any | null>(null)
+const suspending = ref(false)
+const unsuspending = ref(false)
 
 function openSuspend(c: any) {
   selectedCustomer.value = c
   showSuspendModal.value = true
 }
 
-function handleSuspend(reason: string) {
-  console.log('Suspend', selectedCustomer.value?.user?.name, 'reason:', reason)
-  showSuspendModal.value = false
-  selectedCustomer.value = null
+function openUnsuspend(c: any) {
+  selectedCustomer.value = c
+  showUnsuspendConfirm.value = true
+}
+
+async function handleSuspend(reason: string) {
+  if (!reason.trim()) {
+    toast.error('Please provide a reason for suspension')
+    return
+  }
+
+  if (!selectedCustomer.value) return
+
+  suspending.value = true
+  const result = await api.patch<{ success: boolean; message?: string }>(
+    `/customer/admin/${selectedCustomer.value.id}/suspend`,
+    { reason: reason.trim() },
+    'Failed to suspend account'
+  )
+  suspending.value = false
+
+  if (result) {
+    updateCustomerStatus(selectedCustomer.value.id, 'inactive')
+    toast.success(result.message || 'Account suspended successfully')
+    showSuspendModal.value = false
+    selectedCustomer.value = null
+  }
+}
+
+async function handleUnsuspend() {
+  if (!selectedCustomer.value) return
+
+  unsuspending.value = true
+  const result = await api.patch<{ success: boolean; message?: string }>(
+    `/customer/admin/${selectedCustomer.value.id}/unsuspend`,
+    {},
+    'Failed to unsuspend account'
+  )
+  unsuspending.value = false
+
+  if (result) {
+    updateCustomerStatus(selectedCustomer.value.id, 'active')
+    toast.success(result.message || 'Account unsuspended successfully')
+    showUnsuspendConfirm.value = false
+    selectedCustomer.value = null
+  }
+}
+
+function updateCustomerStatus(id: string, status: string) {
+  const idx = customers.value.findIndex((c) => c.id === id)
+  if (idx !== -1) {
+    customers.value[idx].status = status
+  }
 }
 
 const search = ref('')
@@ -23,6 +78,7 @@ const planFilter = ref('all')
 const customers = ref<any[]>([])
 const total = ref(0)
 const loading = ref(true)
+const downloading = ref(false)
 const page = ref(1)
 const perPage = 20
 
@@ -60,6 +116,45 @@ function planBadge(plan: string | undefined) {
   return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: plan }
 }
 
+function formatPlanLabel(plan: string | undefined): string {
+  return planBadge(plan).label
+}
+
+async function downloadExcel() {
+  if (!customers.value.length) {
+    toast.error('No customers to export')
+    return
+  }
+
+  downloading.value = true
+  try {
+    const XLSX = await import('xlsx')
+
+    const rows = customers.value.map((c) => ({
+      Name: c.user?.name ?? '—',
+      Phone: c.phoneNumber ?? '—',
+      Address: c.address ?? '—',
+      Plan: formatPlanLabel(c.customerType?.name),
+      'Last Pickup': c.lastPickup ?? '—',
+      Balance: c.balance ?? 0,
+      Status: c.status ?? '—',
+    }))
+
+    const worksheet = XLSX.utils.json_to_sheet(rows)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Customers')
+
+    const date = new Date().toISOString().split('T')[0]
+    XLSX.writeFile(workbook, `customers-${date}.xlsx`)
+
+    toast.success('Customers exported successfully')
+  } catch (err: any) {
+    toast.error('Failed to export customers', err.message)
+  } finally {
+    downloading.value = false
+  }
+}
+
 function statusBadge(status: string) {
   if (status === 'active')   return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e', label: 'active' }
   if (status === 'overdue')  return { bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.2)',  color: '#ef4444', label: 'overdue' }
@@ -88,7 +183,7 @@ function statusBadge(status: string) {
 
     <!-- Filters card -->
     <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:25px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto auto;gap:16px;align-items:center" class="filters-grid">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:16px;align-items:center" class="filters-grid">
         <!-- Search -->
         <div style="position:relative">
           <UIcon name="i-lucide-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#6b7280" />
@@ -129,15 +224,17 @@ function statusBadge(status: string) {
           <UIcon name="i-lucide-chevron-down" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#6b7280;pointer-events:none" />
         </div>
 
-        <!-- Filter -->
-        <button style="height:42px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap">
-          <UIcon name="i-lucide-sliders-horizontal" style="width:16px;height:16px;color:#111" />
-          Filter
-        </button>
-
         <!-- Export -->
-        <button style="width:48px;height:42px;background:#ececec;border:none;border-radius:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <UIcon name="i-lucide-download" style="width:16px;height:16px;color:#111" />
+        <button
+          :disabled="downloading"
+          style="width:48px;height:42px;background:#ececec;border:none;border-radius:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;opacity:1"
+          title="Download Excel"
+          @click="downloadExcel"
+        >
+          <UIcon
+            :name="downloading ? 'i-lucide-loader-2' : 'i-lucide-download'"
+            :style="`width:16px;height:16px;color:#111;${downloading ? 'animation:spin 1s linear infinite' : ''}`"
+          />
         </button>
       </div>
     </div>
@@ -195,13 +292,16 @@ function statusBadge(status: string) {
                   </button>
                 </NuxtLink>
                 <button
-                  style="width:32px;height:32px;border-radius:20px;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center"
-                  title="Suspend"
-                  @click="openSuspend(c)"
-                  @mouseover="($event.currentTarget as HTMLElement).style.background='#fef2f2'"
-                  @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
+                  :title="c.status === 'active' ? 'Suspend' : 'Unsuspend'"
+                  :style="`width:32px;height:32px;border-radius:20px;background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer`"
+                  @click="c.status === 'active' ? openSuspend(c) : openUnsuspend(c)"
+                  @mouseover="($event.currentTarget as HTMLElement).style.background = c.status === 'active' ? '#fef2f2' : '#f0fdf4'"
+                  @mouseleave="($event.currentTarget as HTMLElement).style.background = 'transparent'"
                 >
-                  <UIcon name="i-lucide-user-x" style="width:16px;height:16px;color:#ef4444" />
+                  <UIcon
+                    :name="c.status === 'active' ? 'i-lucide-user-x' : 'i-lucide-user-check'"
+                    :style="`width:16px;height:16px;color:${c.status === 'active' ? '#ef4444' : '#22c55e'}`"
+                  />
                 </button>
               </div>
             </td>
@@ -226,7 +326,20 @@ function statusBadge(status: string) {
   <SuspendModal
     v-if="showSuspendModal && selectedCustomer"
     :customer-name="selectedCustomer.user?.name ?? selectedCustomer.name"
+    :loading="suspending"
     @close="showSuspendModal = false"
     @confirm="handleSuspend"
+  />
+
+  <!-- Unsuspend Confirm Dialog -->
+  <ConfirmDialog
+    v-if="showUnsuspendConfirm && selectedCustomer"
+    title="Unsuspend Account"
+    :message="`Are you sure you want to reactivate ${selectedCustomer.user?.name ?? selectedCustomer.name}'s account?`"
+    confirm-text="Unsuspend Account"
+    confirm-color="#22c55e"
+    :loading="unsuspending"
+    @confirm="handleUnsuspend"
+    @cancel="showUnsuspendConfirm = false"
   />
 </template>

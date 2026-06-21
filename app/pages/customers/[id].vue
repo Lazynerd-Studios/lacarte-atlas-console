@@ -49,6 +49,7 @@ const statusBadge = computed(() => {
 })
 
 const showSuspendModal = ref(false)
+const showUnsuspendConfirm = ref(false)
 const showEditModal = ref(false)
 
 async function handleSuspend(reason: string) {
@@ -69,6 +70,22 @@ async function handleSuspend(reason: string) {
     customer.value.status = 'inactive'
     showSuspendModal.value = false
     toast.success(result.message || 'Account suspended successfully')
+  }
+}
+
+async function handleUnsuspend() {
+  suspending.value = true
+  const result = await api.patch<{ success: boolean; message?: string }>(
+    `/customer/admin/${route.params.id}/unsuspend`,
+    {},
+    'Failed to unsuspend account'
+  )
+  suspending.value = false
+
+  if (result) {
+    customer.value.status = 'active'
+    showUnsuspendConfirm.value = false
+    toast.success(result.message || 'Account unsuspended successfully')
   }
 }
 
@@ -232,11 +249,10 @@ function addStaffNote() {
             Edit Customer
           </button>
           <button
-            :disabled="isSuspended()"
-            :style="`height:40px;padding:0 16px;background:#ef4444;border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:${isSuspended() ? 'not-allowed' : 'pointer'};opacity:${isSuspended() ? '0.5' : '1'}`"
-            @click="showSuspendModal = true"
+            :style="`height:40px;padding:0 16px;background:${isSuspended() ? '#22c55e' : '#ef4444'};border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:pointer`"
+            @click="isSuspended() ? (showUnsuspendConfirm = true) : (showSuspendModal = true)"
           >
-            {{ isSuspended() ? 'Account Suspended' : 'Suspend Account' }}
+            {{ isSuspended() ? 'Unsuspend Account' : 'Suspend Account' }}
           </button>
         </div>
       </div>
@@ -662,6 +678,18 @@ function addStaffNote() {
     :loading="suspending"
     @close="showSuspendModal = false"
     @confirm="handleSuspend"
+  />
+
+  <!-- Unsuspend Account Confirm Dialog -->
+  <ConfirmDialog
+    v-if="showUnsuspendConfirm"
+    title="Unsuspend Account"
+    :message="`Are you sure you want to reactivate ${customer.firstName} ${customer.lastName}'s account?`"
+    confirm-text="Unsuspend Account"
+    confirm-color="#22c55e"
+    :loading="suspending"
+    @confirm="handleUnsuspend"
+    @cancel="showUnsuspendConfirm = false"
   />
 
   <!-- Edit Customer Modal -->
