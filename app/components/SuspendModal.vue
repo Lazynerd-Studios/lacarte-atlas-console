@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const props = defineProps<{ customerName: string }>()
+const props = defineProps<{ customerName: string; loading?: boolean }>()
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'confirm', reason: string): void
@@ -62,9 +62,12 @@ function confirm() {
           @click="emit('close')"
         >Cancel</button>
         <button
-          style="height:40px;padding:0 20px;background:#ef4444;border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:pointer"
+          :disabled="props.loading"
+          :style="`height:40px;padding:0 20px;background:#ef4444;border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:pointer;opacity:${props.loading ? '0.6' : '1'}`"
           @click="confirm"
-        >Suspend Account</button>
+        >
+          {{ props.loading ? 'Suspending...' : 'Suspend Account' }}
+        </button>
       </div>
     </div>
   </div>

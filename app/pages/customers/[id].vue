@@ -2,9 +2,12 @@
 definePageMeta({ layout: 'dashboard' })
 
 const { format } = useCurrency()
+const api = useApi()
+const route = useRoute()
+const toast = useAppToast()
 
-// Mock customer data — replace with API call using useRoute().params.id
-const customer = {
+// Mock customer data — replace with API call using route.params.id
+const customer = ref({
   id: 'CUST-2025-1',
   firstName: 'Sarah',
   lastName: 'Johnson',
@@ -33,23 +36,40 @@ const customer = {
   gpsLng: -0.1870,
   gpsLastUpdated: '2026-03-07 08:42 AM',
   gpsAddress: '123 Oak Street, Downtown, Accra',
-}
+})
 
-const initials = computed(() => `${customer.firstName[0]}${customer.lastName[0]}`)
+const suspending = ref(false)
+
+const initials = computed(() => `${customer.value.firstName[0]}${customer.value.lastName[0]}`)
 
 const statusBadge = computed(() => {
-  if (customer.status === 'active')   return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e', label: 'Active' }
-  if (customer.status === 'overdue')  return { bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.2)',  color: '#ef4444', label: 'Overdue' }
+  if (customer.value.status === 'active')   return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e', label: 'Active' }
+  if (customer.value.status === 'overdue')  return { bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.2)',  color: '#ef4444', label: 'Overdue' }
   return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: 'Inactive' }
 })
 
 const showSuspendModal = ref(false)
 const showEditModal = ref(false)
 
-function handleSuspend(reason: string) {
-  // TODO: call API to suspend customer
-  console.log('Suspend reason:', reason)
-  showSuspendModal.value = false
+async function handleSuspend(reason: string) {
+  if (!reason.trim()) {
+    toast.error('Please provide a reason for suspension')
+    return
+  }
+
+  suspending.value = true
+  const result = await api.patch<{ success: boolean; message?: string }>(
+    `/customer/admin/${route.params.id}/suspend`,
+    { reason: reason.trim() },
+    'Failed to suspend account'
+  )
+  suspending.value = false
+
+  if (result) {
+    customer.value.status = 'inactive'
+    showSuspendModal.value = false
+    toast.success(result.message || 'Account suspended successfully')
+  }
 }
 
 function handleEditCustomer(data: Record<string, unknown>) {
@@ -58,16 +78,20 @@ function handleEditCustomer(data: Record<string, unknown>) {
   showEditModal.value = false
 }
 
+function isSuspended() {
+  return customer.value.status !== 'active'
+}
+
 function downloadQR() {
   // TODO: generate and download QR code for customer
-  console.log('Download QR for', customer.id)
+  console.log('Download QR for', customer.value.id)
 }
 
 const linkCopied = ref(false)
 let copyTimeout: ReturnType<typeof setTimeout> | null = null
 
 function copyPaymentLink() {
-  const url = `${window.location.origin}/pay/${customer.id}`
+  const url = `${window.location.origin}/pay/${customer.value.id}`
   navigator.clipboard.writeText(url)
   linkCopied.value = true
   if (copyTimeout) clearTimeout(copyTimeout)
@@ -113,7 +137,7 @@ const newStaffNote = ref('')
 
 function addCustomerNote() {
   if (!newCustomerNote.value.trim()) return
-  customerNotes.value.unshift({ date: new Date().toISOString().slice(0, 10), author: `${customer.firstName} ${customer.lastName}`, text: newCustomerNote.value.trim() })
+  customerNotes.value.unshift({ date: new Date().toISOString().slice(0, 10), author: `${customer.value.firstName} ${customer.value.lastName}`, text: newCustomerNote.value.trim() })
   newCustomerNote.value = ''
 }
 
@@ -134,10 +158,10 @@ function addStaffNote() {
     </NuxtLink>
 
     <!-- Profile card -->
-    <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:10px 25px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-      <div style="display:flex;align-items:center;justify-content:space-between;min-height:87px">
+    <div class="profile-card" style="background:white;border:1px solid #ececec;border-radius:16px;padding:10px 25px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+      <div class="profile-header" style="display:flex;align-items:center;justify-content:space-between;min-height:87px">
         <!-- Left: avatar + info -->
-        <div style="display:flex;align-items:center;gap:16px">
+        <div class="profile-info" style="display:flex;align-items:center;gap:16px">
           <div style="width:64px;height:64px;border-radius:9999px;background:#ffb400;display:flex;align-items:center;justify-content:center;flex-shrink:0">
             <span style="font-size:24px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ initials }}</span>
           </div>
@@ -169,7 +193,7 @@ function addStaffNote() {
           </div>
         </div>
         <!-- Right: actions -->
-        <div style="display:flex;gap:8px;flex-shrink:0">
+        <div class="profile-actions" style="display:flex;gap:8px;flex-shrink:0">
           <button
             style="height:40px;width:40px;background:#ffb400;border:none;border-radius:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0"
             title="Download QR"
@@ -207,15 +231,19 @@ function addStaffNote() {
           >
             Edit Customer
           </button>
-          <button style="height:40px;padding:0 16px;background:#ef4444;border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:pointer" @click="showSuspendModal = true">
-            Suspend Account
+          <button
+            :disabled="isSuspended()"
+            :style="`height:40px;padding:0 16px;background:#ef4444;border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:${isSuspended() ? 'not-allowed' : 'pointer'};opacity:${isSuspended() ? '0.5' : '1'}`"
+            @click="showSuspendModal = true"
+          >
+            {{ isSuspended() ? 'Account Suspended' : 'Suspend Account' }}
           </button>
         </div>
       </div>
     </div>
 
     <!-- Stat cards -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:24px">
+    <div class="grid-cols-4 stat-cards">
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:1px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
         <div style="padding:10px 24px 10px">
           <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">Plan Type</p>
@@ -247,9 +275,9 @@ function addStaffNote() {
     </div>
 
     <!-- Tabbed card -->
-    <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:1px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+    <div class="tabbed-card" style="background:white;border:1px solid #ececec;border-radius:16px;padding:1px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
       <!-- Tab bar -->
-      <div style="padding:24px 24px 0;border-bottom:1px solid #e5e7eb;display:flex;gap:0">
+      <div class="tab-bar" style="padding:24px 24px 0;border-bottom:1px solid #e5e7eb;display:flex;gap:0">
         <button
           v-for="tab in tabs"
           :key="tab"
@@ -262,7 +290,7 @@ function addStaffNote() {
       <div style="padding:24px">
 
         <!-- Overview -->
-        <div v-if="activeTab === 'Overview'" style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+        <div v-if="activeTab === 'Overview'" class="overview-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
           <div style="display:flex;flex-direction:column;gap:16px">
             <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Account Information</p>
             <div style="display:flex;flex-direction:column;gap:12px">
@@ -311,7 +339,7 @@ function addStaffNote() {
         <!-- Pickup History -->
         <div v-else-if="activeTab === 'Pickup History'" style="display:flex;flex-direction:column;gap:16px">
           <!-- Summary row -->
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+          <div class="summary-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
             <div style="background:#f8f9fa;border-radius:16px;padding:16px 20px">
               <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Total Pickups</p>
               <p style="font-size:20px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ pickupHistory.length }}</p>
@@ -327,8 +355,8 @@ function addStaffNote() {
           </div>
 
           <!-- Table -->
-          <div style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
-            <table style="width:100%;border-collapse:collapse">
+          <div class="table-scroll" style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
+            <table style="width:100%;border-collapse:collapse;min-width:480px">
               <thead>
                 <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Date</th>
@@ -396,8 +424,8 @@ function addStaffNote() {
           </div>
 
           <!-- Table -->
-          <div style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
-            <table style="width:100%;border-collapse:collapse">
+          <div class="table-scroll" style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
+            <table style="width:100%;border-collapse:collapse;min-width:600px">
               <thead>
                 <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Date</th>
@@ -444,8 +472,8 @@ function addStaffNote() {
 
         <!-- Assigned Bins -->
         <div v-else-if="activeTab === 'Assigned Bins'">
-          <div style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
-            <table style="width:100%;border-collapse:collapse">
+          <div class="table-scroll" style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
+            <table style="width:100%;border-collapse:collapse;min-width:480px">
               <thead>
                 <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Bin Type</th>
@@ -485,7 +513,7 @@ function addStaffNote() {
         <!-- GPS Location -->
         <div v-else-if="activeTab === 'GPS Location'" style="display:flex;flex-direction:column;gap:20px">
           <!-- Info row -->
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+          <div class="summary-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
             <div style="background:#f8f9fa;border-radius:16px;padding:16px 20px">
               <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Latitude</p>
               <p style="font-size:16px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ customer.gpsLat }}</p>
@@ -535,7 +563,7 @@ function addStaffNote() {
         </div>
 
         <!-- Notes -->
-        <div v-else-if="activeTab === 'Notes'" style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+        <div v-else-if="activeTab === 'Notes'" class="notes-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
 
           <!-- Customer Notes -->
           <div style="display:flex;flex-direction:column;gap:16px">
@@ -631,6 +659,7 @@ function addStaffNote() {
   <SuspendModal
     v-if="showSuspendModal"
     :customer-name="`${customer.firstName} ${customer.lastName}`"
+    :loading="suspending"
     @close="showSuspendModal = false"
     @confirm="handleSuspend"
   />
@@ -643,3 +672,70 @@ function addStaffNote() {
     @submit="handleEditCustomer"
   />
 </template>
+
+<style scoped>
+/* Responsive adjustments for customer detail page */
+
+@media (max-width: 1024px) {
+  .profile-header {
+    align-items: flex-start !important;
+    gap: 16px;
+  }
+
+  .profile-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 260px;
+  }
+}
+
+@media (max-width: 768px) {
+  .profile-card {
+    padding: 16px !important;
+  }
+
+  .profile-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+
+  .profile-info {
+    width: 100%;
+  }
+
+  .profile-actions {
+    width: 100%;
+    justify-content: flex-start;
+    max-width: none;
+  }
+
+  .tab-bar {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tab-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .overview-grid,
+  .notes-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .profile-info {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+
+  .profile-actions button {
+    font-size: 13px;
+  }
+}
+</style>

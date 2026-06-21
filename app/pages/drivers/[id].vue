@@ -13,6 +13,26 @@ const loadingHistory = ref(false)
 const routeProgress = ref({ completed: 0, inProgress: 0, pending: 0, total: 0, percentage: 0 })
 const estimatedCompletion = ref('N/A')
 
+// Performance metrics
+interface MonthlyMetric {
+  month: string
+  year: string
+  count?: string
+  rate?: number
+}
+
+interface DriverPerformance {
+  monthlyPickups: MonthlyMetric[]
+  monthlyCompletionRate: MonthlyMetric[]
+  avgTimePerStop: number
+  onTimeRate: number
+  customerRating: number | null
+}
+
+const performance = ref<DriverPerformance | null>(null)
+const loadingPerformance = ref(false)
+const performanceMonths = ref(6)
+
 async function fetchTodayPickups() {
   loadingPickups.value = true
   const api = useApi()
@@ -72,13 +92,26 @@ function getStatusBadgeStyle(status: string) {
   return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280' }
 }
 
+async function fetchPerformance() {
+  loadingPerformance.value = true
+  const api = useApi()
+  const data = await api.get<DriverPerformance>(
+    `/drivers/admin/${route.params.id}/performance?months=${performanceMonths.value}`,
+    'Failed to load performance metrics'
+  )
+  if (data) {
+    performance.value = data
+  }
+  loadingPerformance.value = false
+}
+
 onMounted(async () => {
   const api = useApi()
   const data = await api.get<any>(`/drivers/admin/${route.params.id}`)
   if (data) {
     driver.value = data
-    // Fetch today's pickups and history after driver data is loaded
-    await Promise.all([fetchTodayPickups(), fetchPickupHistory()])
+    // Fetch today's pickups, history, and performance after driver data is loaded
+    await Promise.all([fetchTodayPickups(), fetchPickupHistory(), fetchPerformance()])
   } else {
     notFound.value = true
   }
@@ -122,43 +155,59 @@ function getPickupStatus(stop: any): string {
 
 // Performance tab charts
 
-const monthlyPickups = [
-  { month: 'Sep', value: 480 },
-  { month: 'Oct', value: 520 },
-  { month: 'Nov', value: 560 },
-  { month: 'Dec', value: 500 },
-  { month: 'Jan', value: 610 },
-  { month: 'Feb', value: 680 },
-]
+const monthLabels: Record<string, string> = {
+  january: 'Jan', february: 'Feb', march: 'Mar', april: 'Apr', may: 'May', june: 'Jun',
+  july: 'Jul', august: 'Aug', september: 'Sep', october: 'Oct', november: 'Nov', december: 'Dec',
+}
 
-const completionRates = [
-  { month: 'Sep', value: 91 },
-  { month: 'Oct', value: 93 },
-  { month: 'Nov', value: 95 },
-  { month: 'Dec', value: 92 },
-  { month: 'Jan', value: 97 },
-  { month: 'Feb', value: 98.5 },
-]
+function shortMonth(month: string): string {
+  const key = month.toLowerCase()
+  return monthLabels[key] || month.slice(0, 3)
+}
 
-const perfStats = [
-  { label: 'Average Time/Stop', value: '4.2 min', color: '#1a1a1a' },
-  { label: 'On-Time Rate',      value: '98.5%',   color: '#22c55e' },
-  { label: 'Customer Rating',   value: '4.9/5.0', color: '#1a1a1a' },
-]
+const monthlyPickups = computed(() => {
+  if (!performance.value?.monthlyPickups) return []
+  return performance.value.monthlyPickups.map(m => ({
+    month: shortMonth(m.month),
+    value: Number(m.count) || 0,
+  }))
+})
+
+const completionRates = computed(() => {
+  if (!performance.value?.monthlyCompletionRate) return []
+  return performance.value.monthlyCompletionRate.map(m => ({
+    month: shortMonth(m.month),
+    value: m.rate ?? 0,
+  }))
+})
+
+const perfStats = computed(() => {
+  const avg = performance.value?.avgTimePerStop
+  const onTime = performance.value?.onTimeRate
+  const rating = performance.value?.customerRating
+  return [
+    { label: 'Average Time/Stop', value: avg !== undefined && avg !== null ? `${Number(avg).toFixed(1)} min` : 'N/A', color: '#1a1a1a' },
+    { label: 'On-Time Rate',      value: onTime !== undefined && onTime !== null ? `${Number(onTime).toFixed(1)}%` : 'N/A', color: '#22c55e' },
+    { label: 'Customer Rating',   value: rating !== undefined && rating !== null ? `${Number(rating).toFixed(1)}/5.0` : 'N/A', color: '#1a1a1a' },
+  ]
+})
 
 // Bar chart helpers
 const barChartH = 220
 const barChartPadL = 40
 const barChartPadB = 28
-const barMax = 800
-function barY(v: number) { return barChartH - barChartPadB - (v / barMax) * (barChartH - barChartPadB - 8) }
-function barH(v: number) { return (v / barMax) * (barChartH - barChartPadB - 8) }
+const barMax = computed(() => {
+  const max = Math.max(...monthlyPickups.value.map(d => d.value), 1)
+  return Math.ceil(max / 100) * 100 || 100
+})
+function barY(v: number) { return barChartH - barChartPadB - (v / barMax.value) * (barChartH - barChartPadB - 8) }
+function barH(v: number) { return (v / barMax.value) * (barChartH - barChartPadB - 8) }
 
 // Line chart helpers
 const lineChartH = 220
 const lineChartPadL = 40
 const lineChartPadB = 28
-const lineMin = 88
+const lineMin = 0
 const lineMax = 100
 function lineY(v: number) { return lineChartH - lineChartPadB - ((v - lineMin) / (lineMax - lineMin)) * (lineChartH - lineChartPadB - 8) }
 
@@ -235,13 +284,18 @@ async function handleEditDriver(data: Record<string, unknown>) {
 async function handleDeleteDriver() {
   deleting.value = true
   const api = useApi()
-  const result = await api.del(`/drivers/admin/${route.params.id}`, 'Failed to delete driver')
-  deleting.value = false
-  
-  if (result !== null) {
+  try {
+    // 204 No Content is the expected success response for driver deletion.
+    // api.request returns null for 204 and throws on failure, so reaching this
+    // point means the deletion succeeded.
+    await api.request(`/drivers/admin/${route.params.id}`, { method: 'DELETE' })
     showDeleteConfirm.value = false
     toast.success('Driver deleted successfully')
     await navigateTo('/drivers')
+  } catch (err: any) {
+    toast.error(err.message || 'Failed to delete driver')
+  } finally {
+    deleting.value = false
   }
 }
 
@@ -270,9 +324,9 @@ function stopBadge(status: string) {
     </NuxtLink>
 
     <!-- Profile card -->
-    <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:10px 25px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-      <div style="display:flex;align-items:center;justify-content:space-between;min-height:87px">
-        <div style="display:flex;align-items:center;gap:16px">
+    <div class="profile-card" style="background:white;border:1px solid #ececec;border-radius:16px;padding:10px 25px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+      <div class="profile-header" style="display:flex;align-items:center;justify-content:space-between;min-height:87px">
+        <div class="profile-info" style="display:flex;align-items:center;gap:16px">
           <div style="width:64px;height:64px;border-radius:9999px;background:#ffb400;display:flex;align-items:center;justify-content:center;flex-shrink:0">
             <span style="font-size:24px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ ((driver?.name || driver?.user?.name) ?? 'U').split(' ').map((n: string) => n[0]).join('') }}</span>
           </div>
@@ -312,7 +366,7 @@ function stopBadge(status: string) {
             </div>
           </div>
         </div>
-        <div style="display:flex;gap:8px;flex-shrink:0">
+        <div class="profile-actions" style="display:flex;gap:8px;flex-shrink:0">
           <button
             style="height:40px;padding:0 16px;background:#dc2626;border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:pointer"
             @click="showDeleteConfirm = true"
@@ -333,7 +387,7 @@ function stopBadge(status: string) {
     </div>
 
     <!-- Stat cards -->
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:24px">
+    <div class="stat-cards" style="display:grid;grid-template-columns:repeat(5,1fr);gap:24px">
       <div
         v-for="stat in [
           { label: `Today's Pickups`, value: driver?.stats?.todayPickups ?? 0, color: '#1a1a1a' },
@@ -357,8 +411,8 @@ function stopBadge(status: string) {
     </div>
 
     <!-- Tabbed card -->
-    <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:1px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-      <div style="padding:24px 24px 0;border-bottom:1px solid #e5e7eb;display:flex;gap:0">
+    <div class="tabbed-card" style="background:white;border:1px solid #ececec;border-radius:16px;padding:1px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+      <div class="tab-bar" style="padding:24px 24px 0;border-bottom:1px solid #e5e7eb;display:flex;gap:0">
         <button
           v-for="tab in tabs"
           :key="tab"
@@ -406,8 +460,8 @@ function stopBadge(status: string) {
                 <span>Pending: <strong style="color:#6b7280">{{ routeProgress.pending }}</strong></span>
               </div>
             </div>
-            <div style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
-              <table style="width:100%;border-collapse:collapse">
+            <div class="table-scroll" style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
+              <table style="width:100%;border-collapse:collapse;min-width:600px">
                 <thead>
                   <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
                     <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Order</th>
@@ -471,8 +525,8 @@ function stopBadge(status: string) {
           </div>
           
           <!-- History table -->
-          <div v-else style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
-            <table style="width:100%;border-collapse:collapse">
+          <div v-else class="table-scroll" style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
+            <table style="width:100%;border-collapse:collapse;min-width:600px">
               <thead>
                 <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Date</th>
@@ -518,15 +572,38 @@ function stopBadge(status: string) {
         <!-- Performance -->
         <div v-else-if="activeTab === 'Performance'" style="display:flex;flex-direction:column;gap:24px">
 
+          <!-- Loading state -->
+          <div v-if="loadingPerformance" style="padding:40px;text-align:center">
+            <UIcon name="i-lucide-loader-2" style="width:32px;height:32px;color:#6b7280;animation:spin 1s linear infinite;margin-bottom:12px" />
+            <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Loading performance metrics...</p>
+          </div>
+
+          <template v-else>
+
+          <!-- Months selector -->
+          <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px">
+            <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Months:</span>
+            <select
+              v-model="performanceMonths"
+              style="height:36px;padding:0 32px 0 12px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E&quot;);background-repeat:no-repeat;background-position:right 10px center"
+              @change="fetchPerformance"
+            >
+              <option :value="3">3 months</option>
+              <option :value="6">6 months</option>
+              <option :value="9">9 months</option>
+              <option :value="12">12 months</option>
+            </select>
+          </div>
+
           <!-- Monthly Pickups bar chart -->
           <div style="display:flex;flex-direction:column;gap:16px">
             <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Monthly Pickups</p>
             <div style="width:100%;overflow:hidden">
               <svg width="100%" :viewBox="`0 0 1030 ${barChartH}`" preserveAspectRatio="none" style="display:block">
                 <!-- Y grid lines + labels -->
-                <template v-for="tick in [0,200,400,600,800]" :key="tick">
+                <template v-for="tick in [0, barMax * 0.25, barMax * 0.5, barMax * 0.75, barMax]" :key="tick">
                   <line :x1="barChartPadL" :y1="barY(tick)" :x2="1030" :y2="barY(tick)" stroke="#e5e7eb" stroke-width="1" />
-                  <text :x="barChartPadL - 6" :y="barY(tick) + 4" text-anchor="end" font-size="11" fill="#6b7280" font-family="Inter,sans-serif">{{ tick }}</text>
+                  <text :x="barChartPadL - 6" :y="barY(tick) + 4" text-anchor="end" font-size="11" fill="#6b7280" font-family="Inter,sans-serif">{{ Math.round(tick) }}</text>
                 </template>
                 <!-- Bars -->
                 <template v-for="b in barPoints(monthlyPickups, 1030)" :key="b.month">
@@ -545,7 +622,7 @@ function stopBadge(status: string) {
             <div style="width:100%;overflow:hidden">
               <svg width="100%" :viewBox="`0 0 1030 ${lineChartH}`" preserveAspectRatio="none" style="display:block">
                 <!-- Y grid lines + labels -->
-                <template v-for="tick in [90,93,96,100]" :key="tick">
+                <template v-for="tick in [0, 25, 50, 75, 100]" :key="tick">
                   <line :x1="lineChartPadL" :y1="lineY(tick)" :x2="1030" :y2="lineY(tick)" stroke="#e5e7eb" stroke-width="1" />
                   <text :x="lineChartPadL - 6" :y="lineY(tick) + 4" text-anchor="end" font-size="11" fill="#6b7280" font-family="Inter,sans-serif">{{ tick }}</text>
                 </template>
@@ -581,6 +658,7 @@ function stopBadge(status: string) {
             </div>
           </div>
 
+          </template>
         </div>
 
         <!-- Earnings -->
@@ -600,7 +678,7 @@ function stopBadge(status: string) {
             </div>
 
             <!-- Breakdown row -->
-            <div style="border-top:1px solid #86efac;padding-top:17px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+            <div class="earnings-breakdown" style="border-top:1px solid #86efac;padding-top:17px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
               <div style="display:flex;flex-direction:column;gap:4px">
                 <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Base Pay</p>
                 <p style="font-size:14px;font-weight:700;color:#15803d;font-family:'Manrope',sans-serif">{{ currentPeriod.basePay }}</p>
@@ -633,8 +711,8 @@ function stopBadge(status: string) {
           <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Earnings History</p>
 
           <!-- History table -->
-          <div style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
-            <table style="width:100%;border-collapse:collapse">
+          <div class="table-scroll" style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
+            <table style="width:100%;border-collapse:collapse;min-width:700px">
               <thead>
                 <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Period</th>
@@ -695,3 +773,81 @@ function stopBadge(status: string) {
 
   </div>
 </template>
+
+<style scoped>
+/* Responsive adjustments for driver detail page */
+
+@media (max-width: 1024px) {
+  .profile-header {
+    align-items: flex-start !important;
+    gap: 16px;
+  }
+
+  .profile-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 260px;
+  }
+
+  .stat-cards {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .profile-card {
+    padding: 16px !important;
+  }
+
+  .profile-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+
+  .profile-info {
+    width: 100%;
+  }
+
+  .profile-actions {
+    width: 100%;
+    justify-content: flex-start;
+    max-width: none;
+  }
+
+  .stat-cards {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .tab-bar {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tab-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .earnings-breakdown {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .profile-info {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+
+  .profile-actions button {
+    font-size: 13px;
+  }
+
+  .stat-cards {
+    grid-template-columns: 1fr !important;
+  }
+
+  .earnings-breakdown {
+    grid-template-columns: 1fr !important;
+  }
+}
+</style>
