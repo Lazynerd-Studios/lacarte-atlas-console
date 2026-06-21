@@ -16,28 +16,93 @@ let map: any = null
 let abortController: AbortController | null = null
 let iconsLoaded = false
 
-function truckIconSvg(color: string): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 48 48"><path fill="white" stroke="white" stroke-width="4" stroke-linejoin="round" d="M6 14h30v22H6z"/><path fill="white" stroke="white" stroke-width="4" stroke-linejoin="round" d="M36 22h4l4 5v9h-8z"/><rect fill="white" stroke="white" stroke-width="4" x="2" y="10" width="34" height="26" rx="3" stroke-linejoin="round"/><path fill="${color}" d="M8 12h26v22H8z"/><path fill="${color}" d="M34 23h4l3 4v7h-7z"/><circle cx="14" cy="38" r="4" fill="#374151" stroke="white" stroke-width="2"/><circle cx="36" cy="38" r="4" fill="#374151" stroke="white" stroke-width="2"/><rect x="10" y="16" width="8" height="8" rx="1" fill="white" opacity=".9"/><rect x="20" y="16" width="8" height="8" rx="1" fill="white" opacity=".9"/></svg>`
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+function truckIconDataUrl(color: string): string {
+  const size = 48
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return ''
+
+  // Background circle
+  ctx.beginPath()
+  ctx.arc(size / 2, size / 2, size / 2 - 1, 0, Math.PI * 2)
+  ctx.fillStyle = color
+  ctx.fill()
+  ctx.strokeStyle = 'white'
+  ctx.lineWidth = 2
+  ctx.stroke()
+
+  // Truck body (white rectangle)
+  ctx.fillStyle = 'white'
+  const bodyW = 26
+  const bodyH = 14
+  const bodyX = (size - bodyW) / 2
+  const bodyY = 16
+  ctx.fillRect(bodyX, bodyY, bodyW, bodyH)
+
+  // Cab (white rectangle)
+  ctx.fillRect(bodyX + bodyW - 8, bodyY - 7, 8, 7)
+
+  // Wheels (dark circles)
+  ctx.fillStyle = '#374151'
+  ctx.beginPath()
+  ctx.arc(bodyX + 7, bodyY + bodyH, 4, 0, Math.PI * 2)
+  ctx.arc(bodyX + bodyW - 7, bodyY + bodyH, 4, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Windows (light rectangles)
+  ctx.fillStyle = 'rgba(255,255,255,0.7)'
+  ctx.fillRect(bodyX + 4, bodyY + 3, 6, 5)
+  ctx.fillRect(bodyX + 12, bodyY + 3, 6, 5)
+
+  return canvas.toDataURL('image/png')
 }
 
 function loadTruckIcons(mapLibreMap: any): Promise<void> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
+    const onlineUrl = truckIconDataUrl('#22c55e')
+    const offlineUrl = truckIconDataUrl('#9ca3af')
+
+    if (!onlineUrl || !offlineUrl) {
+      console.error('[Map] Failed to generate truck icons')
+      reject(new Error('Failed to generate truck icons'))
+      return
+    }
+
     const onlineImg = new Image()
     const offlineImg = new Image()
     let loaded = 0
+    let failed = false
+
     const onLoad = () => {
+      if (failed) return
       if (++loaded === 2) {
-        mapLibreMap.addImage('truck-online', onlineImg, { pixelRatio: 2 })
-        mapLibreMap.addImage('truck-offline', offlineImg, { pixelRatio: 2 })
-        iconsLoaded = true
-        resolve()
+        try {
+          mapLibreMap.addImage('truck-online', onlineImg, { pixelRatio: 2 })
+          mapLibreMap.addImage('truck-offline', offlineImg, { pixelRatio: 2 })
+          iconsLoaded = true
+          console.log('[Map] Truck icons loaded successfully')
+          resolve()
+        } catch (err) {
+          console.error('[Map] Failed to add icons to map:', err)
+          reject(err)
+        }
       }
     }
+
+    const onError = (e: any) => {
+      failed = true
+      console.error('[Map] Failed to load truck icon image:', e)
+      reject(new Error('Failed to load truck icon image'))
+    }
+
     onlineImg.onload = onLoad
     offlineImg.onload = onLoad
-    onlineImg.src = truckIconSvg('#22c55e')
-    offlineImg.src = truckIconSvg('#9ca3af')
+    onlineImg.onerror = onError
+    offlineImg.onerror = onError
+    onlineImg.src = onlineUrl
+    offlineImg.src = offlineUrl
   })
 }
 
@@ -85,7 +150,12 @@ async function initMap() {
 
     map.mapLibreMap.on('load', async () => {
       console.log('[Map] Map loaded successfully')
-      await loadTruckIcons(map.mapLibreMap)
+      try {
+        await loadTruckIcons(map.mapLibreMap)
+      } catch (err) {
+        console.error('[Map] Failed to load truck icons:', err)
+        mapError.value = 'Failed to load driver markers. Please refresh the page.'
+      }
       loading.value = false
       updateMarkers()
     })
@@ -131,20 +201,33 @@ function updateMarkers() {
 
   mapLibreMap.addSource('drivers', { type: 'geojson', data: geojson })
 
-  if (!iconsLoaded) return
-
-  mapLibreMap.addLayer({
-    id: 'drivers-truck',
-    type: 'symbol',
-    source: 'drivers',
-    layout: {
-      'icon-image': ['case', ['get', 'isOnline'], 'truck-online', 'truck-offline'],
-      'icon-size': 0.4,
-      'icon-allow-overlap': true,
-      'icon-rotate': ['get', 'heading'],
-      'icon-rotation-alignment': 'map',
-    },
-  })
+  if (iconsLoaded) {
+    mapLibreMap.addLayer({
+      id: 'drivers-truck',
+      type: 'symbol',
+      source: 'drivers',
+      layout: {
+        'icon-image': ['case', ['get', 'isOnline'], 'truck-online', 'truck-offline'],
+        'icon-size': 1.2,
+        'icon-allow-overlap': true,
+        'icon-rotate': ['get', 'heading'],
+        'icon-rotation-alignment': 'map',
+      },
+    })
+  } else {
+    // Fallback to colored circles if custom icons failed to load
+    mapLibreMap.addLayer({
+      id: 'drivers-truck',
+      type: 'circle',
+      source: 'drivers',
+      paint: {
+        'circle-radius': 8,
+        'circle-color': ['case', ['get', 'isOnline'], '#22c55e', '#9ca3af'],
+        'circle-stroke-width': 2,
+        'circle-stroke-color': 'white',
+      },
+    })
+  }
 
   mapLibreMap.on('click', 'drivers-truck', (e: any) => {
     if (!e.features?.[0]) return
