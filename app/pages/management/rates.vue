@@ -667,7 +667,7 @@ onMounted(async () => {
             <td style="padding:16px 20px">
               <div style="display:flex;align-items:center;gap:6px">
                 <Icon name="lucide:calendar" style="width:14px;height:14px;color:#6b7280;flex-shrink:0" />
-                <span style="font-size:13px;color:#374151;font-family:'Manrope',sans-serif">{{ r.effectiveDate }}</span>
+                <span style="font-size:13px;color:#374151;font-family:'Manrope',sans-serif">{{ r.effectiveDate ? r.effectiveDate.split(/[T ]/)[0] : '' }}</span>
               </div>
             </td>
             <!-- Status -->
