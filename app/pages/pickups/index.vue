@@ -53,13 +53,24 @@ const initialLoading = ref(true)
 
 const activeFilter = ref('All')
 const filters = ['All', 'Pending', 'Assigned', 'Completed']
+const activePaymentStatus = ref('All')
 
 const filtered = computed(() => {
-  if (activeFilter.value === 'All') return requests.value
-  return requests.value.filter(r => r.status.toLowerCase() === activeFilter.value.toLowerCase())
+  let result = requests.value
+  
+  if (activeFilter.value !== 'All') {
+    result = result.filter(r => r.status.toLowerCase() === activeFilter.value.toLowerCase())
+  }
+  
+  if (activePaymentStatus.value !== 'All') {
+    const val = activePaymentStatus.value.toLowerCase().replace(/\s+/g, '-')
+    result = result.filter(r => r.paymentStatus.toLowerCase().replace(/_/g, '-') === val)
+  }
+  
+  return result
 })
 
-watch(activeFilter, () => { 
+watch([activeFilter, activePaymentStatus], () => { 
   pagination.value.page = 1
   fetchRequests()
 })
@@ -101,6 +112,11 @@ async function fetchRequests() {
     
     if (activeFilter.value !== 'All') {
       params.append('status', activeFilter.value.toLowerCase())
+    }
+    
+    if (activePaymentStatus.value !== 'All') {
+      const val = activePaymentStatus.value.toLowerCase().replace(/\s+/g, '-')
+      params.append('paymentStatus', val)
     }
     
     const data = await api.get<{ data: PickupRequest[]; pagination: Pagination }>(
@@ -169,11 +185,56 @@ function openAssignModal(req: PickupRequest) {
 
 async function handleAssignDriver(data: { driver: string; scheduledDate: string; scheduledTime: string; priority: string; adminNotes: string }) {
   if (!selectedRequest.value) return
-  // TODO: Call API to assign driver
-  showAssignDriverModal.value = false
-  selectedRequest.value = null
-  await fetchRequests()
-  await fetchStats()
+  
+  try {
+    // Map time slot to API format
+    let timeSlot = 'afternoon'
+    if (data.scheduledTime.toLowerCase().includes('morning')) {
+      timeSlot = 'morning'
+    } else if (data.scheduledTime.toLowerCase().includes('evening')) {
+      timeSlot = 'evening'
+    }
+    
+    // Check if pickup already has a driver assigned (status is 'assigned')
+    const isReassignment = selectedRequest.value.status === 'assigned'
+    
+    if (isReassignment) {
+      // Use reassign endpoint (PATCH) - doesn't include priorityLevel
+      const payload = {
+        driverId: data.driver,
+        scheduledDate: data.scheduledDate,
+        timeSlot: timeSlot,
+        adminNotes: data.adminNotes
+      }
+      
+      await api.patch(
+        `/pickup-requests/admin/${selectedRequest.value.id}/reassign`,
+        payload,
+        'Failed to reassign driver'
+      )
+    } else {
+      // Use assign endpoint (POST) - includes priorityLevel
+      const payload = {
+        driverId: data.driver,
+        scheduledDate: data.scheduledDate,
+        timeSlot: timeSlot,
+        priorityLevel: data.priority,
+        adminNotes: data.adminNotes
+      }
+      
+      await api.post(
+        `/pickup-requests/admin/${selectedRequest.value.id}/assign`,
+        payload,
+        'Failed to assign driver'
+      )
+    }
+    
+    showAssignDriverModal.value = false
+    selectedRequest.value = null
+    await Promise.all([fetchRequests(), fetchStats()])
+  } catch (err: any) {
+    console.error('Error assigning/reassigning driver:', err)
+  }
 }
 </script>
 
@@ -199,7 +260,7 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
     </div>
 
     <!-- Filter bar skeleton -->
-    <div style="display:flex;align-items:center;gap:16px">
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:8px">
         <div class="skeleton" style="width:16px;height:16px;border-radius:4px" />
         <div class="skeleton" style="height:14px;width:70px" />
@@ -207,6 +268,7 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
       <div style="display:flex;gap:8px">
         <div v-for="i in 4" :key="i" class="skeleton" style="height:32px;width:80px;border-radius:20px" />
       </div>
+      <div class="skeleton" style="height:32px;width:160px;border-radius:20px;margin-left:auto" />
     </div>
 
     <!-- Table skeleton -->
@@ -320,7 +382,7 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
     </div>
 
     <!-- Filter bar -->
-    <div style="display:flex;align-items:center;gap:16px">
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:8px">
         <UIcon name="i-lucide-filter" style="width:16px;height:16px;color:#6b7280" />
         <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Filter by:</span>
@@ -332,6 +394,20 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
           :style="`height:32px;padding:0 12px;border:none;border-radius:20px;font-size:14px;font-weight:500;font-family:'Manrope',sans-serif;cursor:pointer;transition:background 0.15s;background:${activeFilter === f ? '#ffb400' : '#ececec'};color:${activeFilter === f ? '#0a0d12' : '#111'};box-shadow:${activeFilter === f ? '0 1px 3px rgba(255,180,0,0.2)' : 'none'}`"
           @click="activeFilter = f"
         >{{ f }}</button>
+      </div>
+
+      <!-- Payment Status Dropdown -->
+      <div style="position:relative;margin-left:auto">
+        <select 
+          v-model="activePaymentStatus" 
+          style="height:32px;padding:0 32px 0 12px;border:1.5px solid #ececec;border-radius:20px;font-size:13px;font-family:'Manrope',sans-serif;color:#1a1a1a;outline:none;background:#fff;cursor:pointer;appearance:none;min-width:170px"
+        >
+          <option value="All">All Payment Statuses</option>
+          <option value="Paid">Paid</option>
+          <option value="Unpaid">Unpaid</option>
+          <option value="Active Plan">Active Plan</option>
+        </select>
+        <UIcon name="i-lucide-chevron-down" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:#6b7280;pointer-events:none" />
       </div>
     </div>
 
