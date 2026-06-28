@@ -77,7 +77,8 @@ const planFilter = ref('all')
 
 const customers = ref<any[]>([])
 const total = ref(0)
-const loading = ref(true)
+const loading = ref(false)
+const initialLoading = ref(true)
 const downloading = ref(false)
 const page = ref(1)
 const perPage = 20
@@ -101,7 +102,12 @@ async function fetchCustomers() {
 
 watch([search, statusFilter, planFilter], () => { page.value = 1; fetchCustomers() })
 watch(page, fetchCustomers)
-onMounted(fetchCustomers)
+
+onMounted(async () => {
+  initialLoading.value = true
+  await fetchCustomers()
+  initialLoading.value = false
+})
 
 function handleAddCustomer(data: Record<string, unknown>) {
   // TODO: call API to create customer
@@ -166,7 +172,7 @@ function statusBadge(status: string) {
   <div style="display:flex;flex-direction:column;gap:24px">
     
     <!-- Loading skeleton -->
-    <PageSkeleton v-if="loading" type="table" :rows="8" :cards="0" />
+    <PageSkeleton v-if="initialLoading" type="table" :rows="8" :cards="0" />
 
     <!-- Content -->
     <template v-else>
@@ -240,7 +246,7 @@ function statusBadge(status: string) {
     </div>
 
     <!-- Table card -->
-    <div class="table-scroll" style="background:white;border:1px solid #ececec;border-radius:16px;padding:1px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+    <div class="table-scroll" style="background:white;border:1px solid #ececec;border-radius:16px;padding:1px;box-shadow:0 1px 3px rgba(0,0,0,0.1);transition:opacity 0.15s" :style="loading ? 'opacity:0.6' : 'opacity:1'">
       <table style="width:100%;border-collapse:collapse">
         <thead>
           <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
