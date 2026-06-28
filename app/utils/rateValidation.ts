@@ -2,6 +2,7 @@
 
 interface AddFormData {
   customerTypeId: string         // string for select binding, converted to number
+  estimatedQuantityId: string    // string for select binding — quantity tier for this rate
   pickupRate: string             // string for input binding, converted to number
   effectiveDate: string          // ISO date string
   note: string
@@ -10,6 +11,7 @@ interface AddFormData {
 
 interface ApiPayload {
   customerTypeId: string         // Keep as string for API
+  estimatedQuantityId?: string   // Optional — send only when set
   rate: number                   // API uses 'rate' not 'pickupRate'
   effectiveDate: string
   note: string
@@ -24,23 +26,23 @@ interface ApiPayload {
  */
 export function validateForm(form: AddFormData, isEdit = false): string[] {
   const errors: string[] = []
-  
+
   // Validate customer type is selected (only for add operations)
   if (!isEdit && !form.customerTypeId) {
     errors.push('Customer type is required.')
   }
-  
+
   // Validate pickup rate is a positive number
   const pickupRate = Number(form.pickupRate)
   if (!form.pickupRate || isNaN(pickupRate) || pickupRate <= 0) {
     errors.push('Valid pickup rate is required.')
   }
-  
+
   // Validate effective date is provided
   if (!form.effectiveDate) {
     errors.push('Effective date is required.')
   }
-  
+
   return errors
 }
 
@@ -50,11 +52,16 @@ export function validateForm(form: AddFormData, isEdit = false): string[] {
  * @returns API-compatible payload object
  */
 export function formToApiPayload(form: AddFormData): ApiPayload {
-  return {
+  const payload: ApiPayload = {
     customerTypeId: form.customerTypeId,  // Keep as string
     rate: Number(form.pickupRate),        // API uses 'rate' field
     effectiveDate: form.effectiveDate,
     note: form.note.trim(),
     isActive: form.isActive,
   }
+  // Only include estimatedQuantityId when a selection was made
+  if (form.estimatedQuantityId) {
+    payload.estimatedQuantityId = form.estimatedQuantityId
+  }
+  return payload
 }

@@ -7,6 +7,14 @@ interface CustomerType {
   color?: string                 // Optional color (hex color)
 }
 
+interface EstimatedQuantity {
+  id: string
+  label: string
+  description?: string
+  displayOrder?: number
+  isActive?: boolean
+}
+
 interface Rate {
   id: string                     // UUID instead of number
   customerTypeId: string         // UUID
@@ -14,6 +22,8 @@ interface Rate {
     id: string
     name: string
   }
+  estimatedQuantityId?: string   // UUID of the quantity tier
+  estimatedQuantity?: EstimatedQuantity  // Nested quantity object from API
   rate: number                   // Changed from pickupRate
   effectiveDate: string
   note: string
@@ -27,6 +37,7 @@ const { format } = useCurrency()
 
 // State management
 const customerTypes = ref<CustomerType[]>([])
+const estimatedQuantities = ref<EstimatedQuantity[]>([])
 const rates = ref<Rate[]>([])
 const loading = ref(false)
 
@@ -149,6 +160,18 @@ async function fetchCustomerTypes() {
   }
 }
 
+/**
+ * Fetch estimated quantity tiers from API
+ */
+async function fetchEstimatedQuantities() {
+  const api = useApi()
+  const response = await api.get<any>('/disposable/quantities', 'Failed to load estimated quantities')
+  if (response) {
+    const items = Array.isArray(response) ? response : (response.data ?? response.quantities ?? [])
+    estimatedQuantities.value = items.filter((q: EstimatedQuantity) => q.isActive !== false)
+  }
+}
+
 function rateStatus(r: Rate) {
   if (!r.isActive) return 'inactive'
   if (r.effectiveDate > today) return 'upcoming'
@@ -179,12 +202,12 @@ function statusStyle(r: Rate) {
 
 // ── Add modal ──
 const showAddModal = ref(false)
-const addForm = ref({ customerTypeId: '', pickupRate: '', effectiveDate: '', note: '', isActive: true })
+const addForm = ref({ customerTypeId: '', estimatedQuantityId: '', pickupRate: '', effectiveDate: '', note: '', isActive: true })
 const addError = ref('')
 const submitting = ref(false)
 
 function openAdd() {
-  addForm.value = { customerTypeId: '', pickupRate: '', effectiveDate: '', note: '', isActive: true }
+  addForm.value = { customerTypeId: '', estimatedQuantityId: '', pickupRate: '', effectiveDate: '', note: '', isActive: true }
   addError.value = ''
   showAddModal.value = true
 }
@@ -259,13 +282,17 @@ async function handleAdd() {
 
 // ── Edit modal ──
 const showEditModal = ref(false)
-const editForm = ref<Rate & { pickupStr: string }>({
-  id: '', customerTypeId: '', rate: 0, effectiveDate: '', note: '', isActive: true, createdAt: '', pickupStr: '',
-})
+const editForm = ref<Rate & { pickupStr: string; editEstimatedQuantityId: string }>(
+  { id: '', customerTypeId: '', rate: 0, effectiveDate: '', note: '', isActive: true, createdAt: '', pickupStr: '', editEstimatedQuantityId: '' },
+)
 const editError = ref('')
 
 function openEdit(r: Rate) {
-  editForm.value = { ...r, pickupStr: String(r.rate) }
+  editForm.value = {
+    ...r,
+    pickupStr: String(r.rate),
+    editEstimatedQuantityId: r.estimatedQuantityId ?? r.estimatedQuantity?.id ?? '',
+  }
   editError.value = ''
   showEditModal.value = true
 }
@@ -292,6 +319,7 @@ async function handleEdit() {
   // Create form data compatible with validateForm (using pickupStr as pickupRate)
   const formData = {
     customerTypeId: String(editForm.value.customerTypeId),
+    estimatedQuantityId: editForm.value.editEstimatedQuantityId,
     pickupRate: editForm.value.pickupStr,
     effectiveDate: editForm.value.effectiveDate,
     note: editForm.value.note,
@@ -314,11 +342,14 @@ async function handleEdit() {
     const toast = useAppToast()
     
     // Transform form data to API payload
-    const payload = {
+    const payload: Record<string, unknown> = {
       rate: Number(editForm.value.pickupStr),        // API uses 'rate' field
       effectiveDate: editForm.value.effectiveDate,
       note: editForm.value.note.trim(),
       isActive: editForm.value.isActive,
+    }
+    if (editForm.value.editEstimatedQuantityId) {
+      payload.estimatedQuantityId = editForm.value.editEstimatedQuantityId
     }
     
     console.log('[Rates] Updating rate', editForm.value.id, 'with payload:', payload)
@@ -411,7 +442,7 @@ const upcomingCount = computed(() => rates.value.filter(r => rateStatus(r) === '
 
 // Fetch data on mount
 onMounted(async () => {
-  await Promise.all([fetchRates(), fetchStats(), fetchCustomerTypes()])
+  await Promise.all([fetchRates(), fetchStats(), fetchCustomerTypes(), fetchEstimatedQuantities()])
 })
 
 </script>
@@ -599,6 +630,7 @@ onMounted(async () => {
         <thead>
           <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
             <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;font-family:'Manrope',sans-serif;white-space:nowrap">Customer Type</th>
+            <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;font-family:'Manrope',sans-serif;white-space:nowrap">Est. Quantity</th>
             <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;font-family:'Manrope',sans-serif;white-space:nowrap">Pickup Rate</th>
             <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;font-family:'Manrope',sans-serif;white-space:nowrap">Effective Date</th>
             <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;font-family:'Manrope',sans-serif;white-space:nowrap">Status</th>
@@ -617,6 +649,14 @@ onMounted(async () => {
                 <span :style="`width:10px;height:10px;border-radius:50%;background:${getType(r).color || '#ccc'};flex-shrink:0;display:inline-block`"></span>
                 <span style="font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ getType(r).name }}</span>
               </div>
+            </td>
+            <!-- Estimated Quantity -->
+            <td style="padding:16px 20px">
+              <span v-if="r.estimatedQuantity?.label" style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;background:#f0f9ff;color:#0369a1;font-family:'Manrope',sans-serif">
+                <Icon name="lucide:layers" style="width:11px;height:11px" />
+                {{ r.estimatedQuantity.label }}
+              </span>
+              <span v-else style="font-size:13px;color:#d1d5db;font-family:'Manrope',sans-serif">—</span>
             </td>
             <!-- Rate -->
             <td style="padding:16px 20px">
@@ -661,7 +701,7 @@ onMounted(async () => {
             </td>
           </tr>
           <tr v-if="filtered.length === 0">
-            <td colspan="7" style="padding:56px 20px;text-align:center">
+            <td colspan="8" style="padding:56px 20px;text-align:center">
               <Icon name="lucide:percent" style="width:36px;height:36px;color:#d1d5db;margin-bottom:10px" />
               <p style="font-size:14px;font-weight:600;color:#1a1a1a;margin:0 0 4px;font-family:'Manrope',sans-serif">No rates found</p>
               <p style="font-size:13px;color:#6b7280;margin:0;font-family:'Manrope',sans-serif">Try adjusting your filters or add a new rate.</p>
@@ -692,6 +732,18 @@ onMounted(async () => {
               </select>
               <Icon name="lucide:chevron-down" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:#6b7280;pointer-events:none" />
             </div>
+          </div>
+
+          <div>
+            <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Estimated Quantity</label>
+            <div style="position:relative">
+              <select v-model="addForm.estimatedQuantityId" style="width:100%;padding:10px 36px 10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;background:#fff;appearance:none;box-sizing:border-box;cursor:pointer">
+                <option value="">Any quantity (applies to all)</option>
+                <option v-for="q in estimatedQuantities" :key="q.id" :value="q.id">{{ q.label }}</option>
+              </select>
+              <Icon name="lucide:chevron-down" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:#6b7280;pointer-events:none" />
+            </div>
+            <p style="font-size:12px;color:#9ca3af;margin:5px 0 0">Price applies to a specific quantity tier, or leave blank to match all.</p>
           </div>
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -747,6 +799,18 @@ onMounted(async () => {
         </div>
         <div style="padding:24px;display:flex;flex-direction:column;gap:16px">
           <div v-if="editError" style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;font-size:13px;color:#ef4444">{{ editError }}</div>
+
+          <div>
+            <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Estimated Quantity</label>
+            <div style="position:relative">
+              <select v-model="editForm.editEstimatedQuantityId" style="width:100%;padding:10px 36px 10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;background:#fff;appearance:none;box-sizing:border-box;cursor:pointer">
+                <option value="">Any quantity (applies to all)</option>
+                <option v-for="q in estimatedQuantities" :key="q.id" :value="q.id">{{ q.label }}</option>
+              </select>
+              <Icon name="lucide:chevron-down" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:#6b7280;pointer-events:none" />
+            </div>
+            <p style="font-size:12px;color:#9ca3af;margin:5px 0 0">Price applies to a specific quantity tier, or leave blank to match all.</p>
+          </div>
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
             <div>
