@@ -53,3 +53,50 @@ export interface Customer {
   customerType: CustomerType | null
   zone: CustomerZone | null
 }
+
+/** Disposable item type attached to a customer pickup history entry */
+export interface DisposableItemType {
+  id: string
+  name: string
+  icon: string | null
+}
+
+/** Estimated quantity attached to a customer pickup history entry */
+export interface EstimatedQuantity {
+  id: string
+  label: string
+}
+
+/** Driver attached to a customer pickup history entry */
+export interface CustomerPickupDriver {
+  id: string
+  name: string
+  phoneNumber: string | null
+}
+
+/** Pickup history entry returned by /pickup-requests/admin/customers/{id}/history */
+export interface CustomerPickupHistoryEntry {
+  id: string
+  preferredPickupDate: string | null
+  status: string
+  paymentType: string | null
+  paymentStatus: string | null
+  createdAt: string | null
+  updatedAt: string | null
+  disposableItemType: DisposableItemType | null
+  estimatedQuantity: EstimatedQuantity | null
+  driver: CustomerPickupDriver | null
+}
+
+/** Paginated response envelope for customer pickup history */
+export interface CustomerPickupHistoryResponse {
+  data: CustomerPickupHistoryEntry[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+    hasNextPage: boolean
+    hasPreviousPage: boolean
+  }
+}

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Customer } from '~/types/customer'
+import type { Customer, CustomerPickupHistoryEntry } from '~/types/customer'
 
 definePageMeta({ layout: 'dashboard' })
 
@@ -22,6 +22,7 @@ async function fetchCustomer() {
   )
   if (data) {
     customer.value = data
+    if (activeTab.value === 'Pickup History') fetchPickupHistory()
   } else {
     notFound.value = true
   }
@@ -241,6 +242,9 @@ watch(activeTab, (tab) => {
   if (tab === 'GPS Location' && hasLocation.value) {
     nextTick(initGpsMap)
   }
+  if (tab === 'Pickup History' && customer.value && pickupHistory.value.length === 0 && !pickupLoading.value) {
+    fetchPickupHistory()
+  }
 })
 
 onBeforeUnmount(() => {
@@ -250,8 +254,65 @@ onBeforeUnmount(() => {
   }
 })
 
-// TODO: replace with real endpoints (pickups, billing, bins, notes)
-const pickupHistory = ref<any[]>([])
+// TODO: replace with real endpoints (billing, bins, notes)
+const pickupHistory = ref<CustomerPickupHistoryEntry[]>([])
+const pickupLoading = ref(false)
+const pickupPage = ref(1)
+const pickupTotal = ref(0)
+const pickupPerPage = 5
+
+async function fetchPickupHistory() {
+  if (!customer.value) return
+  pickupLoading.value = true
+  const api = useApi()
+  const params = new URLSearchParams()
+  params.set('page', String(pickupPage.value))
+  params.set('limit', String(pickupPerPage))
+  params.set('sortBy', 'createdAt')
+  params.set('sortOrder', 'desc')
+  const res = await api.get<{ data: CustomerPickupHistoryEntry[]; pagination: { total: number } }>(
+    `/pickup-requests/admin/customers/${route.params.id}/history?${params.toString()}`,
+    'Failed to load pickup history'
+  )
+  if (res) {
+    pickupHistory.value = res.data
+    pickupTotal.value = res.pagination.total
+  }
+  pickupLoading.value = false
+}
+
+const pickupSummary = computed(() => {
+  const total = pickupHistory.value.length
+  const completed = pickupHistory.value.filter(p => p.status === 'completed' || p.status === 'picked_up').length
+  const missed = pickupHistory.value.filter(p => p.status === 'cancelled' || p.status === 'expired' || p.status === 'missed').length
+  return { total, completed, missed }
+})
+
+function formatPaymentType(type?: string | null): string {
+  if (!type) return '—'
+  if (type === 'pay_as_you_go') return 'PayGO'
+  return type.charAt(0).toUpperCase() + type.slice(1)
+}
+
+function pickupStatusColor(status?: string | null): string {
+  if (status === 'completed' || status === 'picked_up') return '#22c55e'
+  if (status === 'cancelled' || status === 'expired' || status === 'missed') return '#ef4444'
+  return '#d49a00'
+}
+function pickupStatusBg(status?: string | null): string {
+  if (status === 'completed' || status === 'picked_up') return 'rgba(34,197,94,0.1)'
+  if (status === 'cancelled' || status === 'expired' || status === 'missed') return 'rgba(239,68,68,0.1)'
+  return 'rgba(255,180,0,0.1)'
+}
+function pickupStatusBorder(status?: string | null): string {
+  if (status === 'completed' || status === 'picked_up') return 'rgba(34,197,94,0.2)'
+  if (status === 'cancelled' || status === 'expired' || status === 'missed') return 'rgba(239,68,68,0.2)'
+  return 'rgba(255,180,0,0.2)'
+}
+
+watch(() => pickupPage.value, () => {
+  if (customer.value) fetchPickupHistory()
+})
 const billingHistory = ref<any[]>([])
 // const bins = ref<any[]>([])
 
@@ -490,20 +551,23 @@ const billingHistory = ref<any[]>([])
           <div class="summary-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
             <div style="background:#f8f9fa;border-radius:16px;padding:16px 20px">
               <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Total Pickups</p>
-              <p style="font-size:20px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ pickupHistory.length }}</p>
+              <p style="font-size:20px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ pickupTotal }}</p>
             </div>
             <div style="background:#f8f9fa;border-radius:16px;padding:16px 20px">
               <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Completed</p>
-              <p style="font-size:20px;font-weight:700;color:#22c55e;font-family:'Manrope',sans-serif">{{ pickupHistory.filter(p => p.status === 'completed').length }}</p>
+              <p style="font-size:20px;font-weight:700;color:#22c55e;font-family:'Manrope',sans-serif">{{ pickupSummary.completed }}</p>
             </div>
             <div style="background:#f8f9fa;border-radius:16px;padding:16px 20px">
-              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Missed / Cancelled</p>
-              <p style="font-size:20px;font-weight:700;color:#ef4444;font-family:'Manrope',sans-serif">{{ pickupHistory.filter(p => p.status !== 'completed').length }}</p>
+              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Cancelled / Expired</p>
+              <p style="font-size:20px;font-weight:700;color:#ef4444;font-family:'Manrope',sans-serif">{{ pickupSummary.missed }}</p>
             </div>
           </div>
 
           <!-- Table -->
-          <div class="table-scroll" style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
+          <div class="table-scroll" style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;position:relative">
+            <div v-if="pickupLoading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.6);z-index:1">
+              <UIcon name="i-lucide-loader-2" style="width:22px;height:22px;color:#ffb400;animation:spin 1s linear infinite" />
+            </div>
             <table style="width:100%;border-collapse:collapse;min-width:560px">
               <thead>
                 <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
@@ -517,35 +581,41 @@ const billingHistory = ref<any[]>([])
               <tbody>
                 <tr
                   v-for="(p, i) in pickupHistory"
-                  :key="i"
+                  :key="p.id ?? i"
                   style="border-bottom:1px solid #e5e7eb"
                   @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
                   @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
                 >
-                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">
-                    <div style="display:flex;flex-direction:column;gap:2px">
-                      <span style="font-weight:500">{{ p.date }}</span>
-                      <span style="font-size:12px;color:#6b7280">{{ p.time }}</span>
-                    </div>
+                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap;font-weight:500">
+                    {{ formatDate(p.preferredPickupDate ?? p.createdAt) }}
                   </td>
-                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ p.driver }}</td>
-                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ p.paymentType || '—' }}</td>
-                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ p.quantity ?? '—' }}</td>
+                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ p.driver?.name || '—' }}</td>
+                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ formatPaymentType(p.paymentType) }}</td>
+                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ p.estimatedQuantity?.label || '—' }}</td>
                   <td style="padding:16px">
-                    <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;
-                      color:${p.status === 'completed' ? '#22c55e' : p.status === 'missed' ? '#ef4444' : '#d49a00'};
-                      background:${p.status === 'completed' ? 'rgba(34,197,94,0.1)' : p.status === 'missed' ? 'rgba(239,68,68,0.1)' : 'rgba(255,180,0,0.1)'};
-                      border:1px solid ${p.status === 'completed' ? 'rgba(34,197,94,0.2)' : p.status === 'missed' ? 'rgba(239,68,68,0.2)' : 'rgba(255,180,0,0.2)'}`">
-                      {{ p.status }}
+                    <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;text-transform:capitalize;
+                      color:${pickupStatusColor(p.status)};
+                      background:${pickupStatusBg(p.status)};
+                      border:1px solid ${pickupStatusBorder(p.status)}`">
+                      {{ p.status?.replace(/_/g, ' ') || '—' }}
                     </span>
                   </td>
                 </tr>
-                <tr v-if="pickupHistory.length === 0">
+                <tr v-if="!pickupLoading && pickupHistory.length === 0">
                   <td colspan="5" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No pickup history found</td>
                 </tr>
               </tbody>
             </table>
           </div>
+
+          <!-- Pagination -->
+          <AppPagination
+            v-if="pickupTotal > pickupPerPage"
+            :page="pickupPage"
+            :total="pickupTotal"
+            :per-page="pickupPerPage"
+            @update:page="pickupPage = $event"
+          />
         </div>
 
         <!-- Billing -->
