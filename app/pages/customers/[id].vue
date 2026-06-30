@@ -275,21 +275,29 @@ async function fetchPickupStats() {
   if (!customer.value || pickupStatsLoaded.value) return
   pickupStatsLoaded.value = true
   const api = useApi()
-  const params = new URLSearchParams()
-  params.set('page', '1')
-  params.set('limit', '500')
-  params.set('sortBy', 'createdAt')
-  params.set('sortOrder', 'desc')
-  const res = await api.get<{ data: CustomerPickupHistoryEntry[]; pagination: { total: number } }>(
-    `/pickup-requests/admin/customers/${route.params.id}/history?${params.toString()}`,
-    'Failed to load pickup stats'
-  )
-  if (res) {
+  const all: CustomerPickupHistoryEntry[] = []
+  let page = 1
+  const limit = 100
+  let hasNext = true
+  while (hasNext) {
+    const params = new URLSearchParams()
+    params.set('page', String(page))
+    params.set('limit', String(limit))
+    params.set('sortBy', 'createdAt')
+    params.set('sortOrder', 'desc')
+    const res = await api.get<{ data: CustomerPickupHistoryEntry[]; pagination: { total: number; hasNextPage?: boolean } }>(
+      `/pickup-requests/admin/customers/${route.params.id}/history?${params.toString()}`,
+      'Failed to load pickup stats'
+    )
+    if (!res) break
+    if (res.data) all.push(...res.data)
     pickupTotal.value = res.pagination.total
-    pickupStats = {
-      completed: res.data.filter(p => p.status === 'completed' || p.status === 'picked_up').length,
-      missed: res.data.filter(p => p.status === 'cancelled' || p.status === 'expired' || p.status === 'missed').length,
-    }
+    hasNext = !!res.pagination.hasNextPage
+    page++
+  }
+  pickupStats = {
+    completed: all.filter(p => p.status === 'completed' || p.status === 'picked_up').length,
+    missed: all.filter(p => p.status === 'cancelled' || p.status === 'expired' || p.status === 'missed').length,
   }
 }
 

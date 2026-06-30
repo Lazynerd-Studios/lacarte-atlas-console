@@ -497,7 +497,7 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
         </div>
 
         <!-- Action buttons -->
-        <div class="pickup-actions" style="display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
+        <div class="pickup-actions" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
           <!-- Start Trip — shown when assigned -->
           <button
             v-if="pickup.status.toLowerCase() === 'assigned'"
@@ -760,3 +760,81 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
   </div>
 
 </template>
+
+<style scoped>
+@media (max-width: 1024px) {
+  .pickup-header {
+    align-items: flex-start !important;
+    gap: 16px;
+  }
+  .pickup-actions {
+    justify-content: flex-start !important;
+    width: 100%;
+  }
+  .pickup-actions button {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+  }
+  .pickup-stat-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .pickup-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+  .pickup-header-info {
+    width: 100%;
+  }
+  .pickup-actions {
+    width: 100%;
+    row-gap: 8px;
+  }
+  .pickup-actions button {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+    max-width: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .pickup-stat-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+  .pickup-detail-grid {
+    grid-template-columns: 1fr !important;
+    gap: 24px !important;
+  }
+  .pickup-timeline {
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+  .pickup-timeline > div {
+    min-width: 100px;
+  }
+  .table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .table-scroll::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .pickup-header-info {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+  .pickup-actions button {
+    flex: 1 1 100%;
+    font-size: 13px;
+    padding: 0 12px;
+    height: 36px;
+  }
+}
+</style>
