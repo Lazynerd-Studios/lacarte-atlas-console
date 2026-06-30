@@ -1,64 +1,65 @@
 <script setup lang="ts">
+import type { Customer } from '~/types/customer'
+
 definePageMeta({ layout: 'dashboard' })
 
 const { format } = useCurrency()
-const api = useApi()
 const route = useRoute()
 const toast = useAppToast()
 
-// Mock customer data — replace with API call using route.params.id
-const customer = ref({
-  id: 'CUST-2025-1',
-  firstName: 'Sarah',
-  lastName: 'Johnson',
-  email: 'sarah.j@email.com',
-  phone: '(555) 123-4567',
-  address: '123 Oak Street, Downtown',
-  street: '123 Oak Street',
-  city: 'Downtown',
-  postalCode: '12345',
-  instructions: 'Leave bins at side entrance',
-  userType: 'commercial',
-  entityName: 'Johnson Enterprises Ltd',
-  plan: 'subscription',
-  subscriptionInterval: 'monthly',
-  subscriptionType: 'prepaid',
-  planDetail: 'Weekly Pickup - GHS 45/month',
-  nextPickup: 'March 8, 2026',
-  since: 'Jan 2025',
-  status: 'active',
-  totalPickups: 42,
-  balance: 0,
-  lifetimeValue: 'GHS 1,890',
-  pickupRate: 'GHS 45.00 / pickup',
-  monthlyRate: 'GHS 45.00 / month',
-  gpsLat: 5.6037,
-  gpsLng: -0.1870,
-  gpsLastUpdated: '2026-03-07 08:42 AM',
-  gpsAddress: '123 Oak Street, Downtown, Accra',
-})
-
+const customer = ref<Customer | null>(null)
+const loading = ref(true)
+const notFound = ref(false)
 const suspending = ref(false)
 
-const initials = computed(() => `${customer.value.firstName[0]}${customer.value.lastName[0]}`)
+async function fetchCustomer() {
+  loading.value = true
+  notFound.value = false
+  const api = useApi()
+  const data = await api.get<Customer>(
+    `/customer/admin/${route.params.id}`,
+    'Failed to load customer'
+  )
+  if (data) {
+    customer.value = data
+  } else {
+    notFound.value = true
+  }
+  loading.value = false
+}
+
+onMounted(fetchCustomer)
+
+const fullName = computed(() => customer.value?.user.name ?? 'Unknown Customer')
+
+const initials = computed(() => {
+  const name = customer.value?.user.name?.trim()
+  if (!name) return '?'
+  const parts = name.split(/\s+/)
+  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || name[0]?.toUpperCase() || '?'
+})
 
 const statusBadge = computed(() => {
-  if (customer.value.status === 'active')   return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e', label: 'Active' }
-  if (customer.value.status === 'overdue')  return { bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.2)',  color: '#ef4444', label: 'Overdue' }
+  const s = customer.value?.status
+  if (s === 'active')   return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e', label: 'Active' }
+  if (s === 'overdue')  return { bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.2)',  color: '#ef4444', label: 'Overdue' }
   return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: 'Inactive' }
 })
 
 const showSuspendModal = ref(false)
 const showUnsuspendConfirm = ref(false)
 const showEditModal = ref(false)
+const saving = ref(false)
 
 async function handleSuspend(reason: string) {
   if (!reason.trim()) {
     toast.error('Please provide a reason for suspension')
     return
   }
+  if (!customer.value) return
 
   suspending.value = true
+  const api = useApi()
   const result = await api.patch<{ success: boolean; message?: string }>(
     `/customer/admin/${route.params.id}/suspend`,
     { reason: reason.trim() },
@@ -74,7 +75,10 @@ async function handleSuspend(reason: string) {
 }
 
 async function handleUnsuspend() {
+  if (!customer.value) return
+
   suspending.value = true
+  const api = useApi()
   const result = await api.patch<{ success: boolean; message?: string }>(
     `/customer/admin/${route.params.id}/unsuspend`,
     {},
@@ -89,25 +93,47 @@ async function handleUnsuspend() {
   }
 }
 
-function handleEditCustomer(data: Record<string, unknown>) {
-  // TODO: call API to update customer
-  console.log('Updated customer:', data)
-  showEditModal.value = false
+async function handleEditCustomer(payload: {
+  customerTypeId: string
+  zoneId: string
+  phoneNumber: string
+  noBins: number
+  address: string
+  city: string
+  region: string
+  postalCode: string
+  country: string
+  placeName: string
+}) {
+  if (!customer.value) return
+  saving.value = true
+  const api = useApi()
+  const updated = await api.patch<Customer>(
+    `/customer/admin/${route.params.id}`,
+    payload,
+    'Failed to update customer'
+  )
+  saving.value = false
+  if (updated) {
+    customer.value = updated
+    showEditModal.value = false
+    toast.success('Customer updated successfully')
+  }
 }
 
-function isSuspended() {
-  return customer.value.status !== 'active'
-}
+const isSuspended = computed(() => !!customer.value && customer.value.status !== 'active')
 
-function downloadQR() {
-  // TODO: generate and download QR code for customer
-  console.log('Download QR for', customer.value.id)
-}
+// Download QR (disabled — no endpoint yet)
+// function downloadQR() {
+//   if (!customer.value) return
+//   console.log('Download QR for', customer.value.id)
+// }
 
 const linkCopied = ref(false)
 let copyTimeout: ReturnType<typeof setTimeout> | null = null
 
 function copyPaymentLink() {
+  if (!customer.value) return
   const url = `${window.location.origin}/pay/${customer.value.id}`
   navigator.clipboard.writeText(url)
   linkCopied.value = true
@@ -115,54 +141,55 @@ function copyPaymentLink() {
   copyTimeout = setTimeout(() => { linkCopied.value = false }, 2000)
 }
 
+function formatDate(dateString?: string | null): string {
+  if (!dateString) return '—'
+  try {
+    return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  } catch {
+    return dateString
+  }
+}
+
+function formatDateTime(dateString?: string | null): string {
+  if (!dateString) return '—'
+  try {
+    return new Date(dateString).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return dateString
+  }
+}
+
+const customerSince = computed(() => formatDate(customer.value?.user.createdAt ?? customer.value?.createdAt))
+
 const activeTab = ref('Overview')
-const tabs = ['Overview', 'Pickup History', 'Billing', 'Assigned Bins', 'GPS Location', 'Notes']
+const tabs = ['Overview', 'Pickup History', 'Billing', 'GPS Location']
 
-const pickupHistory = [
-  { date: '2026-03-01', time: '08:45 AM', driver: 'John Smith',    status: 'completed', amount: 45 },
-  { date: '2026-02-22', time: '09:10 AM', driver: 'Maria Garcia',  status: 'completed', amount: 45 },
-  { date: '2026-02-15', time: '08:30 AM', driver: 'John Smith',    status: 'completed', amount: 45 },
-  { date: '2026-02-08', time: '10:00 AM', driver: 'James Wilson',  status: 'missed',    amount: 0  },
-  { date: '2026-02-01', time: '08:55 AM', driver: 'John Smith',    status: 'completed', amount: 45 },
-  { date: '2026-01-25', time: '09:20 AM', driver: 'Maria Garcia',  status: 'completed', amount: 45 },
-  { date: '2026-01-18', time: '08:40 AM', driver: 'John Smith',    status: 'completed', amount: 45 },
-  { date: '2026-01-11', time: '09:05 AM', driver: 'Lisa Anderson', status: 'rescheduled', amount: 0 },
-]
+// TODO: replace with real endpoints (pickups, billing, bins, notes)
+const pickupHistory = ref<any[]>([])
+const billingHistory = ref<any[]>([])
+// const bins = ref<any[]>([])
 
-const billingHistory = [
-  { date: '2026-03-01', invoice: 'INV-2026-001', description: 'Monthly Subscription', amountRaw: 45, status: 'paid' },
-  { date: '2026-02-01', invoice: 'INV-2026-002', description: 'Monthly Subscription', amountRaw: 45, status: 'paid' },
-  { date: '2026-01-01', invoice: 'INV-2026-003', description: 'Monthly Subscription', amountRaw: 45, status: 'paid' },
-  { date: '2025-12-01', invoice: 'INV-2025-012', description: 'Monthly Subscription', amountRaw: 45, status: 'paid' },
-  { date: '2025-11-01', invoice: 'INV-2025-011', description: 'Monthly Subscription + Extra Pickup', amountRaw: 65, status: 'paid' },
-  { date: '2025-10-01', invoice: 'INV-2025-010', description: 'Monthly Subscription', amountRaw: 45, status: 'paid' },
-]
+// Notes (disabled — no endpoint yet)
+// const customerNotes = ref<{ date: string; author: string; text: string }[]>([])
+// const staffNotes = ref<{ date: string; author: string; text: string }[]>([])
+// const newCustomerNote = ref('')
+// const newStaffNote = ref('')
 
-const bins = [
-  { type: 'Standard Bin',  size: '120L', assigned: '2025-06-15', status: 'active' },
-  { type: 'Recycling Bin', size: '80L',  assigned: '2025-06-15', status: 'active' },
-]
+// function addCustomerNote() {
+//   if (!newCustomerNote.value.trim()) return
+//   customerNotes.value.unshift({
+//     date: new Date().toISOString().slice(0, 10),
+//     author: fullName.value,
+//     text: newCustomerNote.value.trim(),
+//   })
+//   newCustomerNote.value = ''
+// }
 
-const customerNotes = ref([
-  { date: '2026-01-15', author: 'Sarah Johnson', text: 'Please ensure the bin is collected before 9am on Saturdays.' },
-])
-const staffNotes = ref([
-  { date: '2026-02-10', author: 'Admin', text: 'Customer requested bin relocation to side entrance.' },
-])
-const newCustomerNote = ref('')
-const newStaffNote = ref('')
-
-function addCustomerNote() {
-  if (!newCustomerNote.value.trim()) return
-  customerNotes.value.unshift({ date: new Date().toISOString().slice(0, 10), author: `${customer.value.firstName} ${customer.value.lastName}`, text: newCustomerNote.value.trim() })
-  newCustomerNote.value = ''
-}
-
-function addStaffNote() {
-  if (!newStaffNote.value.trim()) return
-  staffNotes.value.unshift({ date: new Date().toISOString().slice(0, 10), author: 'Admin', text: newStaffNote.value.trim() })
-  newStaffNote.value = ''
-}
+// function addStaffNote() {
+//   if (!newStaffNote.value.trim()) return
+//   staffNotes.value.unshift({ date: new Date().toISOString().slice(0, 10), author: 'Admin', text: newStaffNote.value.trim() })
+//   newStaffNote.value = ''
+// }
 </script>
 
 <template>
@@ -174,7 +201,23 @@ function addStaffNote() {
       <span style="font-size:16px;color:#6b7280;font-family:'Manrope',sans-serif">Back to Customers</span>
     </NuxtLink>
 
+    <!-- Loading state -->
+    <div v-if="loading" style="display:flex;align-items:center;justify-content:center;padding:80px 0">
+      <UIcon name="i-lucide-loader-2" style="width:28px;height:28px;color:#ffb400;animation:spin 1s linear infinite" />
+    </div>
+
+    <!-- Not found state -->
+    <div v-else-if="notFound || !customer" style="background:white;border:1px solid #ececec;border-radius:16px;padding:48px;text-align:center">
+      <UIcon name="i-lucide-user-x" style="width:40px;height:40px;color:#6b7280;margin-bottom:12px" />
+      <p style="font-size:18px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin-bottom:4px">Customer not found</p>
+      <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:16px">This customer may have been removed or the ID is invalid.</p>
+      <NuxtLink to="/customers" style="display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;background:#ffb400;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;text-decoration:none">
+        Back to Customers
+      </NuxtLink>
+    </div>
+
     <!-- Profile card -->
+    <template v-else>
     <div class="profile-card" style="background:white;border:1px solid #ececec;border-radius:16px;padding:10px 25px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
       <div class="profile-header" style="display:flex;align-items:center;justify-content:space-between;min-height:87px">
         <!-- Left: avatar + info -->
@@ -184,33 +227,34 @@ function addStaffNote() {
           </div>
           <div style="display:flex;flex-direction:column;gap:8px">
             <div style="display:flex;align-items:center;gap:12px">
-              <span style="font-size:24px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">{{ customer.firstName }} {{ customer.lastName }}</span>
-              <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;color:${statusBadge.color};background:${statusBadge.bg};border:1px solid ${statusBadge.border};border-radius:14px;padding:3px 11px`">
-                {{ statusBadge.label }}
-              </span>
+            <span style="font-size:24px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">{{ fullName }}</span>
+            <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;color:${statusBadge.color};background:${statusBadge.bg};border:1px solid ${statusBadge.border};border-radius:14px;padding:3px 11px`">
+              {{ statusBadge.label }}
+            </span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:16px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <UIcon name="i-lucide-phone" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
+              <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ customer.phoneNumber || '—' }}</span>
             </div>
-            <div style="display:flex;flex-wrap:wrap;gap:16px">
-              <div style="display:flex;align-items:center;gap:8px">
-                <UIcon name="i-lucide-phone" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
-                <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ customer.phone }}</span>
-              </div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <UIcon name="i-lucide-mail" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
-                <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ customer.email }}</span>
-              </div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <UIcon name="i-lucide-map-pin" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
-                <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ customer.address }}</span>
-              </div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <UIcon name="i-lucide-calendar" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
-                <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Customer since {{ customer.since }}</span>
-              </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <UIcon name="i-lucide-mail" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
+              <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ customer.user.email }}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <UIcon name="i-lucide-map-pin" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
+              <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ customer.placeName || customer.address || '—' }}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <UIcon name="i-lucide-calendar" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
+              <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Customer since {{ customerSince }}</span>
+            </div>
             </div>
           </div>
         </div>
         <!-- Right: actions -->
         <div class="profile-actions" style="display:flex;gap:8px;flex-shrink:0">
+          <!-- Download QR (disabled — no endpoint yet)
           <button
             style="height:40px;width:40px;background:#ffb400;border:none;border-radius:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0"
             title="Download QR"
@@ -218,6 +262,7 @@ function addStaffNote() {
           >
             <UIcon name="i-lucide-qr-code" style="width:16px;height:16px;color:#0a0d12" />
           </button>
+          -->
           <div style="position:relative;display:inline-flex">
             <button
               :style="`height:40px;width:40px;background:${linkCopied ? '#22c55e' : '#3b82f6'};border:none;border-radius:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background 0.2s`"
@@ -249,10 +294,10 @@ function addStaffNote() {
             Edit Customer
           </button>
           <button
-            :style="`height:40px;padding:0 16px;background:${isSuspended() ? '#22c55e' : '#ef4444'};border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:pointer`"
-            @click="isSuspended() ? (showUnsuspendConfirm = true) : (showSuspendModal = true)"
+            :style="`height:40px;padding:0 16px;background:${isSuspended ? '#22c55e' : '#ef4444'};border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:pointer`"
+            @click="isSuspended ? (showUnsuspendConfirm = true) : (showSuspendModal = true)"
           >
-            {{ isSuspended() ? 'Unsuspend Account' : 'Suspend Account' }}
+            {{ isSuspended ? 'Unsuspend Account' : 'Suspend Account' }}
           </button>
         </div>
       </div>
@@ -262,30 +307,29 @@ function addStaffNote() {
     <div class="grid-cols-4 stat-cards">
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:1px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
         <div style="padding:10px 24px 10px">
-          <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">Plan Type</p>
+          <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">Customer Type</p>
+          <p style="font-size:20px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ customer.customerType?.name || '—' }}</p>
+        </div>
+      </div>
+      <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:1px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+        <div style="padding:10px 24px 10px">
+          <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">Zone</p>
           <p style="font-size:20px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">
-            {{ customer.plan === 'subscription' ? `Subscription (${customer.subscriptionType.charAt(0).toUpperCase() + customer.subscriptionType.slice(1)})` : 'Pay-as-you-go' }}
+            <span v-if="customer.zone" :style="`color:${customer.zone.color}`">{{ customer.zone.name }}</span>
+            <span v-else>—</span>
           </p>
         </div>
       </div>
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:1px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
         <div style="padding:10px 24px 10px">
-          <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">Total Pickups</p>
-          <p style="font-size:20px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ customer.totalPickups }}</p>
+          <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">Assigned Bins</p>
+          <p style="font-size:20px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ customer.noBins }}</p>
         </div>
       </div>
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:1px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
         <div style="padding:10px 24px 10px">
-          <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">Outstanding Balance</p>
-          <p :style="`font-size:20px;font-weight:700;font-family:'Manrope',sans-serif;color:${customer.balance > 0 ? '#ef4444' : '#22c55e'}`">
-            GHS {{ customer.balance }}
-          </p>
-        </div>
-      </div>
-      <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:1px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-        <div style="padding:10px 24px 10px">
-          <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">Lifetime Value</p>
-          <p style="font-size:20px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ customer.lifetimeValue }}</p>
+          <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">Customer Since</p>
+          <p style="font-size:20px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ customerSince }}</p>
         </div>
       </div>
     </div>
@@ -311,14 +355,14 @@ function addStaffNote() {
             <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Account Information</p>
             <div style="display:flex;flex-direction:column;gap:12px">
               <div v-for="row in [
-                { label: 'Customer ID',       value: customer.id },
-                { label: 'Customer Type',     value: customer.userType.charAt(0).toUpperCase() + customer.userType.slice(1) },
-                { label: customer.userType !== 'regular' ? 'Entity Name' : 'User Type', value: customer.userType !== 'regular' ? customer.entityName : 'Regular' },
-                { label: 'Subscription Plan', value: customer.plan === 'subscription' ? customer.subscriptionInterval.charAt(0).toUpperCase() + customer.subscriptionInterval.slice(1) : 'Pay-as-you-go' },
-                { label: 'Next Pickup',       value: customer.nextPickup },
+                { label: 'Customer ID',     value: customer.id },
+                { label: 'Customer Type',   value: customer.customerType?.name || '—' },
+                { label: 'Account Role',    value: customer.user.role },
+                { label: 'Email Verified',  value: customer.user.emailVerified ? 'Yes' : 'No' },
+                { label: 'Customer Since',  value: customerSince },
               ]" :key="row.label" style="display:flex;flex-direction:column;gap:2px">
                 <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ row.label }}</p>
-                <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.value }}</p>
+                <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;text-transform:capitalize">{{ row.value }}</p>
               </div>
             </div>
           </div>
@@ -327,25 +371,27 @@ function addStaffNote() {
               <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Service Address</p>
               <div style="display:flex;flex-direction:column;gap:12px">
                 <div v-for="row in [
-                  { label: 'Street Address',       value: customer.street },
-                  { label: 'City',                 value: customer.city },
-                  { label: 'Postal Code',          value: customer.postalCode },
-                  { label: 'Special Instructions', value: customer.instructions },
+                  { label: 'Address',      value: customer.address },
+                  { label: 'City',         value: customer.city },
+                  { label: 'Region',       value: customer.region },
+                  { label: 'Postal Code',  value: customer.postalCode },
+                  { label: 'Country',      value: customer.country },
+                  { label: 'Place Name',   value: customer.placeName },
                 ]" :key="row.label" style="display:flex;flex-direction:column;gap:2px">
                   <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ row.label }}</p>
-                  <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.value }}</p>
+                  <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.value || '—' }}</p>
                 </div>
               </div>
             </div>
             <div style="display:flex;flex-direction:column;gap:16px">
-              <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Rates</p>
+              <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Assigned Zone</p>
               <div style="display:flex;flex-direction:column;gap:12px">
                 <div v-for="row in [
-                  { label: 'Pickup Rate',   value: customer.pickupRate },
-                  { label: 'Monthly Rate',  value: customer.monthlyRate },
+                  { label: 'Zone',    value: customer.zone?.name },
+                  { label: 'Active',  value: customer.zone?.isActive ? 'Yes' : 'No' },
                 ]" :key="row.label" style="display:flex;flex-direction:column;gap:2px">
                   <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ row.label }}</p>
-                  <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.value }}</p>
+                  <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.value || '—' }}</p>
                 </div>
               </div>
             </div>
@@ -486,7 +532,7 @@ function addStaffNote() {
           </div>
         </div>
 
-        <!-- Assigned Bins -->
+        <!-- Assigned Bins (disabled — no endpoint yet)
         <div v-else-if="activeTab === 'Assigned Bins'">
           <div class="table-scroll" style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
             <table style="width:100%;border-collapse:collapse;min-width:480px">
@@ -525,22 +571,23 @@ function addStaffNote() {
             </table>
           </div>
         </div>
+        -->
 
         <!-- GPS Location -->
         <div v-else-if="activeTab === 'GPS Location'" style="display:flex;flex-direction:column;gap:20px">
           <!-- Info row -->
           <div class="summary-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
             <div style="background:#f8f9fa;border-radius:16px;padding:16px 20px">
-              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Latitude</p>
-              <p style="font-size:16px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ customer.gpsLat }}</p>
+              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Place Name</p>
+              <p style="font-size:16px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ customer.placeName || '—' }}</p>
             </div>
             <div style="background:#f8f9fa;border-radius:16px;padding:16px 20px">
-              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Longitude</p>
-              <p style="font-size:16px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ customer.gpsLng }}</p>
+              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Address</p>
+              <p style="font-size:16px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ customer.address || '—' }}</p>
             </div>
             <div style="background:#f8f9fa;border-radius:16px;padding:16px 20px">
               <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">Last Updated</p>
-              <p style="font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ customer.gpsLastUpdated }}</p>
+              <p style="font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ formatDateTime(customer.locationUpdatedAt) }}</p>
             </div>
           </div>
 
@@ -549,7 +596,7 @@ function addStaffNote() {
             <UIcon name="i-lucide-map-pin" style="width:18px;height:18px;color:#ffb400;flex-shrink:0" />
             <div>
               <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:2px">Resolved Address</p>
-              <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ customer.gpsAddress }}</p>
+              <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ customer.placeName || customer.address || '—' }}</p>
             </div>
           </div>
 
@@ -570,18 +617,17 @@ function addStaffNote() {
                 <UIcon name="i-lucide-map-pin" style="width:24px;height:24px;color:#1a1a1a" />
               </div>
               <div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:8px 16px;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
-                <p style="font-size:13px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;text-align:center">{{ customer.firstName }} {{ customer.lastName }}</p>
-                <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;text-align:center">{{ customer.gpsLat }}, {{ customer.gpsLng }}</p>
+                <p style="font-size:13px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;text-align:center">{{ fullName }}</p>
+                <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;text-align:center">{{ customer.placeName || customer.address || '—' }}</p>
               </div>
             </div>
-            <p style="position:absolute;bottom:12px;font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Map integration — connect to Google Maps or Mapbox</p>
+            <p style="position:absolute;bottom:12px;font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Map integration — connect to TomTom Maps SDK</p>
           </div>
         </div>
 
-        <!-- Notes -->
+        <!-- Notes (disabled — no endpoint yet)
         <div v-else-if="activeTab === 'Notes'" class="notes-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
 
-          <!-- Customer Notes -->
           <div style="display:flex;flex-direction:column;gap:16px">
             <p style="font-size:18px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Customer Notes</p>
             <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:-8px">Notes submitted by the customer</p>
@@ -602,7 +648,6 @@ function addStaffNote() {
               </div>
             </div>
 
-            <!-- Add customer note -->
             <div style="display:flex;flex-direction:column;gap:8px">
               <textarea
                 v-model="newCustomerNote"
@@ -623,7 +668,6 @@ function addStaffNote() {
             </div>
           </div>
 
-          <!-- Staff Notes -->
           <div style="display:flex;flex-direction:column;gap:16px">
             <p style="font-size:18px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Staff Notes</p>
             <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:-8px">Internal notes visible to staff only</p>
@@ -644,7 +688,6 @@ function addStaffNote() {
               </div>
             </div>
 
-            <!-- Add staff note -->
             <div style="display:flex;flex-direction:column;gap:8px">
               <textarea
                 v-model="newStaffNote"
@@ -666,15 +709,17 @@ function addStaffNote() {
           </div>
 
         </div>
+        -->
 
       </div>
     </div>
+    </template>
   </div>
 
   <!-- Suspend Account Modal -->
   <SuspendModal
-    v-if="showSuspendModal"
-    :customer-name="`${customer.firstName} ${customer.lastName}`"
+    v-if="showSuspendModal && customer"
+    :customer-name="fullName"
     :loading="suspending"
     @close="showSuspendModal = false"
     @confirm="handleSuspend"
@@ -682,9 +727,9 @@ function addStaffNote() {
 
   <!-- Unsuspend Account Confirm Dialog -->
   <ConfirmDialog
-    v-if="showUnsuspendConfirm"
+    v-if="showUnsuspendConfirm && customer"
     title="Unsuspend Account"
-    :message="`Are you sure you want to reactivate ${customer.firstName} ${customer.lastName}'s account?`"
+    :message="`Are you sure you want to reactivate ${fullName}'s account?`"
     confirm-text="Unsuspend Account"
     confirm-color="#22c55e"
     :loading="suspending"
@@ -694,8 +739,9 @@ function addStaffNote() {
 
   <!-- Edit Customer Modal -->
   <EditCustomerModal
-    v-if="showEditModal"
+    v-if="showEditModal && customer"
     :customer="customer"
+    :saving="saving"
     @close="showEditModal = false"
     @submit="handleEditCustomer"
   />
