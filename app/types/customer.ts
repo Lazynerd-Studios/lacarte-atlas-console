@@ -46,6 +46,7 @@ export interface Customer {
   country: string | null
   placeName: string | null
   locationUpdatedAt: string | null
+  location: { latitude: number; longitude: number } | null
   createdAt: string
   updatedAt: string
   user: CustomerUser

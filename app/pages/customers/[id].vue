@@ -164,6 +164,92 @@ const customerSince = computed(() => formatDate(customer.value?.user.createdAt ?
 const activeTab = ref('Overview')
 const tabs = ['Overview', 'Pickup History', 'Billing', 'GPS Location']
 
+const config = useRuntimeConfig()
+let gpsMap: any = null
+const gpsMapError = ref('')
+const gpsMapLoading = ref(false)
+
+const hasLocation = computed(() => {
+  const loc = customer.value?.location
+  return !!loc && loc.latitude != null && loc.longitude != null
+})
+
+async function initGpsMap() {
+  if (!import.meta.client) return
+  if (gpsMap || gpsMapLoading.value) return
+  const loc = customer.value?.location
+  if (!loc) return
+
+  await nextTick()
+  const container = document.getElementById('customer-gps-map')
+  if (!container) return
+
+  const apiKey = config.public.tomtomApiKey
+  if (!apiKey) {
+    gpsMapError.value = 'TomTom API key not configured. Set NUXT_PUBLIC_TOMTOM_API_KEY.'
+    return
+  }
+
+  gpsMapLoading.value = true
+  try {
+    const { TomTomConfig } = await import('@tomtom-org/maps-sdk/core')
+    const { TomTomMap } = await import('@tomtom-org/maps-sdk/map')
+    TomTomConfig.instance.put({ apiKey })
+    gpsMap = new TomTomMap({
+      style: 'standardLight',
+      mapLibre: {
+        container: 'customer-gps-map',
+        center: [loc.longitude, loc.latitude],
+        zoom: 14,
+      },
+    })
+
+    gpsMap.mapLibreMap.on('load', () => {
+      gpsMap.mapLibreMap.addSource('customer-location', {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [loc.longitude, loc.latitude] },
+          properties: {},
+        },
+      })
+      gpsMap.mapLibreMap.addLayer({
+        id: 'customer-pin',
+        type: 'circle',
+        source: 'customer-location',
+        paint: {
+          'circle-radius': 10,
+          'circle-color': '#ffb400',
+          'circle-stroke-width': 3,
+          'circle-stroke-color': '#111111',
+        },
+      })
+    })
+    gpsMap.mapLibreMap.on('error', (e: any) => {
+      console.error('[customer-gps] map error:', e)
+      gpsMapError.value = 'Map failed to load.'
+    })
+  } catch (e) {
+    console.error('[customer-gps] map init failed:', e)
+    gpsMapError.value = 'Failed to load map.'
+  } finally {
+    gpsMapLoading.value = false
+  }
+}
+
+watch(activeTab, (tab) => {
+  if (tab === 'GPS Location' && hasLocation.value) {
+    nextTick(initGpsMap)
+  }
+})
+
+onBeforeUnmount(() => {
+  if (gpsMap) {
+    try { gpsMap.remove() } catch {}
+    gpsMap = null
+  }
+})
+
 // TODO: replace with real endpoints (pickups, billing, bins, notes)
 const pickupHistory = ref<any[]>([])
 const billingHistory = ref<any[]>([])
@@ -418,12 +504,13 @@ const billingHistory = ref<any[]>([])
 
           <!-- Table -->
           <div class="table-scroll" style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
-            <table style="width:100%;border-collapse:collapse;min-width:480px">
+            <table style="width:100%;border-collapse:collapse;min-width:560px">
               <thead>
                 <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Date</th>
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Driver</th>
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Amount</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Payment Type</th>
+                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Quantity</th>
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Status</th>
                 </tr>
               </thead>
@@ -442,7 +529,8 @@ const billingHistory = ref<any[]>([])
                     </div>
                   </td>
                   <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ p.driver }}</td>
-                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ p.amount > 0 ? format(p.amount) : '—' }}</td>
+                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ p.paymentType || '—' }}</td>
+                  <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ p.quantity ?? '—' }}</td>
                   <td style="padding:16px">
                     <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;
                       color:${p.status === 'completed' ? '#22c55e' : p.status === 'missed' ? '#ef4444' : '#d49a00'};
@@ -453,7 +541,7 @@ const billingHistory = ref<any[]>([])
                   </td>
                 </tr>
                 <tr v-if="pickupHistory.length === 0">
-                  <td colspan="4" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No pickup history found</td>
+                  <td colspan="5" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No pickup history found</td>
                 </tr>
               </tbody>
             </table>
@@ -600,28 +688,39 @@ const billingHistory = ref<any[]>([])
             </div>
           </div>
 
-          <!-- Map placeholder -->
-          <div style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;height:340px;background:#f0f4f8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;position:relative">
-            <!-- Grid lines to simulate map -->
-            <svg style="position:absolute;inset:0;width:100%;height:100%;opacity:0.15" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                  <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#6b7280" stroke-width="1"/>
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#grid)" />
-            </svg>
-            <!-- Pin -->
-            <div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:8px">
-              <div style="width:48px;height:48px;border-radius:9999px;background:#ffb400;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(255,180,0,0.4)">
-                <UIcon name="i-lucide-map-pin" style="width:24px;height:24px;color:#1a1a1a" />
-              </div>
-              <div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:8px 16px;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
-                <p style="font-size:13px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;text-align:center">{{ fullName }}</p>
-                <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;text-align:center">{{ customer.placeName || customer.address || '—' }}</p>
-              </div>
+          <!-- Map -->
+          <div style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;height:340px;position:relative;background:#f0f4f8">
+            <div v-if="hasLocation" id="customer-gps-map" data-testid="customer-gps-map" style="position:absolute;inset:0;width:100%;height:100%"></div>
+
+            <!-- Loading overlay -->
+            <div v-if="hasLocation && gpsMapLoading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.6)">
+              <UIcon name="i-lucide-loader-2" style="width:24px;height:24px;color:#ffb400;animation:spin 1s linear infinite" />
             </div>
-            <p style="position:absolute;bottom:12px;font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Map integration — connect to TomTom Maps SDK</p>
+
+            <!-- Error -->
+            <div v-if="gpsMapError" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;padding:16px;text-align:center">
+              <UIcon name="i-lucide-map-pin-off" style="width:28px;height:28px;color:#6b7280" />
+              <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ gpsMapError }}</p>
+            </div>
+
+            <!-- No location placeholder -->
+            <template v-else-if="!hasLocation">
+              <svg style="position:absolute;inset:0;width:100%;height:100%;opacity:0.15" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#6b7280" stroke-width="1"/>
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#grid)" />
+              </svg>
+              <div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;align-items:center;justify-content:center">
+                <div style="width:48px;height:48px;border-radius:9999px;background:#ffb400;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(255,180,0,0.4)">
+                  <UIcon name="i-lucide-map-pin" style="width:24px;height:24px;color:#1a1a1a" />
+                </div>
+                <p style="font-size:13px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ fullName }}</p>
+                <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">No GPS coordinates available for this customer</p>
+              </div>
+            </template>
           </div>
         </div>
 
