@@ -16,53 +16,27 @@ let map: any = null
 let abortController: AbortController | null = null
 let iconsLoaded = false
 
-function truckIconDataUrl(color: string): string {
-  const size = 48
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return ''
-
-  // Background circle
-  ctx.beginPath()
-  ctx.arc(size / 2, size / 2, size / 2 - 1, 0, Math.PI * 2)
-  ctx.fillStyle = color
-  ctx.fill()
-  ctx.strokeStyle = 'white'
-  ctx.lineWidth = 2
-  ctx.stroke()
-
-  // Truck body (white rectangle)
-  ctx.fillStyle = 'white'
-  const bodyW = 26
-  const bodyH = 14
-  const bodyX = (size - bodyW) / 2
-  const bodyY = 16
-  ctx.fillRect(bodyX, bodyY, bodyW, bodyH)
-
-  // Cab (white rectangle)
-  ctx.fillRect(bodyX + bodyW - 8, bodyY - 7, 8, 7)
-
-  // Wheels (dark circles)
-  ctx.fillStyle = '#374151'
-  ctx.beginPath()
-  ctx.arc(bodyX + 7, bodyY + bodyH, 4, 0, Math.PI * 2)
-  ctx.arc(bodyX + bodyW - 7, bodyY + bodyH, 4, 0, Math.PI * 2)
-  ctx.fill()
-
-  // Windows (light rectangles)
-  ctx.fillStyle = 'rgba(255,255,255,0.7)'
-  ctx.fillRect(bodyX + 4, bodyY + 3, 6, 5)
-  ctx.fillRect(bodyX + 12, bodyY + 3, 6, 5)
-
-  return canvas.toDataURL('image/png')
+function truckIconDataUrl(bodyColor: string, accentColor: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+    <g stroke="${accentColor}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">
+      <rect x="6" y="14" width="34" height="28" rx="3" fill="${bodyColor}"/>
+      <path d="M40 42 V28 L48 28 L57 34 V42 Z" fill="${bodyColor}"/>
+      <rect x="42" y="30" width="12" height="6" rx="1" fill="${accentColor}" stroke="none"/>
+    </g>
+    <circle cx="16" cy="44" r="6" fill="${accentColor}"/>
+    <circle cx="46" cy="44" r="6" fill="${accentColor}"/>
+    <circle cx="16" cy="44" r="2.5" fill="${bodyColor}"/>
+    <circle cx="46" cy="44" r="2.5" fill="${bodyColor}"/>
+  </svg>`
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`
 }
 
 function loadTruckIcons(mapLibreMap: any): Promise<void> {
   return new Promise((resolve, reject) => {
-    const onlineUrl = truckIconDataUrl('#22c55e')
-    const offlineUrl = truckIconDataUrl('#9ca3af')
+    const PRIMARY = '#ffb400'
+    const BLACK = '#111111'
+    const onlineUrl = truckIconDataUrl(PRIMARY, BLACK)
+    const offlineUrl = truckIconDataUrl(BLACK, PRIMARY)
 
     if (!onlineUrl || !offlineUrl) {
       console.error('[Map] Failed to generate truck icons')
@@ -222,7 +196,7 @@ function updateMarkers() {
       source: 'drivers',
       paint: {
         'circle-radius': 8,
-        'circle-color': ['case', ['get', 'isOnline'], '#22c55e', '#9ca3af'],
+        'circle-color': ['case', ['get', 'isOnline'], '#ffb400', '#111111'],
         'circle-stroke-width': 2,
         'circle-stroke-color': 'white',
       },
