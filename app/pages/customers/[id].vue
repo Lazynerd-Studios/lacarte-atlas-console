@@ -22,7 +22,10 @@ async function fetchCustomer() {
   )
   if (data) {
     customer.value = data
-    if (activeTab.value === 'Pickup History') fetchPickupHistory()
+    if (activeTab.value === 'Pickup History') {
+      fetchPickupStats()
+      fetchPickupHistory()
+    }
   } else {
     notFound.value = true
   }
@@ -242,8 +245,11 @@ watch(activeTab, (tab) => {
   if (tab === 'GPS Location' && hasLocation.value) {
     nextTick(initGpsMap)
   }
-  if (tab === 'Pickup History' && customer.value && pickupHistory.value.length === 0 && !pickupLoading.value) {
-    fetchPickupHistory()
+  if (tab === 'Pickup History' && customer.value) {
+    fetchPickupStats()
+    if (pickupHistory.value.length === 0 && !pickupLoading.value) {
+      fetchPickupHistory()
+    }
   }
 })
 
@@ -260,6 +266,32 @@ const pickupLoading = ref(false)
 const pickupPage = ref(1)
 const pickupTotal = ref(0)
 const pickupPerPage = 5
+
+// Aggregate counts across all pickups (independent of the current page)
+let pickupStats = { completed: 0, missed: 0 }
+const pickupStatsLoaded = ref(false)
+
+async function fetchPickupStats() {
+  if (!customer.value || pickupStatsLoaded.value) return
+  pickupStatsLoaded.value = true
+  const api = useApi()
+  const params = new URLSearchParams()
+  params.set('page', '1')
+  params.set('limit', '500')
+  params.set('sortBy', 'createdAt')
+  params.set('sortOrder', 'desc')
+  const res = await api.get<{ data: CustomerPickupHistoryEntry[]; pagination: { total: number } }>(
+    `/pickup-requests/admin/customers/${route.params.id}/history?${params.toString()}`,
+    'Failed to load pickup stats'
+  )
+  if (res) {
+    pickupTotal.value = res.pagination.total
+    pickupStats = {
+      completed: res.data.filter(p => p.status === 'completed' || p.status === 'picked_up').length,
+      missed: res.data.filter(p => p.status === 'cancelled' || p.status === 'expired' || p.status === 'missed').length,
+    }
+  }
+}
 
 async function fetchPickupHistory() {
   if (!customer.value) return
@@ -281,12 +313,11 @@ async function fetchPickupHistory() {
   pickupLoading.value = false
 }
 
-const pickupSummary = computed(() => {
-  const total = pickupHistory.value.length
-  const completed = pickupHistory.value.filter(p => p.status === 'completed' || p.status === 'picked_up').length
-  const missed = pickupHistory.value.filter(p => p.status === 'cancelled' || p.status === 'expired' || p.status === 'missed').length
-  return { total, completed, missed }
-})
+const pickupSummary = computed(() => ({
+  total: pickupTotal.value,
+  completed: pickupStats.completed,
+  missed: pickupStats.missed,
+}))
 
 function formatPaymentType(type?: string | null): string {
   if (!type) return '—'

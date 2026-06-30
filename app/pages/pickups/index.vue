@@ -176,6 +176,7 @@ function statusBadge(s: string) {
 }
 
 const showAssignDriverModal = ref(false)
+const showCreatePickupModal = ref(false)
 const selectedRequest = ref<PickupRequest | null>(null)
 
 function openAssignModal(req: PickupRequest) {
@@ -359,9 +360,20 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
   <div v-else style="display:flex;flex-direction:column;gap:32px">
 
     <!-- Header -->
-    <div>
-      <h1 style="font-size:32px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;line-height:1.3">Pickup Requests</h1>
-      <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:8px">Manage customer pickup requests and assignments</p>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+      <div>
+        <h1 style="font-size:32px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;line-height:1.3">Pickup Requests</h1>
+        <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:8px">Manage customer pickup requests and assignments</p>
+      </div>
+      <button
+        style="height:40px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px"
+        @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
+        @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
+        @click="showCreatePickupModal = true"
+      >
+        <UIcon name="i-lucide-plus" style="width:16px;height:16px;color:#0a0d12" />
+        Create Pickup
+      </button>
     </div>
 
     <!-- Stat cards -->
@@ -530,6 +542,13 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
     }"
     @close="showAssignDriverModal = false"
     @submit="handleAssignDriver"
+  />
+
+  <!-- Create Pickup Modal -->
+  <CreatePickupModal
+    v-if="showCreatePickupModal"
+    @close="showCreatePickupModal = false"
+    @created="() => { showCreatePickupModal = false; fetchStats(); fetchRequests() }"
   />
 </template>
 

@@ -463,8 +463,8 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
 
     <!-- Header card -->
     <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:10px 25px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-      <div style="display:flex;align-items:center;justify-content:space-between;min-height:87px">
-        <div style="display:flex;align-items:center;gap:16px">
+      <div class="pickup-header" style="display:flex;align-items:center;justify-content:space-between;min-height:87px;gap:16px">
+        <div class="pickup-header-info" style="display:flex;align-items:center;gap:16px">
           <div style="width:64px;height:64px;border-radius:16px;background:#ffb400;display:flex;align-items:center;justify-content:center;flex-shrink:0">
             <UIcon name="i-lucide-package" style="width:32px;height:32px;color:#1a1a1a" />
           </div>
@@ -497,7 +497,7 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
         </div>
 
         <!-- Action buttons -->
-        <div style="display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
+        <div class="pickup-actions" style="display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
           <!-- Start Trip — shown when assigned -->
           <button
             v-if="pickup.status.toLowerCase() === 'assigned'"
@@ -564,7 +564,7 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
     </div>
 
     <!-- Stat cards -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:24px">
+    <div class="pickup-stat-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:24px">
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:10px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
         <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">Payment Type</p>
         <p style="font-size:18px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ paymentTypeLabel }}</p>
@@ -599,7 +599,7 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
       <div style="padding:24px">
 
         <!-- Details tab -->
-        <div v-if="activeTab === 'Details'" style="display:grid;grid-template-columns:1fr 1fr;gap:32px">
+        <div v-if="activeTab === 'Details'" class="pickup-detail-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:32px">
 
           <!-- Pickup Info -->
           <div style="display:flex;flex-direction:column;gap:16px">
@@ -667,7 +667,7 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
         <div v-else-if="activeTab === 'Activity Log'" style="display:flex;flex-direction:column;gap:24px">
 
           <!-- Progress timeline -->
-          <div style="display:flex;align-items:flex-start;gap:0">
+          <div class="pickup-timeline" style="display:flex;align-items:flex-start;gap:0">
             <template v-for="(step, i) in timeline" :key="step.label">
               <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:0">
                 <div :style="`width:32px;height:32px;border-radius:9999px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:2px solid ${step.done ? '#ffb400' : '#e5e7eb'};background:${step.done ? '#ffb400' : 'white'}`">
@@ -682,8 +682,8 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
           </div>
 
           <!-- Log entries -->
-          <div style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
-            <table style="width:100%;border-collapse:collapse">
+          <div class="table-scroll" style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
+            <table style="width:100%;border-collapse:collapse;min-width:480px">
               <thead>
                 <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
                   <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Time</th>
