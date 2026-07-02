@@ -16,19 +16,21 @@ const navLinks = computed(() => [
   { label: 'Pickup Requests',    icon: 'i-lucide-package',          to: '/pickups', permission: 'pickups.view' },
   { label: 'Live Tracking',      icon: 'i-lucide-map-pin',          to: '/tracking', permission: 'tracking.view' },
   { label: 'Billing & Payments', icon: 'i-lucide-credit-card',      to: '/billing', permission: 'billing.view' },
-  { label: 'Shop',               icon: 'i-lucide-shopping-bag',     to: '/shop', permission: 'shop.view' },
-  { label: 'Inventory',          icon: 'i-lucide-boxes',            to: '/inventory', permission: 'inventory.view' },
+  // { label: 'Shop',               icon: 'i-lucide-shopping-bag',     to: '/shop', permission: 'shop.view' },
+  // { label: 'Inventory',          icon: 'i-lucide-boxes',            to: '/inventory', permission: 'inventory.view' },
   { label: 'Support Tickets',    icon: 'i-lucide-headphones',       to: '/support', permission: 'support.view' },
   { label: 'Team',               icon: 'i-lucide-users-round',      to: '/team', permission: 'team.view' },
   { label: 'Settings',           icon: 'i-lucide-settings',         to: '/settings', permission: null },
 ].filter(link => !link.permission || hasPermission(link.permission)))
 
+/*
 const reportsSubLinks = computed(() => [
   { label: 'Analytics',            to: '/reports/analytics', permission: 'reports.view' },
   { label: 'Operations Analytics', to: '/reports/operations', permission: 'reports.view' },
   { label: 'Customer Analytics',   to: '/reports/customers', permission: 'reports.view' },
   { label: 'Zone Performance',     to: '/reports/zones', permission: 'reports.view' },
 ].filter(link => !link.permission || hasPermission(link.permission)))
+*/
 
 const commsSubLinks = computed(() => [
   { label: 'Quick SMS',  to: '/comms/sms', permission: 'communications.send' },
@@ -44,20 +46,20 @@ const managementSubLinks = computed(() => [
 ].filter(link => !link.permission || hasPermission(link.permission)))
 
 // Show groups only if user has access to at least one sub-link
-const showReports = computed(() => reportsSubLinks.value.length > 0)
+// const showReports = computed(() => reportsSubLinks.value.length > 0)
 const showManagement = computed(() => managementSubLinks.value.length > 0)
 const showComms = computed(() => commsSubLinks.value.length > 0)
 
-const isReportsOpen = ref(route.path.startsWith('/reports'))
+// const isReportsOpen = ref(route.path.startsWith('/reports'))
 const isManagementOpen = ref(route.path.startsWith('/management'))
 const isCommsOpen = ref(route.path.startsWith('/comms'))
 
-const isReportsActive = computed(() => route.path.startsWith('/reports'))
+// const isReportsActive = computed(() => route.path.startsWith('/reports'))
 const isManagementActive = computed(() => route.path.startsWith('/management'))
 const isCommsActive = computed(() => route.path.startsWith('/comms'))
 
 watch(() => route.path, (p) => {
-  if (p.startsWith('/reports'))    isReportsOpen.value = true
+  // if (p.startsWith('/reports'))    isReportsOpen.value = true
   if (p.startsWith('/management')) isManagementOpen.value = true
   if (p.startsWith('/comms'))      isCommsOpen.value = true
 })
@@ -75,12 +77,12 @@ function toggleGroup(group: 'reports' | 'management' | 'comms') {
   if (collapsed.value) {
     collapsed.value = false
     nextTick(() => {
-      if (group === 'reports')    isReportsOpen.value = true
+      // if (group === 'reports')    isReportsOpen.value = true
       if (group === 'management') isManagementOpen.value = true
       if (group === 'comms')      isCommsOpen.value = true
     })
   } else {
-    if (group === 'reports')    isReportsOpen.value = !isReportsOpen.value
+    // if (group === 'reports')    isReportsOpen.value = !isReportsOpen.value
     if (group === 'management') isManagementOpen.value = !isManagementOpen.value
     if (group === 'comms')      isCommsOpen.value = !isCommsOpen.value
   }
@@ -175,7 +177,7 @@ function toggleGroup(group: 'reports' | 'management' | 'comms') {
         </div>
       </NuxtLink>
 
-      <!-- Reports -->
+      <!-- Reports (commented out)
       <div v-if="showReports">
         <div
           :style="`
@@ -212,6 +214,7 @@ function toggleGroup(group: 'reports' | 'management' | 'comms') {
           </NuxtLink>
         </div>
       </div>
+      -->
 
       <!-- Management -->
       <div v-if="showManagement">

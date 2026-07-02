@@ -11,17 +11,10 @@ const form = reactive({
   phone: '',
   password: '',
   confirmPassword: '',
-  street: '',
-  city: '',
-  postalCode: '',
   zone: '',
   userType: 'regular',
   entityName: '',
-  plan: 'subscription',
-  subscriptionInterval: 'monthly',
-  subscriptionType: 'prepaid',
   binCount: 1,
-  instructions: '',
   sendWelcome: true,
 })
 
@@ -39,8 +32,6 @@ function validate() {
   if (!form.password)          errors.password = 'Required'
   else if (form.password.length < 6) errors.password = 'Min 6 characters'
   if (form.confirmPassword !== form.password) errors.confirmPassword = 'Passwords do not match'
-  if (!form.street.trim())     errors.street = 'Required'
-  if (!form.city.trim())       errors.city = 'Required'
   return Object.keys(errors).length === 0
 }
 
@@ -165,29 +156,6 @@ function onBlur(e: Event, field: string) {
           </label>
         </div>
 
-        <!-- Street address -->
-        <div style="display:flex;flex-direction:column;gap:6px">
-          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Street Address</label>
-          <input v-model="form.street" type="text" placeholder="123 Main Street" :style="inputStyle('street')"
-            @focus="onFocus($event, 'street')" @blur="onBlur($event, 'street')" />
-          <span v-if="errors.street" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.street }}</span>
-        </div>
-
-        <!-- City / Postal -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-          <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">City</label>
-            <input v-model="form.city" type="text" placeholder="Downtown" :style="inputStyle('city')"
-              @focus="onFocus($event, 'city')" @blur="onBlur($event, 'city')" />
-            <span v-if="errors.city" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.city }}</span>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Postal Code</label>
-            <input v-model="form.postalCode" type="text" placeholder="12345" :style="inputStyle('postalCode')"
-              @focus="onFocus($event, 'postalCode')" @blur="onBlur($event, 'postalCode')" />
-          </div>
-        </div>
-
         <!-- Zone -->
         <div style="display:flex;flex-direction:column;gap:6px">
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Zone</label>
@@ -199,43 +167,6 @@ function onBlur(e: Event, field: string) {
           >
             <option value="" disabled>Select a zone</option>
             <option v-for="z in zones" :key="z.id" :value="z.id">{{ z.name }}</option>
-          </select>
-        </div>
-
-        <!-- Plan type -->
-        <div style="display:flex;flex-direction:column;gap:6px">
-          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Plan Type</label>
-          <select
-            v-model="form.plan"
-            :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
-          >
-            <option value="subscription">Subscription</option>
-            <option value="pay-as-you-go">Pay-as-you-go</option>
-          </select>
-        </div>
-
-        <!-- Subscription Interval -->
-        <div v-if="form.plan === 'subscription'" style="display:flex;flex-direction:column;gap:6px">
-          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Subscription Interval</label>
-          <select
-            v-model="form.subscriptionInterval"
-            :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
-          >
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-            <option value="yearly">Yearly</option>
-          </select>
-        </div>
-
-        <!-- Subscription Type -->
-        <div style="display:flex;flex-direction:column;gap:6px">
-          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Subscription Type</label>
-          <select
-            v-model="form.subscriptionType"
-            :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
-          >
-            <option value="prepaid">Prepaid</option>
-            <option value="postpaid">Postpaid</option>
           </select>
         </div>
 
@@ -258,18 +189,6 @@ function onBlur(e: Event, field: string) {
           </div>
         </div>
 
-        <!-- Special instructions -->
-        <div style="display:flex;flex-direction:column;gap:6px">
-          <label style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">Special Instructions</label>
-          <textarea
-            v-model="form.instructions"
-            placeholder="Any special pickup instructions..."
-            rows="4"
-            style="width:100%;padding:8px 12px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;resize:none;box-sizing:border-box;line-height:1.5"
-            @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
-            @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
-          />
-        </div>
       </div>
 
       <!-- Footer -->

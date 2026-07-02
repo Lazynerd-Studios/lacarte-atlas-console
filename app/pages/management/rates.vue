@@ -343,13 +343,11 @@ async function handleEdit() {
     
     // Transform form data to API payload
     const payload: Record<string, unknown> = {
-      rate: Number(editForm.value.pickupStr),        // API uses 'rate' field
+      rate: Number(editForm.value.pickupStr),
+      estimatedQuantityId: editForm.value.editEstimatedQuantityId,
       effectiveDate: editForm.value.effectiveDate,
       note: editForm.value.note.trim(),
       isActive: editForm.value.isActive,
-    }
-    if (editForm.value.editEstimatedQuantityId) {
-      payload.estimatedQuantityId = editForm.value.editEstimatedQuantityId
     }
     
     console.log('[Rates] Updating rate', editForm.value.id, 'with payload:', payload)

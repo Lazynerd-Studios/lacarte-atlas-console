@@ -4,40 +4,34 @@ definePageMeta({ layout: 'dashboard' })
 const api = useApi()
 
 const stats = [
-  { label: 'Active Customers', value: '2,847', change: '+12.5%', positive: true, icon: 'i-lucide-users' },
-  { label: 'Drivers on Duty',  value: '48',    change: '94% active', positive: null, icon: 'i-lucide-truck' },
-  { label: "Today's Pickups",  value: '342',   change: '+8.2%', positive: true, icon: 'i-lucide-package' },
-  { label: 'Outstanding Payments', value: 'GHS 12,480', change: '-5.3%', positive: false, icon: 'i-lucide-credit-card' },
-  { label: 'Revenue This Month',   value: 'GHS 84,230', change: '+18.4%', positive: true, icon: 'i-lucide-bar-chart-2' },
-  { label: 'Shop Orders Today',    value: '67',         change: '+23.1%', positive: true, icon: 'i-lucide-shopping-bag' },
+  { label: 'Active Customers', value: '0', change: '0%', positive: null, icon: 'i-lucide-users' },
+  { label: 'Drivers on Duty',  value: '0', change: '0%', positive: null, icon: 'i-lucide-truck' },
+  { label: "Today's Pickups",  value: '0', change: '0%', positive: null, icon: 'i-lucide-package' },
+  { label: 'Outstanding Payments', value: 'GHS 0', change: '0%', positive: null, icon: 'i-lucide-credit-card' },
+  { label: 'Revenue This Month',   value: 'GHS 0', change: '0%', positive: null, icon: 'i-lucide-bar-chart-2' },
+  { label: 'Shop Orders Today',    value: '0', change: '0%', positive: null, icon: 'i-lucide-shopping-bag' },
 ]
 
 const revenueData = [
-  { month: 'Jan', value: 62000 },
-  { month: 'Feb', value: 48000 },
-  { month: 'Mar', value: 71000 },
-  { month: 'Apr', value: 55000 },
-  { month: 'May', value: 84230 },
-  { month: 'Jun', value: 78000 },
+  { month: 'Jan', value: 0 },
+  { month: 'Feb', value: 0 },
+  { month: 'Mar', value: 0 },
+  { month: 'Apr', value: 0 },
+  { month: 'May', value: 0 },
+  { month: 'Jun', value: 0 },
 ]
 
 const pickupData = [
-  { day: 'Mon', value: 220 },
-  { day: 'Tue', value: 280 },
-  { day: 'Wed', value: 260 },
-  { day: 'Thu', value: 342 },
-  { day: 'Fri', value: 310 },
-  { day: 'Sat', value: 120 },
-  { day: 'Sun', value: 80 },
+  { day: 'Mon', value: 0 },
+  { day: 'Tue', value: 0 },
+  { day: 'Wed', value: 0 },
+  { day: 'Thu', value: 0 },
+  { day: 'Fri', value: 0 },
+  { day: 'Sat', value: 0 },
+  { day: 'Sun', value: 0 },
 ]
 
-const activities = [
-  { text: 'Pickup completed - Johnson Residence', time: '5 minutes ago', badge: 'success', badgeColor: '#22c55e', badgeBg: 'rgba(34,197,94,0.1)', badgeBorder: 'rgba(34,197,94,0.2)' },
-  { text: 'Payment received - GHS 245 from Sarah Chen', time: '12 minutes ago', badge: 'success', badgeColor: '#22c55e', badgeBg: 'rgba(34,197,94,0.1)', badgeBorder: 'rgba(34,197,94,0.2)' },
-  { text: 'New shop order - 2x Waste Bins', time: '18 minutes ago', badge: 'info', badgeColor: '#3b82f6', badgeBg: 'rgba(59,130,246,0.1)', badgeBorder: 'rgba(59,130,246,0.2)' },
-  { text: 'Low stock alert - Bin Bags (15 units left)', time: '23 minutes ago', badge: 'warning', badgeColor: '#d49a00', badgeBg: 'rgba(255,180,0,0.1)', badgeBorder: 'rgba(255,180,0,0.2)' },
-  { text: 'Route completed - Driver #24 (34 stops)', time: '45 minutes ago', badge: 'success', badgeColor: '#22c55e', badgeBg: 'rgba(34,197,94,0.1)', badgeBorder: 'rgba(34,197,94,0.2)' },
-]
+const activities: Array<Record<string, string>> = []
 
 interface PickupRequest {
   id: string
@@ -121,7 +115,7 @@ const innerH = chartH - padT - padB
 function revenuePoints() {
   return revenueData.map((d, i) => {
     const x = padL + (i / (revenueData.length - 1)) * innerW
-    const y = padT + innerH - (d.value / revenueMax) * innerH
+    const y = padT + innerH - (revenueMax ? d.value / revenueMax : 0) * innerH
     return `${x},${y}`
   }).join(' ')
 }
@@ -129,7 +123,7 @@ function revenuePoints() {
 function revenueArea() {
   const pts = revenueData.map((d, i) => {
     const x = padL + (i / (revenueData.length - 1)) * innerW
-    const y = padT + innerH - (d.value / revenueMax) * innerH
+    const y = padT + innerH - (revenueMax ? d.value / revenueMax : 0) * innerH
     return `${x},${y}`
   })
   const first = pts[0]!.split(',')
@@ -139,8 +133,8 @@ function revenueArea() {
 
 function barX(i: number) { return padL + (i / pickupData.length) * innerW + 10 }
 function barW() { return (innerW / pickupData.length) - 14 }
-function barY(v: number) { return padT + innerH - (v / pickupMax) * innerH }
-function barH(v: number) { return (v / pickupMax) * innerH }
+function barY(v: number) { return padT + innerH - (pickupMax ? v / pickupMax : 0) * innerH }
+function barH(v: number) { return (pickupMax ? v / pickupMax : 0) * innerH }
 </script>
 
 <template>

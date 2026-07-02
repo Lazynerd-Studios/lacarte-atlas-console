@@ -11,7 +11,7 @@ const userInitial = computed(() => {
 
 const userName = computed(() => authStore.user?.name || 'Admin User')
 
-const showNotifications = ref(false)
+// const showNotifications = ref(false)
 const search = ref('')
 
 async function logout() {
@@ -48,7 +48,7 @@ async function logout() {
 
     <!-- Right side -->
     <div style="display:flex;align-items:center;gap:4px;margin-left:auto">
-      <!-- Notifications -->
+      <!-- Notifications (commented out)
       <button
         style="position:relative;width:36px;height:36px;border-radius:20px;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center"
         @click="showNotifications = true"
@@ -58,6 +58,7 @@ async function logout() {
         <UIcon name="i-lucide-bell" style="width:20px;height:20px;color:#6b7280" />
         <span style="position:absolute;top:6px;right:6px;width:8px;height:8px;background:#ef4444;border-radius:9999px" />
       </button>
+      -->
 
       <!-- Divider -->
       <div style="width:1px;height:40px;background:#ececec;margin:0 12px" />
@@ -88,5 +89,5 @@ async function logout() {
     </div>
   </header>
 
-  <NotificationsModal v-if="showNotifications" @close="showNotifications = false" />
+  <!-- <NotificationsModal v-if="showNotifications" @close="showNotifications = false" /> -->
 </template>

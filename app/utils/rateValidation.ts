@@ -1,7 +1,7 @@
 // Rate management validation and transformation utilities
 
 interface AddFormData {
-  customerTypeId: string         // string for select binding, converted to number
+  customerTypeId: string         // string for select binding
   estimatedQuantityId: string    // string for select binding — quantity tier for this rate
   pickupRate: string             // string for input binding, converted to number
   effectiveDate: string          // ISO date string
@@ -11,7 +11,7 @@ interface AddFormData {
 
 interface ApiPayload {
   customerTypeId: string         // Keep as string for API
-  estimatedQuantityId?: string   // Optional — send only when set
+  estimatedQuantityId: string    // Required — quantity tier for this rate
   rate: number                   // API uses 'rate' not 'pickupRate'
   effectiveDate: string
   note: string
@@ -30,6 +30,11 @@ export function validateForm(form: AddFormData, isEdit = false): string[] {
   // Validate customer type is selected (only for add operations)
   if (!isEdit && !form.customerTypeId) {
     errors.push('Customer type is required.')
+  }
+
+  // Validate estimated quantity is selected
+  if (!form.estimatedQuantityId) {
+    errors.push('Estimated quantity is required.')
   }
 
   // Validate pickup rate is a positive number
@@ -52,16 +57,12 @@ export function validateForm(form: AddFormData, isEdit = false): string[] {
  * @returns API-compatible payload object
  */
 export function formToApiPayload(form: AddFormData): ApiPayload {
-  const payload: ApiPayload = {
-    customerTypeId: form.customerTypeId,  // Keep as string
-    rate: Number(form.pickupRate),        // API uses 'rate' field
+  return {
+    customerTypeId: form.customerTypeId,
+    estimatedQuantityId: form.estimatedQuantityId,
+    rate: Number(form.pickupRate),
     effectiveDate: form.effectiveDate,
     note: form.note.trim(),
     isActive: form.isActive,
   }
-  // Only include estimatedQuantityId when a selection was made
-  if (form.estimatedQuantityId) {
-    payload.estimatedQuantityId = form.estimatedQuantityId
-  }
-  return payload
 }
