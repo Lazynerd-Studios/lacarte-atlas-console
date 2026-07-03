@@ -1,11 +1,11 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'dashboard' })
 
-const activeTab = ref('general')
+const activeTab = ref('security')
 
 const tabs = [
-  { key: 'general',       label: 'General' },
-  { key: 'notifications', label: 'Notifications' },
+  // { key: 'general',       label: 'General' },
+  // { key: 'notifications', label: 'Notifications' },
   { key: 'security',      label: 'Security' },
   { key: 'activity',      label: 'Activity Logs' },
 ]
@@ -239,10 +239,9 @@ watch(activeTab, (newTab) => {
       <!-- Tab content -->
       <div style="padding:32px 24px">
 
-        <!-- General -->
+        <!-- General (commented out)
         <div v-if="activeTab === 'general'" style="display:flex;flex-direction:column;gap:32px;max-width:672px">
 
-          <!-- Company Information -->
           <div style="display:flex;flex-direction:column;gap:16px">
             <h3 style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Company Information</h3>
 
@@ -291,7 +290,6 @@ watch(activeTab, (newTab) => {
             </div>
           </div>
 
-          <!-- Regional Settings -->
           <div style="display:flex;flex-direction:column;gap:16px">
             <h3 style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Regional Settings</h3>
 
@@ -326,7 +324,6 @@ watch(activeTab, (newTab) => {
             </div>
           </div>
 
-          <!-- Save button -->
           <div style="display:flex;align-items:center;gap:12px">
             <button
               style="height:40px;padding:0 24px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
@@ -342,8 +339,9 @@ watch(activeTab, (newTab) => {
             </span>
           </div>
         </div>
+        -->
 
-        <!-- Notifications -->
+        <!-- Notifications (commented out)
         <div v-else-if="activeTab === 'notifications'" style="display:flex;flex-direction:column;gap:24px;max-width:672px">
           <h3 style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Notification Preferences</h3>
 
@@ -385,9 +383,10 @@ watch(activeTab, (newTab) => {
             Save Changes
           </button>
         </div>
+        -->
 
         <!-- Security -->
-        <div v-else-if="activeTab === 'security'" style="display:flex;flex-direction:column;gap:24px;max-width:480px">
+        <div v-if="activeTab === 'security'" style="display:flex;flex-direction:column;gap:24px;max-width:480px">
           <h3 style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Change Password</h3>
 
           <div style="display:flex;flex-direction:column;gap:16px">
@@ -423,6 +422,7 @@ watch(activeTab, (newTab) => {
             </div>
           </div>
 
+          <!-- 2FA (commented out)
           <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border:1px solid #e5e7eb;border-radius:16px">
             <div>
               <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0">Two-Factor Authentication</p>
@@ -435,6 +435,7 @@ watch(activeTab, (newTab) => {
               <span :style="`position:absolute;top:2px;width:20px;height:20px;border-radius:50%;background:white;box-shadow:0 1px 3px rgba(0,0,0,0.2);transition:left 0.2s;left:${security.twoFactor ? '22px' : '2px'}`" />
             </button>
           </div>
+          -->
 
           <button
             style="align-self:flex-start;height:40px;padding:0 24px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
