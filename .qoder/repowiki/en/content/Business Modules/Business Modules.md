@@ -21,7 +21,15 @@
 - [management/subscriptions.vue](file://app/pages/management/subscriptions.vue)
 - [team/index.vue](file://app/pages/team/index.vue)
 - [support/index.vue](file://app/pages/support/index.vue)
+- [settings/index.vue](file://app/pages/settings/index.vue)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Updated Settings module documentation to reflect interface refactoring
+- Added new Activity Logs functionality to Settings module
+- Documented disabled General and Notifications tabs with preserved code structure
+- Enhanced security features documentation with password management capabilities
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -36,7 +44,7 @@
 10. [Appendices](#appendices)
 
 ## Introduction
-This document provides comprehensive documentation for the business modules in the Lacarte Atlas Console, covering customer management, fleet management (drivers and trucks), pickup operations, billing and subscriptions, team administration, and support systems. It explains user stories, feature descriptions, data models, CRUD operations, workflows, and integration patterns between modules. The console is a Nuxt 3 application that communicates with a backend API via a centralized HTTP client and uses role-based permissions to control access.
+This document provides comprehensive documentation for the business modules in the Lacarte Atlas Console, covering customer management, fleet management (drivers and trucks), pickup operations, billing and subscriptions, team administration, support systems, and system settings. It explains user stories, feature descriptions, data models, CRUD operations, workflows, and integration patterns between modules. The console is a Nuxt 3 application that communicates with a backend API via a centralized HTTP client and uses role-based permissions to control access.
 
 ## Project Structure
 The application follows a page-driven structure under app/pages, with shared composables, types, components, and middleware. Key configuration includes runtime API base URL and module setup.
@@ -44,7 +52,7 @@ The application follows a page-driven structure under app/pages, with shared com
 ```mermaid
 graph TB
 A["Nuxt App<br/>app.vue"] --> B["Layouts<br/>dashboard.vue / default.vue"]
-A --> C["Pages<br/>customers, drivers, trucks, pickups,<br/>billing, management, team, support"]
+A --> C["Pages<br/>customers, drivers, trucks, pickups,<br/>billing, management, team, support, settings"]
 C --> D["Composables<br/>useApi, usePermissions, useCurrency"]
 C --> E["Types<br/>customer.ts, driver.ts, support.ts, team.ts"]
 C --> F["Components<br/>modals, tables, pagination"]
@@ -157,7 +165,7 @@ Purpose:
 
 User stories:
 - As an admin, I want to add a new driver and assign them to a zone and truck so they can start operations.
-- As an admin, I want to see each driver’s assigned truck, zone, and performance metrics.
+- As an admin, I want to see each driver's assigned truck, zone, and performance metrics.
 
 CRUD and workflows:
 - Add Driver via POST /drivers/admin/.
@@ -434,10 +442,71 @@ Update --> End(["Done"])
 - [support/index.vue:1-422](file://app/pages/support/index.vue#L1-L422)
 - [support.ts:1-81](file://app/types/support.ts#L1-L81)
 
+### System Settings
+Purpose:
+- Admin users can manage system preferences, security settings, and monitor activity logs. The settings interface has been refactored to prioritize security features while preserving existing functionality for future expansion.
+
+User stories:
+- As an admin, I want to change my password securely with validation and confirmation.
+- As an admin, I want to monitor system activity logs with filtering and search capabilities.
+- As an admin, I want to configure general company settings and notification preferences when available.
+
+**Updated** The settings interface has undergone significant refactoring with Security tab as the default view and enhanced activity monitoring capabilities.
+
+CRUD and workflows:
+- **Security Tab (Default)**:
+  - Password change with current password verification and confirmation.
+  - Two-factor authentication toggle (currently disabled but preserved for future use).
+- **Activity Logs Tab**:
+  - Real-time activity monitoring with search and filtering.
+  - Pagination support for large datasets.
+  - Module-specific filtering (auth, customer, driver, pickup, billing, inventory, team).
+  - Entity type filtering (customer, driver, pickup, truck, rate, zone, admin).
+- **General Tab (Disabled)**: Company information and regional settings preserved for future implementation.
+- **Notifications Tab (Disabled)**: Email and SMS notification preferences preserved for future implementation.
+
+Data model highlights:
+- Security settings include password fields and two-factor authentication toggle.
+- ActivityLog interface tracks comprehensive audit trails with actor information, actions, modules, and metadata.
+- ActivityLogsPagination manages server-side pagination with search and filter parameters.
+
+Integration points:
+- Uses useApi for activity log retrieval from `/activity-logs/me` endpoint.
+- Integrates with system-wide activity tracking across all modules.
+- Debounced search functionality for optimal performance.
+
+```mermaid
+flowchart TD
+SettingsStart(["Settings Interface"]) --> DefaultView["Security Tab (Default)"]
+DefaultView --> PasswordChange["Password Change Form"]
+PasswordChange --> Validation["Input Validation"]
+Validation --> SaveSuccess["Save Confirmation"]
+SettingsStart --> ActivityTab["Activity Logs Tab"]
+ActivityTab --> FetchLogs["GET /activity-logs/me"]
+FetchLogs --> FilterOptions["Search & Filter Options"]
+FilterOptions --> ModuleFilter["Module Filter"]
+FilterOptions --> EntityFilter["Entity Type Filter"]
+FilterOptions --> SearchInput["Debounced Search"]
+ModuleFilter --> Results["Paginated Results"]
+EntityFilter --> Results
+SearchInput --> Results
+Results --> Pagination["Server-side Pagination"]
+SettingsStart --> DisabledTabs["Disabled Tabs (Future Use)"]
+DisabledTabs --> GeneralTab["General Settings (Commented)"]
+DisabledTabs --> NotificationTab["Notification Preferences (Commented)"]
+```
+
+**Diagram sources**
+- [settings/index.vue:1-566](file://app/pages/settings/index.vue#L1-566)
+
+**Section sources**
+- [settings/index.vue:1-566](file://app/pages/settings/index.vue#L1-566)
+
 ## Dependency Analysis
 Module interactions:
 - Customers link to zones and customer types; pickups reference customers and drivers; billing references customers and plans; team manages roles and permissions affecting access to these modules.
 - Fleet management (drivers/trucks) supports pickup assignment and tracking.
+- Settings module provides system-wide configuration and monitoring capabilities that impact all other modules.
 
 ```mermaid
 graph TB
@@ -449,6 +518,8 @@ Subscriptions["Subscription Plans"] --> Customers
 Rates["Pay-as-you-go Rates"] --> Pickups
 Team["Team & Roles"] --> All["All Admin Pages"]
 Support["Support Tickets"] --> Customers
+Settings["System Settings"] --> All
+ActivityLogs["Activity Logs"] --> All
 ```
 
 [No sources needed since this diagram shows conceptual relationships]
@@ -459,6 +530,7 @@ Support["Support Tickets"] --> Customers
 - Lazy-load heavy libraries like xlsx only when exporting.
 - Prefer parallel fetches (e.g., stats + lists) to improve perceived performance.
 - Cache static lookups (customer types, quantities) in composables or stores if frequently accessed.
+- **Settings Optimization**: Activity logs implement debounced search (500ms delay) and server-side pagination to handle large datasets efficiently.
 
 [No sources needed since this section provides general guidance]
 
@@ -468,18 +540,24 @@ Common issues and resolutions:
 - Network errors: useErrorHandler wraps failures and shows toasts; verify network connectivity and API base URL.
 - Validation errors: Some endpoints return 400 validation messages; ensure payloads match expected schemas.
 - Missing data: If fields appear empty, check backend response shape and mapping in the page component.
+- **Settings Issues**: 
+  - Activity logs not loading: Verify `/activity-logs/me` endpoint availability and proper authentication.
+  - Search not working: Check debounced search implementation and ensure input values are properly passed to API.
+  - Tab navigation: Ensure activeTab state is properly managed and tab content conditionals are correct.
 
 Operational tips:
 - Inspect console logs from useApi for request/response details.
 - Verify runtime config values (NUXT_PUBLIC_API_BASE) in nuxt.config.ts.
 - For permission-related blocks, confirm the user has required roles/permissions.
+- **Settings Debugging**: Monitor activity log API calls and verify pagination parameters are correctly formatted.
 
 **Section sources**
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
 - [nuxt.config.ts:1-46](file://nuxt.config.ts#L1-L46)
+- [settings/index.vue:104-130](file://app/pages/settings/index.vue#L104-L130)
 
 ## Conclusion
-The Lacarte Atlas Console provides robust administrative capabilities across customers, fleet, pickups, billing, subscriptions, team, and support. Each module implements clear CRUD flows, consistent error handling, and permission checks. Integration points between modules enable end-to-end operational workflows from customer onboarding to service delivery and billing.
+The Lacarte Atlas Console provides robust administrative capabilities across customers, fleet, pickups, billing, subscriptions, team, support, and system settings. Each module implements clear CRUD flows, consistent error handling, and permission checks. Integration points between modules enable end-to-end operational workflows from customer onboarding to service delivery and billing. The recent settings interface refactoring enhances security focus while maintaining extensibility for future feature additions.
 
 [No sources needed since this section summarizes without analyzing specific files]
 
@@ -523,5 +601,29 @@ The Lacarte Atlas Console provides robust administrative capabilities across cus
 - Support
   - GET /support/admin/tickets
   - GET /support/admin/tickets/stats
+- **Settings**
+  - GET /activity-logs/me (with pagination and filters)
 
 [No sources needed since this section aggregates endpoint usage patterns]
+
+### Settings Interface Architecture
+The settings interface follows a modular tab-based architecture with the following structure:
+
+```mermaid
+graph LR
+A["Settings Container"] --> B["Tab Navigation"]
+B --> C["Security Tab (Active)"]
+B --> D["Activity Logs Tab (Active)"]
+B --> E["General Tab (Disabled)"]
+B --> F["Notifications Tab (Disabled)"]
+C --> G["Password Management"]
+D --> H["Activity Log Viewer"]
+E --> I["Company Settings (Preserved)"]
+F --> J["Notification Preferences (Preserved)"]
+H --> K["Search & Filters"]
+K --> L["Pagination"]
+```
+
+**Diagram sources**
+- [settings/index.vue:6-11](file://app/pages/settings/index.vue#L6-L11)
+- [settings/index.vue:214-237](file://app/pages/settings/index.vue#L214-L237)

@@ -59,6 +59,52 @@ const security = reactive({
   twoFactor: false,
 })
 
+const api = useApi()
+const toast = useAppToast()
+const securityErrors = reactive<Record<string, string>>({})
+const securityLoading = ref(false)
+
+// Password visibility toggles
+const showCurrentPassword = ref(false)
+const showNewPassword = ref(false)
+const showConfirmPassword = ref(false)
+
+function validatePasswordForm() {
+  Object.keys(securityErrors).forEach(k => delete securityErrors[k])
+  if (!security.currentPassword) securityErrors.currentPassword = 'Required'
+  if (!security.newPassword) securityErrors.newPassword = 'Required'
+  else if (security.newPassword.length < 8) securityErrors.newPassword = 'Must be at least 8 characters'
+  if (!security.confirmPassword) securityErrors.confirmPassword = 'Required'
+  else if (security.newPassword !== security.confirmPassword) securityErrors.confirmPassword = 'Passwords do not match'
+  return Object.keys(securityErrors).length === 0
+}
+
+async function changePassword() {
+  if (!validatePasswordForm()) return
+  securityLoading.value = true
+  try {
+    const result = await api.post<{ token: string; user: any }>('/auth/change-password', {
+      currentPassword: security.currentPassword,
+      newPassword: security.newPassword,
+      revokeOtherSessions: false,
+    }, 'Failed to change password')
+    if (result) {
+      // Update token if new one is returned
+      if (result.token) {
+        const authStore = useAuthStore()
+        authStore.token = result.token
+      }
+      // Clear form
+      security.currentPassword = ''
+      security.newPassword = ''
+      security.confirmPassword = ''
+      toast.success('Password changed successfully')
+    }
+  } finally {
+    securityLoading.value = false
+  }
+}
+
 // Activity Logs tab state
 interface ActivityLog {
   id: string
@@ -100,8 +146,6 @@ const activityActionFilter = ref<string>('')
 const activityModuleFilter = ref<string>('')
 const activityEntityTypeFilter = ref<string>('')
 const activityLoading = ref(false)
-
-const api = useApi()
 
 async function fetchActivityLogs() {
   activityLoading.value = true
@@ -392,33 +436,63 @@ watch(activeTab, (newTab) => {
           <div style="display:flex;flex-direction:column;gap:16px">
             <div style="display:flex;flex-direction:column;gap:6px">
               <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Current Password</label>
-              <input
-                v-model="security.currentPassword"
-                type="password"
-                style="height:39px;padding:8px 12px;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;width:100%"
-                @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
-                @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
-              />
+              <div style="position:relative">
+                <input
+                  v-model="security.currentPassword"
+                  :type="showCurrentPassword ? 'text' : 'password'"
+                  :style="`height:39px;padding:8px 40px 8px 12px;border:1px solid ${securityErrors.currentPassword ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;width:100%`"
+                  @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+                  @blur="($event.target as HTMLElement).style.borderColor=securityErrors.currentPassword ? '#ef4444' : '#e5e7eb'"
+                />
+                <button
+                  type="button"
+                  style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:28px;height:28px;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px"
+                  @click="showCurrentPassword = !showCurrentPassword"
+                >
+                  <UIcon :name="showCurrentPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'" style="width:16px;height:16px;color:#6b7280" />
+                </button>
+              </div>
+              <span v-if="securityErrors.currentPassword" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ securityErrors.currentPassword }}</span>
             </div>
             <div style="display:flex;flex-direction:column;gap:6px">
               <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">New Password</label>
-              <input
-                v-model="security.newPassword"
-                type="password"
-                style="height:39px;padding:8px 12px;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;width:100%"
-                @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
-                @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
-              />
+              <div style="position:relative">
+                <input
+                  v-model="security.newPassword"
+                  :type="showNewPassword ? 'text' : 'password'"
+                  :style="`height:39px;padding:8px 40px 8px 12px;border:1px solid ${securityErrors.newPassword ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;width:100%`"
+                  @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+                  @blur="($event.target as HTMLElement).style.borderColor=securityErrors.newPassword ? '#ef4444' : '#e5e7eb'"
+                />
+                <button
+                  type="button"
+                  style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:28px;height:28px;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px"
+                  @click="showNewPassword = !showNewPassword"
+                >
+                  <UIcon :name="showNewPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'" style="width:16px;height:16px;color:#6b7280" />
+                </button>
+              </div>
+              <span v-if="securityErrors.newPassword" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ securityErrors.newPassword }}</span>
             </div>
             <div style="display:flex;flex-direction:column;gap:6px">
               <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Confirm New Password</label>
-              <input
-                v-model="security.confirmPassword"
-                type="password"
-                style="height:39px;padding:8px 12px;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;width:100%"
-                @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
-                @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
-              />
+              <div style="position:relative">
+                <input
+                  v-model="security.confirmPassword"
+                  :type="showConfirmPassword ? 'text' : 'password'"
+                  :style="`height:39px;padding:8px 40px 8px 12px;border:1px solid ${securityErrors.confirmPassword ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;width:100%`"
+                  @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+                  @blur="($event.target as HTMLElement).style.borderColor=securityErrors.confirmPassword ? '#ef4444' : '#e5e7eb'"
+                />
+                <button
+                  type="button"
+                  style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:28px;height:28px;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px"
+                  @click="showConfirmPassword = !showConfirmPassword"
+                >
+                  <UIcon :name="showConfirmPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'" style="width:16px;height:16px;color:#6b7280" />
+                </button>
+              </div>
+              <span v-if="securityErrors.confirmPassword" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ securityErrors.confirmPassword }}</span>
             </div>
           </div>
 
@@ -438,11 +512,12 @@ watch(activeTab, (newTab) => {
           -->
 
           <button
-            style="align-self:flex-start;height:40px;padding:0 24px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
-            @mouseover="($event.currentTarget as HTMLElement).style.background='#e6a200'"
-            @mouseleave="($event.currentTarget as HTMLElement).style.background='#ffb400'"
+            :disabled="securityLoading"
+            :style="`align-self:flex-start;height:40px;padding:0 24px;background:${securityLoading ? '#f3f4f6' : '#ffb400'};border:none;border-radius:20px;font-size:14px;font-weight:500;color:${securityLoading ? '#9ca3af' : '#0a0d12'};font-family:'Manrope',sans-serif;cursor:${securityLoading ? 'not-allowed' : 'pointer'};box-shadow:0 1px 3px rgba(255,180,0,0.2);display:flex;align-items:center;gap:8px`"
+            @click="changePassword"
           >
-            Update Password
+            <UIcon v-if="securityLoading" name="i-lucide-loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
+            {{ securityLoading ? 'Updating...' : 'Update Password' }}
           </button>
         </div>
 

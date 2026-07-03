@@ -13,6 +13,12 @@
 - [main.css](file://app/assets/css/main.css)
 </cite>
 
+## Update Summary
+**Changes Made**
+- Updated AppHeader section to reflect disabled search functionality
+- Added notes about temporarily commented search interface
+- Maintained all other existing documentation structure and content
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Project Structure](#project-structure)
@@ -25,7 +31,7 @@
 9. [Conclusion](#conclusion)
 
 ## Introduction
-This document explains the layout components that form the main application shell: AppSidebar for navigation and AppHeader for user controls. It covers how the sidebar collapses, filters navigation by permissions, behaves on mobile, and integrates with the authentication store. It also documents the header’s user profile display, notification system integration points, and responsive design patterns. Finally, it provides props, events, slots, customization options, and examples of how these components work together to create the primary dashboard layout.
+This document explains the layout components that form the main application shell: AppSidebar for navigation and AppHeader for user controls. It covers how the sidebar collapses, filters navigation by permissions, behaves on mobile, and integrates with the authentication store. It also documents the header's user profile display, notification system integration points, and responsive design patterns. Finally, it provides props, events, slots, customization options, and examples of how these components work together to create the primary dashboard layout.
 
 ## Project Structure
 The layout is composed of a dashboard layout that composes AppSidebar and AppHeader, with global CSS handling responsive behavior and a permission system driven by the auth store and utilities.
@@ -66,7 +72,7 @@ H --> CSS
 - [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
 - [default.vue:1-6](file://app/layouts/default.vue#L1-L6)
 - [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
-- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
+- [AppHeader.vue:1-95](file://app/components/AppHeader.vue#L1-L95)
 - [NotificationsModal.vue:1-210](file://app/components/NotificationsModal.vue#L1-L210)
 - [auth.ts](file://app/stores/auth.ts)
 - [usePermissions.ts:1-43](file://app/composables/usePermissions.ts#L1-L43)
@@ -77,7 +83,7 @@ H --> CSS
 - [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
 - [default.vue:1-6](file://app/layouts/default.vue#L1-L6)
 - [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
-- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
+- [AppHeader.vue:1-95](file://app/components/AppHeader.vue#L1-L95)
 - [auth.ts](file://app/stores/auth.ts)
 - [usePermissions.ts:1-43](file://app/composables/usePermissions.ts#L1-L43)
 - [auth.ts](file://app/utils/auth.ts)
@@ -86,17 +92,17 @@ H --> CSS
 
 ## Core Components
 - AppSidebar: Collapsible navigation with permission-based filtering, grouped sections, active state, and a user footer.
-- AppHeader: Top bar with hamburger toggle (mobile), search input, and user area with logout.
+- AppHeader: Top bar with hamburger toggle (mobile), disabled search input, and user area with logout.
 - Dashboard layout: Composes sidebar and header, manages mobile open/close state, and renders page content via slot.
 
 Key responsibilities:
 - Sidebar: Renders filtered links based on current user permissions; toggles collapse state; handles group expansion; shows user initials and name/email at the bottom.
-- Header: Emits toggle event for mobile sidebar; displays user info from auth store; triggers logout flow.
+- Header: Emits toggle event for mobile sidebar; displays user info from auth store; triggers logout flow. Search functionality is currently disabled.
 - Layout: Controls mobile overlay/backdrop and ensures sidebar closes on route change.
 
 **Section sources**
 - [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
-- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
+- [AppHeader.vue:1-95](file://app/components/AppHeader.vue#L1-L95)
 - [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
 
 ## Architecture Overview
@@ -132,7 +138,7 @@ Header->>Layout : router.push('/login')
 
 **Diagram sources**
 - [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
-- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
+- [AppHeader.vue:1-95](file://app/components/AppHeader.vue#L1-L95)
 - [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
 - [auth.ts](file://app/stores/auth.ts)
 - [usePermissions.ts:1-43](file://app/composables/usePermissions.ts#L1-L43)
@@ -206,7 +212,7 @@ Render --> End(["Done"])
 ### AppHeader
 Responsibilities:
 - Mobile hamburger button to toggle sidebar.
-- Search input placeholder (non-functional in this file).
+- Disabled search input placeholder (currently commented out).
 - User area displaying name and role text, avatar with initial, and logout button.
 - Placeholder for notifications (modal integration point).
 
@@ -225,6 +231,7 @@ Computed data:
 Behavior highlights:
 - Logout calls auth store logout, shows success toast, and redirects to login.
 - Notification UI is commented out but ready to integrate with NotificationsModal.
+- Search functionality is currently disabled and commented out pending future updates.
 
 Integration points:
 - useAuthStore for user data and logout.
@@ -232,15 +239,18 @@ Integration points:
 - Router for navigation after logout.
 
 Customization options:
-- Replace search input behavior with a global search composable.
+- Enable search functionality by uncommenting the search interface section (lines 36-48).
+- Replace search input behavior with a global search composable when re-enabled.
 - Enable notifications by uncommenting the bell button and modal binding.
 - Style user text and avatar via CSS classes or theme tokens.
 
 Example usage:
 - Placed above the main content in the dashboard layout; emits toggle-sidebar to control mobile sidebar.
 
+**Updated** Search functionality is currently disabled (commented out) pending future updates. The search interface section in lines 36-48 has been temporarily commented out.
+
 **Section sources**
-- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
+- [AppHeader.vue:1-95](file://app/components/AppHeader.vue#L1-L95)
 - [NotificationsModal.vue:1-210](file://app/components/NotificationsModal.vue#L1-L210)
 - [auth.ts](file://app/stores/auth.ts)
 
@@ -278,7 +288,7 @@ A minimal layout wrapper that simply renders its default slot. Useful for non-da
 
 ### Notifications Modal
 Responsibilities:
-- Display a list of notifications with unread indicators, filters, mark-as-read, dismiss, and “mark all read”.
+- Display a list of notifications with unread indicators, filters, mark-as-read, dismiss, and "mark all read".
 - Close via emitting a close event.
 
 Props:
@@ -314,7 +324,7 @@ Styles --> Header
 
 **Diagram sources**
 - [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
-- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
+- [AppHeader.vue:1-95](file://app/components/AppHeader.vue#L1-L95)
 - [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
 - [usePermissions.ts:1-43](file://app/composables/usePermissions.ts#L1-L43)
 - [auth.ts](file://app/stores/auth.ts)
@@ -323,7 +333,7 @@ Styles --> Header
 
 **Section sources**
 - [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
-- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
+- [AppHeader.vue:1-95](file://app/components/AppHeader.vue#L1-L95)
 - [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
 - [usePermissions.ts:1-43](file://app/composables/usePermissions.ts#L1-L43)
 - [auth.ts](file://app/stores/auth.ts)
@@ -336,6 +346,7 @@ Styles --> Header
 - Route watchers: Expand groups only when needed; consider debouncing if many nested groups are added.
 - Icons and hover effects: Inline styles are used; extracting to CSS variables can improve maintainability and reduce style churn.
 - Notifications modal: Currently static data; when integrating real-time updates, prefer incremental updates and virtualized lists for large datasets.
+- Search functionality: When re-enabling search, implement debounced search queries to prevent excessive API calls.
 
 [No sources needed since this section provides general guidance]
 
@@ -351,14 +362,18 @@ Common issues and resolutions:
   - Verify the dashboard layout binds mobileOpen and emits/handles toggle-sidebar correctly.
   - Ensure the backdrop click handler sets mobileOpen to false.
 - Header user info not updating:
-  - Confirm the auth store’s user object is populated and reactive.
+  - Confirm the auth store's user object is populated and reactive.
   - After logout, ensure the router navigates away from protected routes.
 - Notifications modal not appearing:
   - If enabling the bell button, ensure the modal is conditionally rendered and emits close properly.
+- Search functionality not working:
+  - Search interface is currently disabled (commented out) in AppHeader.vue lines 36-48.
+  - To enable search, uncomment the search interface section and implement the search logic.
+  - Consider implementing debounced search to prevent performance issues with frequent API calls.
 
 **Section sources**
 - [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
-- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
+- [AppHeader.vue:1-95](file://app/components/AppHeader.vue#L1-L95)
 - [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
 - [auth.ts](file://app/stores/auth.ts)
 - [usePermissions.ts:1-43](file://app/composables/usePermissions.ts#L1-L43)
@@ -366,4 +381,4 @@ Common issues and resolutions:
 - [NotificationsModal.vue:1-210](file://app/components/NotificationsModal.vue#L1-L210)
 
 ## Conclusion
-The layout components provide a robust foundation for the application’s main shell. AppSidebar offers flexible, permission-aware navigation with collapsible behavior and mobile support. AppHeader centralizes user controls and integrates seamlessly with the auth store. Together with the dashboard layout and global responsive styles, they deliver a consistent, accessible experience across devices. Extensibility points include adding new navigation entries, enabling notifications, and customizing visual themes via CSS variables.
+The layout components provide a robust foundation for the application's main shell. AppSidebar offers flexible, permission-aware navigation with collapsible behavior and mobile support. AppHeader centralizes user controls and integrates seamlessly with the auth store. Together with the dashboard layout and global responsive styles, they deliver a consistent, accessible experience across devices. Extensibility points include adding new navigation entries, enabling notifications, customizing visual themes via CSS variables, and re-implementing search functionality when needed.
