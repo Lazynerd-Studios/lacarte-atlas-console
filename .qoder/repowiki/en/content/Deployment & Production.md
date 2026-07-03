@@ -2,336 +2,351 @@
 
 <cite>
 **Referenced Files in This Document**
-- [nuxt.config.ts](file://nuxt.config.ts)
 - [package.json](file://package.json)
+- [nuxt.config.ts](file://nuxt.config.ts)
 - [README.md](file://README.md)
-- [.gitignore](file://.gitignore)
-- [useApi.ts](file://app/composables/useApi.ts)
-- [auth.ts](file://app/stores/auth.ts)
-- [drivers.vue](file://app/pages/tracking/drivers.vue)
-- [index.vue](file://app/pages/tracking/index.vue)
-- [api-1(6).yaml](file://api-1(6).yaml)
+- [tsconfig.json](file://tsconfig.json)
+- [vitest.config.ts](file://vitest.config.ts)
+- [app/composables/useApi.ts](file://app/composables/useApi.ts)
+- [app/plugins/auth-init.client.ts](file://app/plugins/auth-init.client.ts)
+- [app/stores/auth.ts](file://app/stores/auth.ts)
+- [app/middleware/auth.global.ts](file://app/middleware/auth.global.ts)
+- [app/middleware/permissions.global.ts](file://app/middleware/permissions.global.ts)
 </cite>
 
 ## Table of Contents
-1. Introduction
-2. Project Structure
-3. Core Components
-4. Architecture Overview
-5. Detailed Component Analysis
-6. Dependency Analysis
-7. Performance Considerations
-8. Troubleshooting Guide
-9. Conclusion
-10. Appendices
+1. [Introduction](#introduction)
+2. [Project Structure](#project-structure)
+3. [Core Components](#core-components)
+4. [Architecture Overview](#architecture-overview)
+5. [Detailed Component Analysis](#detailed-component-analysis)
+6. [Dependency Analysis](#dependency-analysis)
+7. [Performance Considerations](#performance-considerations)
+8. [Troubleshooting Guide](#troubleshooting-guide)
+9. [Conclusion](#conclusion)
+10. [Appendices](#appendices)
 
 ## Introduction
-This document provides a comprehensive guide to deploying and operating the application in production. It covers build configuration, environment variable management, performance monitoring, error tracking, asset optimization, caching strategies, and platform-specific deployment examples. It also addresses security considerations, scaling strategies, and maintenance procedures for production environments.
-
-The project is a Nuxt 4 application using Vite under the hood, with runtime configuration exposed via Nuxt’s runtimeConfig. The app consumes a backend API (documented by an OpenAPI spec), manages authentication state client-side, and integrates a mapping SDK that requires a public API key.
+This document provides comprehensive deployment and production guidance for the Lacarte Atlas Console, a Nuxt-based application. It covers building for production, environment configuration, runtime behavior, security posture, monitoring/logging hooks, scaling strategies, and maintenance procedures. The goal is to enable reliable deployments with clear operational runbooks and troubleshooting steps.
 
 ## Project Structure
-At a high level:
-- Build and scripts are defined in package.json.
-- Nuxt configuration includes modules, runtime config, route rules, and Vite optimizations.
-- Client-side API access uses a composable that reads runtime config and attaches auth headers.
-- Authentication state and session handling live in a Pinia store.
-- Mapping features require a public API key provided at runtime.
-- .gitignore excludes build artifacts and local env files.
+The project is a Nuxt 4 application using Vue 3 and Pinia. Build and preview scripts are provided via package.json, and runtime configuration is centralized in nuxt.config.ts. Authentication, authorization, and API communication are implemented through composables, stores, plugins, and middleware.
 
 ```mermaid
 graph TB
-A["package.json<br/>scripts"] --> B["Nuxt CLI<br/>(build/dev/generate/preview)"]
-B --> C["Vite Build<br/>ESNext target"]
-C --> D[".output / dist<br/>production artifacts"]
-E["nuxt.config.ts<br/>runtimeConfig.public"] --> F["Client Runtime Config"]
-G["useApi.ts<br/>fetch wrapper"] --> H["Backend API<br/>(OpenAPI)"]
-I["auth.ts<br/>session + token"] --> G
-J["tracking pages<br/>map init"] --> K["@tomtom-org/maps-sdk"]
+A["package.json<br/>scripts: build, dev, generate, preview"] --> B["Nuxt Build System"]
+C["nuxt.config.ts<br/>runtimeConfig.public.*"] --> D["Runtime Config (Client)"]
+E["app/composables/useApi.ts<br/>fetch + Authorization header"] --> F["Backend API"]
+G["app/stores/auth.ts<br/>session management"] --> H["Middleware auth.global.ts"]
+I["Middleware permissions.global.ts"] --> J["Route Guards"]
+K["app/plugins/auth-init.client.ts<br/>initial session check"] --> L["App Startup"]
 ```
 
 **Diagram sources**
-- [package.json:1-33](file://package.json#L1-L33)
-- [nuxt.config.ts:1-46](file://nuxt.config.ts#L1-L46)
-- [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
-- [auth.ts:1-230](file://app/stores/auth.ts#L1-L230)
-- [drivers.vue:102-185](file://app/pages/tracking/drivers.vue#L102-L185)
-- [index.vue:83-123](file://app/pages/tracking/index.vue#L83-L123)
+- [package.json:5-12](file://package.json#L5-L12)
+- [nuxt.config.ts:21-26](file://nuxt.config.ts#L21-L26)
+- [app/composables/useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
+- [app/stores/auth.ts:1-230](file://app/stores/auth.ts#L1-L230)
+- [app/middleware/auth.global.ts:1-32](file://app/middleware/auth.global.ts#L1-L32)
+- [app/middleware/permissions.global.ts:1-59](file://app/middleware/permissions.global.ts#L1-L59)
+- [app/plugins/auth-init.client.ts:1-25](file://app/plugins/auth-init.client.ts#L1-L25)
 
 **Section sources**
 - [package.json:1-33](file://package.json#L1-L33)
 - [nuxt.config.ts:1-46](file://nuxt.config.ts#L1-L46)
-- [.gitignore:1-28](file://.gitignore#L1-L28)
+- [README.md:41-76](file://README.md#L41-L76)
 
 ## Core Components
-- Build pipeline: npm/pnpm/yarn/bun scripts wrap Nuxt commands for development, building, generating static output, and previewing production builds.
-- Runtime configuration: Public runtime variables are injected into the client via runtimeConfig.public. These include the API base URL and a mapping API key.
-- API client: A composable wraps fetch calls, injects Authorization headers when available, and centralizes error handling and redirects on 401.
-- Authentication store: Manages tokens, user data, session expiry, periodic checks, and logout flows.
-- Mapping integration: Pages initialize the map only when the public API key is present; otherwise they surface a clear error message.
+- Runtime Configuration: Public runtime config exposes API base URL and third-party keys to the client.
+- API Composable: Centralized HTTP client that attaches bearer tokens, handles 401 redirects, and normalizes responses.
+- Auth Store: Manages user state, token lifecycle, periodic session checks, and warnings.
+- Middleware: Global authentication and permission guards enforce access control on routes.
+- Plugin: Initializes session validation at app startup.
 
 Key responsibilities:
-- nuxt.config.ts: Modules, head meta, color mode preference, runtimeConfig.public, router options, Vite build targets, dependency pre-bundling, and route-level SSR toggles.
-- useApi.ts: Centralized HTTP layer with auth header injection, success/failure handling, and 401 redirect behavior.
-- auth.ts: Token lifecycle, profile fetching, session refresh, warning UI, and logout.
-- Tracking pages: Conditional map initialization based on runtime config and DOM readiness.
+- Environment-driven endpoints and keys via runtime config.
+- Secure request handling with automatic token injection and error normalization.
+- Session lifecycle with proactive refresh and warning UI.
+- Route-level protection based on roles and permissions.
 
 **Section sources**
-- [nuxt.config.ts:1-46](file://nuxt.config.ts#L1-L46)
-- [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
-- [auth.ts:1-230](file://app/stores/auth.ts#L1-L230)
-- [drivers.vue:102-185](file://app/pages/tracking/drivers.vue#L102-L185)
-- [index.vue:83-123](file://app/pages/tracking/index.vue#L83-L123)
+- [nuxt.config.ts:21-26](file://nuxt.config.ts#L21-L26)
+- [app/composables/useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
+- [app/stores/auth.ts:1-230](file://app/stores/auth.ts#L1-L230)
+- [app/middleware/auth.global.ts:1-32](file://app/middleware/auth.global.ts#L1-L32)
+- [app/middleware/permissions.global.ts:1-59](file://app/middleware/permissions.global.ts#L1-L59)
+- [app/plugins/auth-init.client.ts:1-25](file://app/plugins/auth-init.client.ts#L1-L25)
 
 ## Architecture Overview
-The application follows a client-first architecture:
-- Nuxt builds a client bundle optimized for production.
-- At runtime, the app reads public configuration from runtimeConfig.public.
-- API requests are made directly from the browser using the configured base URL.
-- Authentication is handled client-side with token storage and periodic validation against the server.
-- Mapping features depend on a public API key and are initialized lazily.
+High-level runtime flow:
+- Build produces static assets and server runtime (Nuxt).
+- At runtime, public runtime config values are injected into the client bundle.
+- On first load, the auth plugin validates an existing session.
+- All route navigations pass through auth and permissions middleware.
+- API calls go through useApi, which injects Authorization headers and handles errors.
 
 ```mermaid
 sequenceDiagram
-participant U as "User"
-participant FE as "Nuxt App (Client)"
-participant RC as "Runtime Config"
-participant API as "Backend API"
-participant MAP as "TomTom Maps SDK"
-U->>FE : Navigate to protected page
-FE->>RC : Read public.apiBase, public.tomtomApiKey
-FE->>API : GET /auth/get-session (Bearer token)
-API-->>FE : Session valid or invalid
-alt Valid
-FE->>FE : Update user/profile, schedule checks
-FE->>MAP : Initialize map if key present
-MAP-->>FE : Map ready
-else Invalid
-FE->>U : Redirect to login
+participant Browser as "Browser"
+participant Nuxt as "Nuxt App"
+participant Plugin as "auth-init.plugin"
+participant MWAuth as "auth.global.middleware"
+participant MWPerm as "permissions.global.middleware"
+participant Store as "auth.store"
+participant API as "useApi.composable"
+participant Backend as "Backend API"
+Browser->>Nuxt : Load app
+Nuxt->>Plugin : Initialize
+Plugin->>Store : checkSession() if authenticated
+Store->>Backend : GET /auth/get-session
+Backend-->>Store : Valid/Invalid
+alt Invalid
+Store-->>Plugin : false
+Plugin->>Nuxt : Redirect to /login
+else Valid
+Store-->>Plugin : true
 end
+Browser->>MWAuth : Navigate to protected route
+MWAuth->>Store : isAuthenticated?
+alt Not authenticated
+MWAuth->>Nuxt : Redirect to /login
+else Authenticated
+MWAuth->>Store : checkSession() (on navigation)
+Store->>Backend : GET /auth/get-session
+Backend-->>Store : Valid/Invalid
+alt Invalid
+Store-->>MWAuth : false
+MWAuth->>Nuxt : Redirect to /login
+else Valid
+MWAuth->>MWPerm : Continue
+MWPerm->>Store : Check permissions
+MWPerm-->>Nuxt : Allow or redirect to /unauthorized
+end
+end
+Browser->>API : Request data
+API->>Backend : fetch with Authorization header
+Backend-->>API : Response
+API-->>Browser : Data or error
 ```
 
 **Diagram sources**
-- [nuxt.config.ts:21-26](file://nuxt.config.ts#L21-L26)
-- [auth.ts:90-120](file://app/stores/auth.ts#L90-L120)
-- [index.vue:83-123](file://app/pages/tracking/index.vue#L83-L123)
-- [api-1(6).yaml:59-95](file://api-1(6).yaml#L59-L95)
+- [app/plugins/auth-init.client.ts:1-25](file://app/plugins/auth-init.client.ts#L1-L25)
+- [app/middleware/auth.global.ts:1-32](file://app/middleware/auth.global.ts#L1-L32)
+- [app/middleware/permissions.global.ts:1-59](file://app/middleware/permissions.global.ts#L1-L59)
+- [app/stores/auth.ts:90-120](file://app/stores/auth.ts#L90-L120)
+- [app/composables/useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
 
 ## Detailed Component Analysis
 
-### Build Configuration and Optimization
-- Scripts: Standard Nuxt scripts for dev, build, generate, and preview are provided.
-- Vite settings:
-  - Build target set to esnext for modern browsers.
-  - Dependency pre-bundling includes xlsx to improve cold start and reduce runtime overhead.
-- Route rules: Certain routes disable SSR for client-only rendering where appropriate.
-- Head and meta: Viewport meta tag included for responsive layouts.
+### Build and Preview
+- Build command compiles the app for production.
+- Preview command serves the built output locally for verification.
+- Generate command is available for static generation mode.
 
-Recommendations:
-- Keep build target aligned with your target audience browser support matrix.
-- Use routeRules judiciously to balance SEO and interactivity.
-- Pre-bundle heavy dependencies only when necessary.
+Operational notes:
+- Use the same Node.js version across environments to avoid build differences.
+- Cache dependencies and .nuxt artifacts in CI to speed up builds.
 
 **Section sources**
-- [package.json:5-13](file://package.json#L5-L13)
-- [nuxt.config.ts:32-38](file://nuxt.config.ts#L32-L38)
-- [nuxt.config.ts:39-44](file://nuxt.config.ts#L39-L44)
-- [nuxt.config.ts:11-17](file://nuxt.config.ts#L11-L17)
+- [package.json:5-12](file://package.json#L5-L12)
+- [README.md:41-76](file://README.md#L41-L76)
 
-### Environment Variable Management
-Public runtime variables are defined in runtimeConfig.public and sourced from process.env at build time. The app expects:
-- NUXT_PUBLIC_API_BASE: Base URL for all API calls.
-- NUXT_PUBLIC_TOMTOM_API_KEY: Key for the mapping SDK.
-
-Behavior:
-- If NUXT_PUBLIC_TOMTOM_API_KEY is missing, map initialization fails gracefully with a user-facing error.
-- API calls use config.public.apiBase to construct full URLs.
+### Runtime Configuration
+Public runtime config variables exposed to the client:
+- NUXT_PUBLIC_API_BASE: Base URL for backend API calls.
+- NUXT_PUBLIC_TOMTOM_API_KEY: Key used by mapping services.
 
 Best practices:
-- Provide defaults in nuxt.config.ts for non-sensitive values.
-- Never expose secrets to the client; keep them server-side only.
-- Use CI/CD secret managers to inject environment variables during build/deploy.
+- Set these via your hosting platform’s environment variable system.
+- Never commit secrets; rely on runtime injection.
 
 **Section sources**
 - [nuxt.config.ts:21-26](file://nuxt.config.ts#L21-L26)
-- [useApi.ts:19-20](file://app/composables/useApi.ts#L19-L20)
-- [drivers.vue:116-123](file://app/pages/tracking/drivers.vue#L116-L123)
-- [index.vue:88-94](file://app/pages/tracking/index.vue#L88-L94)
 
-### API Layer and Error Handling
-The API composable:
-- Reads runtime config for the API base URL.
-- Attaches Authorization headers when a token exists.
-- Treats 200/201/204 as success; otherwise attempts to parse JSON messages.
-- On 401, clears session and redirects to login.
-- Provides typed helpers for common HTTP methods and a raw request method.
+### API Client and Error Handling
+Centralized HTTP client:
+- Attaches Authorization header when token exists.
+- Normalizes success codes (200, 201, 204).
+- Handles 401 by logging out and redirecting to login.
+- Wraps errors with consistent messages and logs.
 
-Error handling strategy:
-- Centralized logging for requests/responses.
-- User-friendly errors via toast notifications through a shared error handler.
-- Consistent 401 handling across the app.
+Error handling wrapper:
+- Provides a run helper that shows toast notifications and returns null on failure.
 
-```mermaid
-flowchart TD
-Start(["Request"]) --> BuildHeaders["Build headers<br/>+ Authorization if token"]
-BuildHeaders --> Fetch["Fetch with fullUrl"]
-Fetch --> Status{"Status OK?"}
-Status --> |No| HandleErr["Parse error body<br/>Throw error"]
-Status --> |Yes| Parse["Parse JSON or null"]
-Parse --> Return(["Return result"])
-HandleErr --> AuthCheck{"Status 401?"}
-AuthCheck --> |Yes| Logout["Logout + Redirect"]
-AuthCheck --> |No| Toast["Show toast via error handler"]
-Logout --> End(["Exit"])
-Toast --> End
-Return --> End
-```
-
-**Diagram sources**
-- [useApi.ts:9-67](file://app/composables/useApi.ts#L9-L67)
-- [useErrorHandler.ts:1-29](file://app/composables/useErrorHandler.ts#L1-29)
+Security considerations:
+- Ensure CORS is configured on the backend for the deployed domain.
+- Validate all inputs before sending to the API.
 
 **Section sources**
-- [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
-- [useErrorHandler.ts:1-29](file://app/composables/useErrorHandler.ts#L1-29)
+- [app/composables/useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
+- [app/composables/useErrorHandler.ts:1-29](file://app/composables/useErrorHandler.ts#L1-L29)
 
 ### Authentication and Session Management
-The auth store:
-- Stores user, token, and team member profile.
-- Sets session expiry and starts periodic checks and warnings.
-- Refreshes session by calling the backend session endpoint.
-- Logs out and cleans up state on expiration or explicit logout.
+Auth store responsibilities:
+- Stores user, token, team member profile, and session expiry.
+- Periodically checks session validity and warns users near expiry.
+- Refreshes session and updates expiry upon successful checks.
+- Logs out and clears state on invalid sessions or explicit logout.
 
-Security notes:
-- Tokens are stored client-side; ensure HTTPS and secure cookie policies on the server side.
-- Avoid storing sensitive data beyond what is required.
+Startup flow:
+- On app load, if a token exists, validate session and redirect if invalid.
 
-```mermaid
-sequenceDiagram
-participant Store as "Auth Store"
-participant API as "Backend API"
-participant Router as "Router"
-Store->>API : GET /auth/get-session (Bearer)
-API-->>Store : 200 OK with user data
-Store->>Store : Update user, schedule checks
-loop Every 5 minutes
-Store->>API : GET /auth/get-session
-API-->>Store : 401 Unauthorized
-Store->>Router : Push /login
-end
-```
-
-**Diagram sources**
-- [auth.ts:90-120](file://app/stores/auth.ts#L90-L120)
-- [auth.ts:148-163](file://app/stores/auth.ts#L148-L163)
-- [api-1(6).yaml:59-95](file://api-1(6).yaml#L59-L95)
+Security considerations:
+- Tokens are stored in memory and persisted via Pinia plugin; ensure secure storage policies align with your threat model.
+- Enforce HTTPS everywhere.
 
 **Section sources**
-- [auth.ts:1-230](file://app/stores/auth.ts#L1-230)
+- [app/stores/auth.ts:1-230](file://app/stores/auth.ts#L1-L230)
+- [app/plugins/auth-init.client.ts:1-25](file://app/plugins/auth-init.client.ts#L1-L25)
 
-### Mapping Integration and Asset Loading
-Mapping pages:
-- Check for the presence of the public API key before initializing the map.
-- Dynamically import the mapping SDK to avoid unnecessary loading.
-- Attach event listeners for load and error states.
-- Surface user-friendly errors when the container is missing or the key is absent.
+### Middleware: Authentication and Permissions
+Authentication middleware:
+- Allows public routes (/login, /forgot-password, /unauthorized) and payment pages (/pay/**).
+- Redirects unauthenticated users to login.
+- Verifies session on navigation transitions.
 
-Operational guidance:
-- Ensure the public API key is correctly set in the deployment environment.
-- Validate DOM container existence before map initialization.
+Permissions middleware:
+- Skips public routes.
+- Grants admin/super-admin full access.
+- Maps routes to required permissions and redirects unauthorized users.
+
+Operational tips:
+- Keep route-permission mappings centralized and reviewed regularly.
+- Log denied access attempts for auditability.
 
 **Section sources**
-- [drivers.vue:102-185](file://app/pages/tracking/drivers.vue#L102-L185)
-- [index.vue:83-123](file://app/pages/tracking/index.vue#L83-L123)
+- [app/middleware/auth.global.ts:1-32](file://app/middleware/auth.global.ts#L1-L32)
+- [app/middleware/permissions.global.ts:1-59](file://app/middleware/permissions.global.ts#L1-L59)
+
+### SSR and Routing Rules
+SSR disabled for sensitive or interactive routes:
+- /login
+- /forgot-password
+- /pay/**
+- /tracking/**
+
+Implications:
+- These routes render fully on the client, reducing server load but increasing client-side work.
+- Ensure any secrets remain server-only and are not embedded in client bundles.
+
+**Section sources**
+- [nuxt.config.ts:39-44](file://nuxt.config.ts#L39-L44)
+
+### TypeScript and Build Targets
+- TypeScript references generated configs under .nuxt.
+- Vite build target set to esnext for modern browsers.
+- Dependency optimization includes xlsx for faster cold starts.
+
+Operational notes:
+- Target modern browsers only if supported by your audience.
+- Monitor bundle size and tree-shaking effectiveness.
+
+**Section sources**
+- [tsconfig.json:1-19](file://tsconfig.json#L1-L19)
+- [nuxt.config.ts:32-38](file://nuxt.config.ts#L32-L38)
 
 ## Dependency Analysis
-External dependencies relevant to deployment:
-- Nuxt and Vue ecosystem packages.
-- TomTom Maps SDK used conditionally at runtime.
-- XLSX pre-bundled for performance.
+External dependencies relevant to production:
+- Nuxt framework and modules (@nuxt/ui, @pinia/nuxt, persistedstate).
+- Mapping SDK integration (@tomtom-org/maps-sdk).
+- Spreadsheet utility (xlsx).
+- Testing stack (Vitest, happy-dom) used in development/testing.
+
+Build-time vs runtime:
+- Development-only tooling should be excluded from production images.
+- Only runtime dependencies are shipped to production.
 
 ```mermaid
 graph LR
-Pkg["package.json"] --> Nuxt["nuxt"]
-Pkg --> Vue["vue"]
-Pkg --> Router["vue-router"]
-Pkg --> Pinia["@pinia/nuxt"]
-Pkg --> Persist["@pinia-plugin-persistedstate/nuxt"]
+Pkg["package.json"] --> Nuxt["Nuxt + Modules"]
 Pkg --> TomTom["@tomtom-org/maps-sdk"]
 Pkg --> XLSX["xlsx"]
+Pkg --> Pinia["@pinia/nuxt + persistedstate"]
+Dev["devDependencies"] --> Vitest["Vitest + happy-dom"]
 ```
 
 **Diagram sources**
-- [package.json:14-25](file://package.json#L14-L25)
+- [package.json:14-31](file://package.json#L14-L31)
 
 **Section sources**
 - [package.json:1-33](file://package.json#L1-L33)
 
 ## Performance Considerations
-- Build target: esnext reduces polyfills and improves runtime performance on modern browsers.
-- Dependency pre-bundling: Including xlsx in optimizeDeps avoids runtime compilation overhead.
-- SSR toggles: Disabling SSR on specific routes can reduce server load and improve interactivity for client-heavy pages.
-- Lazy imports: The mapping SDK is dynamically imported to defer loading until needed.
-- Network efficiency: Centralized API layer enables consistent caching headers and retry logic at the edge/proxy layer.
+- Build target: esnext reduces polyfills and improves performance on modern browsers.
+- Dependency optimization: Pre-bundle heavy packages like xlsx to reduce cold start latency.
+- SSR offloading: Disable SSR for specific routes to reduce server CPU usage and improve interactivity.
+- Bundle size: Audit large dependencies and consider lazy-loading where feasible.
+- Caching: Leverage browser caching for static assets; configure CDN cache headers appropriately.
+- Network: Minimize payload sizes and implement pagination for large datasets.
 
 [No sources needed since this section provides general guidance]
 
 ## Troubleshooting Guide
 Common issues and resolutions:
-- Missing API base URL: Verify NUXT_PUBLIC_API_BASE is set in the deployment environment.
-- Missing mapping key: Ensure NUXT_PUBLIC_TOMTOM_API_KEY is configured; pages will show a clear error if absent.
-- 401 redirects: If users are unexpectedly redirected to login, check session validity and token persistence.
-- Map not loading: Confirm the DOM container exists and the API key is present; inspect console logs for initialization errors.
-- Build artifacts: Ensure .output, .data, .nuxt, .nitro, .cache, and dist are excluded from source control and not deployed.
+- 401 Unauthorized loops:
+  - Verify backend session endpoint responds correctly.
+  - Confirm Authorization header is attached and token is valid.
+  - Check that 401 triggers logout and redirect to login.
+- Missing API key errors:
+  - Ensure NUXT_PUBLIC_TOMTOM_API_KEY is set in the runtime environment.
+- CORS failures:
+  - Configure backend CORS to allow the deployed origin.
+- Session expirations:
+  - Review periodic session checks and warning thresholds.
+  - Inspect network requests to /auth/get-session.
+- Permission denials:
+  - Validate route-permission mappings and user role/permissions.
 
-Operational tips:
-- Use the health endpoints documented in the OpenAPI spec to verify backend availability.
-- Enable structured logging on the server and correlate with client logs for faster triage.
+Logging and observability:
+- The API composable logs request metadata and response status.
+- Auth flows log session checks and redirects.
+- Integrate with your logging provider by replacing console logs with structured logging.
 
 **Section sources**
-- [nuxt.config.ts:21-26](file://nuxt.config.ts#L21-L26)
-- [drivers.vue:116-123](file://app/pages/tracking/drivers.vue#L116-L123)
-- [index.vue:88-94](file://app/pages/tracking/index.vue#L88-L94)
-- [auth.ts:90-120](file://app/stores/auth.ts#L90-L120)
-- [.gitignore:1-28](file://.gitignore#L1-L28)
-- [api-1(6).yaml:7-31](file://api-1(6).yaml#L7-L31)
+- [app/composables/useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
+- [app/stores/auth.ts:90-120](file://app/stores/auth.ts#L90-L120)
+- [app/middleware/auth.global.ts:1-32](file://app/middleware/auth.global.ts#L1-L32)
+- [app/middleware/permissions.global.ts:1-59](file://app/middleware/permissions.global.ts#L1-L59)
 
 ## Conclusion
-This application is designed for straightforward production deployment with clear separation between public runtime configuration and private server-side secrets. By leveraging Nuxt’s runtimeConfig, centralized API handling, and conditional feature initialization, it supports scalable and maintainable operations. Follow the environment setup, security, and performance recommendations to ensure reliable production behavior.
+The Lacarte Atlas Console is a modern Nuxt application with robust runtime configuration, secure API interactions, and strong route-level protections. By following the deployment and operational guidance herein—particularly around environment variables, SSR rules, and session management—you can achieve reliable, secure, and performant production deployments.
 
 [No sources needed since this section summarizes without analyzing specific files]
 
 ## Appendices
 
-### Build and Preview Commands
-- Development: run the development server locally.
-- Build: create a production build.
-- Generate: produce a static site (if applicable).
-- Preview: serve the production build locally for verification.
+### Environment Variables Reference
+- NUXT_PUBLIC_API_BASE: Backend API base URL.
+- NUXT_PUBLIC_TOMTOM_API_KEY: Third-party mapping service key.
+
+Set these in your hosting platform’s environment configuration. Do not hardcode them in source.
 
 **Section sources**
-- [README.md:41-73](file://README.md#L41-L73)
-- [package.json:5-13](file://package.json#L5-L13)
-
-### Platform-Specific Deployment Notes
-- Node.js servers: Serve the Nuxt production build using a compatible Node runtime. Configure environment variables for NUXT_PUBLIC_API_BASE and NUXT_PUBLIC_TOMTOM_API_KEY.
-- Static hosting: If using generate, upload the generated static assets to a CDN-backed host and configure environment variables via the host’s environment system.
-- Edge platforms: Deploy to platforms that support serverless functions or edge runtimes, ensuring environment variables are injected at build or runtime as supported.
-
-[No sources needed since this section provides general guidance]
+- [nuxt.config.ts:21-26](file://nuxt.config.ts#L21-L26)
 
 ### Security Checklist
-- Do not commit secrets; rely on CI/CD secret stores.
-- Enforce HTTPS everywhere.
-- Validate and sanitize inputs on the server side.
-- Limit exposure of public keys to only those required by client features.
-- Implement rate limiting and CORS policies on the API gateway.
+- Enforce HTTPS for all traffic.
+- Validate and sanitize all inputs before sending to the API.
+- Restrict public routes and keep secrets server-only.
+- Regularly rotate API keys and review permissions mappings.
+- Enable CORS only for trusted origins.
 
 [No sources needed since this section provides general guidance]
 
-### Monitoring and Logging
-- Client-side: Use the existing console logs around API calls and map initialization for debugging; integrate a lightweight error reporter if desired.
-- Server-side: Collect structured logs and metrics; expose health endpoints for uptime monitoring.
-- Alerting: Set alerts for increased error rates, latency spikes, and failed health checks.
+### Scaling Strategies
+- Horizontal scaling: Run multiple instances behind a load balancer; ensure shared state is externalized (e.g., Redis) if needed.
+- CDN: Serve static assets from a CDN with appropriate cache policies.
+- Rate limiting: Apply at the edge or API gateway to protect backend services.
+- Observability: Centralize logs and metrics; set alerts for 4xx/5xx spikes and slow endpoints.
 
 [No sources needed since this section provides general guidance]
+
+### Maintenance Procedures
+- Update dependencies periodically and test changes with the provided test runner.
+- Rebuild and redeploy after environment variable changes.
+- Monitor session health and adjust intervals/warnings as needed.
+- Review and prune unused routes and permissions.
+
+**Section sources**
+- [package.json:11-12](file://package.json#L11-L12)
+- [app/stores/auth.ts:122-174](file://app/stores/auth.ts#L122-L174)

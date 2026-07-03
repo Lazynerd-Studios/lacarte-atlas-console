@@ -1,0 +1,5 @@
+- Pages declare their layout policy up front with `definePageMeta({ layout: ... })` at the top of `<script setup>` rather than via route config.
+- Form validation is synchronous and field-scoped: a dedicated validator function returns a boolean, errors are stored in a per-field `ref`/`reactive` map, and error text is cleared on `@input`.
+- Network requests wrap the call in `try/catch/finally`, set a `loading` ref before the call, clear `error` at the start, and always reset `loading` in `finally`.
+- User-facing strings are kept as plain English literals inside the component (no i18n keys), and toast notifications are emitted via `useAppToast()` instead of custom alert UIs.
+- Navigation uses `router.push('/path')` for absolute routes and `router.back()` for returning to the previous view.

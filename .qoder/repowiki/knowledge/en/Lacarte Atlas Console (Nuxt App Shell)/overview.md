@@ -1,0 +1,1 @@
+Nuxt 4 application shell that wires together the auth pages, map/tracking UI, and admin features under a shared Pinia + Nuxt UI runtime.

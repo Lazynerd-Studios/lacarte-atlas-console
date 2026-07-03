@@ -2,16 +2,15 @@
 
 <cite>
 **Referenced Files in This Document**
-- [app.vue](file://app/app.vue)
-- [default.vue](file://app/layouts/default.vue)
-- [dashboard.vue](file://app/layouts/dashboard.vue)
-- [AppHeader.vue](file://app/components/AppHeader.vue)
 - [AppSidebar.vue](file://app/components/AppSidebar.vue)
-- [PageSkeleton.vue](file://app/components/PageSkeleton.vue)
+- [AppHeader.vue](file://app/components/AppHeader.vue)
+- [dashboard.vue](file://app/layouts/dashboard.vue)
+- [default.vue](file://app/layouts/default.vue)
+- [auth.ts](file://app/stores/auth.ts)
+- [usePermissions.ts](file://app/composables/usePermissions.ts)
+- [auth.ts](file://app/utils/auth.ts)
 - [NotificationsModal.vue](file://app/components/NotificationsModal.vue)
-- [AppSearch.vue](file://app/components/AppSearch.vue)
 - [main.css](file://app/assets/css/main.css)
-- [index.vue](file://app/pages/index.vue)
 </cite>
 
 ## Table of Contents
@@ -24,399 +23,347 @@
 7. [Performance Considerations](#performance-considerations)
 8. [Troubleshooting Guide](#troubleshooting-guide)
 9. [Conclusion](#conclusion)
-10. [Appendices](#appendices)
 
 ## Introduction
-This document explains the layout system used across the application, focusing on:
-- Application header with user profile display and search
-- Notification system integration points
-- PageSkeleton for loading states and placeholder content
-- Layout composition patterns and responsive breakpoints
-- Integration with sidebar navigation
-- Examples for custom layouts, breadcrumb navigation, page transitions, and layout-specific state
-- Performance considerations, SEO implications, and accessibility compliance
-
-The goal is to provide a clear, practical guide for building consistent, accessible, and performant layouts using the existing components.
+This document explains the layout components that form the main application shell: AppSidebar for navigation and AppHeader for user controls. It covers how the sidebar collapses, filters navigation by permissions, behaves on mobile, and integrates with the authentication store. It also documents the header’s user profile display, notification system integration points, and responsive design patterns. Finally, it provides props, events, slots, customization options, and examples of how these components work together to create the primary dashboard layout.
 
 ## Project Structure
-Layouts are defined under app/layouts and composed by pages via Nuxt’s layout system. The root app shell wraps everything with global UI and accessibility helpers.
+The layout is composed of a dashboard layout that composes AppSidebar and AppHeader, with global CSS handling responsive behavior and a permission system driven by the auth store and utilities.
 
 ```mermaid
 graph TB
-App["app/app.vue"] --> NuxtLayout["NuxtLayout"]
-NuxtLayout --> DefaultLayout["layouts/default.vue"]
-NuxtLayout --> DashboardLayout["layouts/dashboard.vue"]
-DashboardLayout --> AppHeader["components/AppHeader.vue"]
-DashboardLayout --> AppSidebar["components/AppSidebar.vue"]
-DashboardLayout --> MainContent["Pages (slot)"]
-App --> Toast["components/AppToast.vue"]
-App --> SessionWarning["components/SessionWarning.vue"]
+subgraph "Layout"
+D["dashboard.vue"]
+DEF["default.vue"]
+end
+subgraph "Components"
+S["AppSidebar.vue"]
+H["AppHeader.vue"]
+N["NotificationsModal.vue"]
+end
+subgraph "State & Logic"
+AStore["auth.ts (store)"]
+P["usePermissions.ts"]
+UAuth["utils/auth.ts"]
+end
+subgraph "Styles"
+CSS["main.css"]
+end
+D --> S
+D --> H
+H --> N
+S --> P
+P --> AStore
+P --> UAuth
+S --> AStore
+H --> AStore
+D --> CSS
+S --> CSS
+H --> CSS
 ```
 
 **Diagram sources**
-- [app.vue:15-18](file://app/app.vue#L15-L18)
-- [default.vue:1-6](file://app/layouts/default.vue#L1-L6)
 - [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
+- [default.vue:1-6](file://app/layouts/default.vue#L1-L6)
+- [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
+- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
+- [NotificationsModal.vue:1-210](file://app/components/NotificationsModal.vue#L1-L210)
+- [auth.ts](file://app/stores/auth.ts)
+- [usePermissions.ts:1-43](file://app/composables/usePermissions.ts#L1-L43)
+- [auth.ts](file://app/utils/auth.ts)
+- [main.css:1-206](file://app/assets/css/main.css#L1-L206)
 
 **Section sources**
-- [app.vue:1-33](file://app/app.vue#L1-L33)
-- [default.vue:1-6](file://app/layouts/default.vue#L1-L6)
 - [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
+- [default.vue:1-6](file://app/layouts/default.vue#L1-L6)
+- [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
+- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
+- [auth.ts](file://app/stores/auth.ts)
+- [usePermissions.ts:1-43](file://app/composables/usePermissions.ts#L1-L43)
+- [auth.ts](file://app/utils/auth.ts)
+- [NotificationsModal.vue:1-210](file://app/components/NotificationsModal.vue#L1-L210)
+- [main.css:1-206](file://app/assets/css/main.css#L1-L206)
 
 ## Core Components
-- AppHeader: Top bar with hamburger toggle (mobile), search input, and user profile actions including logout. Emits events to control sidebar state.
-- AppSidebar: Collapsible navigation with permission-based visibility, active route detection, and mobile overlay behavior.
-- PageSkeleton: Full-page skeleton placeholders for multiple content types (table, detail, dashboard, card-grid, tracking).
-- NotificationsModal: Modal for displaying notifications with filtering and read/unread management.
-- AppSearch: Reusable search input component with v-model binding.
+- AppSidebar: Collapsible navigation with permission-based filtering, grouped sections, active state, and a user footer.
+- AppHeader: Top bar with hamburger toggle (mobile), search input, and user area with logout.
+- Dashboard layout: Composes sidebar and header, manages mobile open/close state, and renders page content via slot.
 
 Key responsibilities:
-- Header manages user context and emits sidebar toggle events.
-- Sidebar renders navigation links filtered by permissions and handles collapse/open state.
-- Skeleton provides consistent loading UX across pages.
-- Notifications modal offers a centralized notification experience.
-- Search component standardizes search input styling and behavior.
+- Sidebar: Renders filtered links based on current user permissions; toggles collapse state; handles group expansion; shows user initials and name/email at the bottom.
+- Header: Emits toggle event for mobile sidebar; displays user info from auth store; triggers logout flow.
+- Layout: Controls mobile overlay/backdrop and ensures sidebar closes on route change.
 
 **Section sources**
-- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
 - [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
-- [PageSkeleton.vue:1-300](file://app/components/PageSkeleton.vue#L1-L300)
-- [NotificationsModal.vue:1-210](file://app/components/NotificationsModal.vue#L1-L210)
-- [AppSearch.vue:1-25](file://app/components/AppSearch.vue#L1-L25)
+- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
+- [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
 
 ## Architecture Overview
-The dashboard layout composes the header and sidebar around a scrollable main area. Pages opt into the dashboard layout via page metadata. The root app shell injects global UI and accessibility elements.
+The layout architecture centers around a parent layout that wires up state between sidebar and header. The sidebar reads permissions from the auth store through a composable, while the header uses the same store for user data and logout actions. Notifications are available as a modal component integrated into the header via an event-driven pattern.
 
-```mermaid
-sequenceDiagram
-participant Router as "Nuxt Router"
-participant App as "app/app.vue"
-participant Layout as "layouts/dashboard.vue"
-participant Header as "components/AppHeader.vue"
-participant Sidebar as "components/AppSidebar.vue"
-participant Page as "Page Content"
-Router->>App : Navigate to "/"
-App->>Layout : Render NuxtLayout with "dashboard"
-Layout->>Sidebar : Render with mobileOpen=false
-Layout->>Header : Render with toggle event
-Header-->>Layout : Emit "toggle-sidebar"
-Layout->>Layout : Update mobileOpen state
-Layout->>Page : Render page slot
-```
-
-**Diagram sources**
-- [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
-- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
-- [index.vue:1-10](file://app/pages/index.vue#L1-L10)
-
-## Detailed Component Analysis
-
-### AppHeader
-Responsibilities:
-- Displays user name and initial avatar derived from auth store.
-- Provides a search input (local ref) and a hamburger button that emits a sidebar toggle event.
-- Implements logout flow using auth store and router navigation.
-
-Integration points:
-- Emits 'toggle-sidebar' to control mobile sidebar open/close.
-- Uses auth store for user data and logout action.
-- Uses toast utility for success feedback after logout.
-
-Responsive behavior:
-- Hamburger visible on small screens; search hidden on very small screens per CSS rules.
-
-Accessibility notes:
-- Buttons include titles where appropriate.
-- Focus styles are applied inline for visual clarity.
-
-**Section sources**
-- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
-- [main.css:175-197](file://app/assets/css/main.css#L175-L197)
-
-#### Class Diagram
-```mermaid
-classDiagram
-class AppHeader {
-+userInitial : string
-+userName : string
-+search : string
-+logout() void
-+emit("toggle-sidebar") void
-}
-```
-
-**Diagram sources**
-- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
-
-### AppSidebar
-Responsibilities:
-- Renders top-level navigation links and collapsible groups (Management, Communications).
-- Filters links based on permissions.
-- Tracks collapsed state persistently and expands groups when needed.
-- Highlights active routes and supports mobile overlay with backdrop.
-
-State and interactions:
-- Uses useState for collapsed state persistence.
-- Watches route changes to auto-open relevant groups.
-- Emits close event to allow parent to manage mobile overlay.
-
-Responsive behavior:
-- Fixed overlay on mobile with transform translateX for slide-in/out.
-- Backdrop click closes sidebar.
-
-Accessibility notes:
-- Links use NuxtLink for semantic navigation.
-- Titles provided for collapsed items.
-
-**Section sources**
-- [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
-- [main.css:181-197](file://app/assets/css/main.css#L181-L197)
-
-#### Class Diagram
-```mermaid
-classDiagram
-class AppSidebar {
-+collapsed : boolean
-+isManagementOpen : boolean
-+isCommsOpen : boolean
-+navLinks : Array
-+managementSubLinks : Array
-+commsSubLinks : Array
-+isActive(to) bool
-+toggleGroup(group) void
-+emit("close") void
-}
-```
-
-**Diagram sources**
-- [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
-
-### PageSkeleton
-Responsibilities:
-- Provides full-page loading skeletons for different content types: table, detail, dashboard, card-grid, tracking.
-- Accepts props to customize number of rows/cards.
-
-Usage pattern:
-- Show skeleton while data loads, then render actual content.
-
-Styling:
-- Uses shimmer animation defined in global CSS.
-
-**Section sources**
-- [PageSkeleton.vue:1-300](file://app/components/PageSkeleton.vue#L1-L300)
-- [main.css:18-36](file://app/assets/css/main.css#L18-L36)
-
-#### Flowchart
-```mermaid
-flowchart TD
-Start(["Render Page"]) --> CheckLoading{"loading?"}
-CheckLoading --> |Yes| ShowSkeleton["Render PageSkeleton(type, rows, cards)"]
-CheckLoading --> |No| RenderContent["Render Actual Page Content"]
-ShowSkeleton --> End(["End"])
-RenderContent --> End
-```
-
-**Diagram sources**
-- [PageSkeleton.vue:1-300](file://app/components/PageSkeleton.vue#L1-L300)
-
-### NotificationsModal
-Responsibilities:
-- Displays a list of notifications with filters (All, Unread).
-- Supports marking individual or all notifications as read.
-- Allows dismissing notifications.
-
-Integration points:
-- Can be toggled from header (currently commented out in header template).
-- Emits close event to dismiss modal.
-
-Accessibility notes:
-- Clicking outside the modal closes it.
-- Clear labels and roles can be added for screen readers if needed.
-
-**Section sources**
-- [NotificationsModal.vue:1-210](file://app/components/NotificationsModal.vue#L1-L210)
-- [AppHeader.vue:51-61](file://app/components/AppHeader.vue#L51-L61)
-
-#### Sequence Diagram
 ```mermaid
 sequenceDiagram
 participant User as "User"
+participant Layout as "Dashboard Layout"
 participant Header as "AppHeader"
-participant Modal as "NotificationsModal"
-User->>Header : Click bell icon
-Header->>Modal : Open modal
-User->>Modal : Click "Mark all read"
-Modal->>Modal : Set all read=true
-User->>Modal : Click item
-Modal->>Modal : Mark single read=true
-User->>Modal : Click X
-Modal-->>Header : Emit "close"
+participant Sidebar as "AppSidebar"
+participant Store as "Auth Store"
+participant Perm as "usePermissions"
+participant Utils as "utils/auth"
+User->>Layout : Open app
+Layout->>Sidebar : Render with mobileOpen=false
+Layout->>Header : Render with toggle handler
+Header->>Store : Read user.name, user.email
+Sidebar->>Perm : hasPermission(...)
+Perm->>Store : read user.permissions
+Perm->>Utils : userHasPermission(user, perm)
+Utils-->>Perm : boolean
+Perm-->>Sidebar : boolean
+Sidebar-->>Layout : Filtered navLinks
+User->>Header : Click hamburger (mobile)
+Header-->>Layout : emit('toggle-sidebar')
+Layout->>Layout : mobileOpen = !mobileOpen
+User->>Header : Click logout
+Header->>Store : logout()
+Store-->>Header : clears session
+Header->>Layout : router.push('/login')
 ```
 
 **Diagram sources**
-- [NotificationsModal.vue:1-210](file://app/components/NotificationsModal.vue#L1-L210)
-- [AppHeader.vue:51-61](file://app/components/AppHeader.vue#L51-L61)
+- [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
+- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
+- [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
+- [auth.ts](file://app/stores/auth.ts)
+- [usePermissions.ts:1-43](file://app/composables/usePermissions.ts#L1-L43)
+- [auth.ts](file://app/utils/auth.ts)
 
-### AppSearch
+## Detailed Component Analysis
+
+### AppSidebar
 Responsibilities:
-- Reusable search input with v-model binding and placeholder customization.
-- Inline focus border color change for visual feedback.
+- Collapse/expand state persisted across navigations using a shared state key.
+- Permission-based filtering of top-level links and sub-groups.
+- Active link detection based on route path prefixing.
+- Group expansion logic that respects collapsed state.
+- Footer showing user initial, name, and email.
+
+Props:
+- mobileOpen: boolean — controls visibility on mobile via CSS transform.
+
+Events:
+- close: emitted when clicking the backdrop or closing action on mobile.
+
+Slots:
+- None.
+
+Computed data:
+- navLinks: top-level links filtered by permission.
+- managementSubLinks, commsSubLinks: sub-links filtered by permission.
+- showManagement, showComms: whether groups should be visible.
+- isManagementActive, isCommsActive: active group detection.
+- userInitial, userName, userEmail: derived from auth store.
+
+Behavior highlights:
+- Collapsed width transitions and icon-only mode.
+- Hover states and active indicator styling.
+- Watchers expand groups when navigating into their routes.
 
 Integration points:
-- Can be embedded within header or other containers.
+- useAuthStore for user data.
+- usePermissions for permission checks.
+- NuxtLink for routing.
+
+Customization options:
+- Add/remove entries in navLinks and sub-link arrays.
+- Toggle group visibility by editing computed flags.
+- Adjust collapsed width and colors via inline styles or extracted CSS variables.
+
+Example usage:
+- Used within the dashboard layout with mobileOpen bound to layout state and @close handled to hide the sidebar.
 
 **Section sources**
-- [AppSearch.vue:1-25](file://app/components/AppSearch.vue#L1-L25)
+- [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
+- [usePermissions.ts:1-43](file://app/composables/usePermissions.ts#L1-L43)
+- [auth.ts](file://app/stores/auth.ts)
 
-### Layout Composition Patterns
-- Default layout: minimal wrapper rendering slot content.
-- Dashboard layout: flex container with sidebar, header, and scrollable main area. Mobile uses overlay sidebar and backdrop.
+#### Sidebar Navigation Filtering Flow
+```mermaid
+flowchart TD
+Start(["Render Sidebar"]) --> LoadNav["Build navLinks + sub-links"]
+LoadNav --> CheckPerms["Filter by hasPermission(...)"]
+CheckPerms --> Groups["Compute group visibility"]
+Groups --> Active["Compute active group/state"]
+Active --> Render["Render items and groups"]
+Render --> End(["Done"])
+```
 
-Examples:
-- Opt-in to dashboard layout via page metadata.
-- Use slots to compose page content inside layouts.
+**Diagram sources**
+- [AppSidebar.vue:12-51](file://app/components/AppSidebar.vue#L12-L51)
+- [usePermissions.ts:1-43](file://app/composables/usePermissions.ts#L1-L43)
+- [auth.ts](file://app/utils/auth.ts)
+
+### AppHeader
+Responsibilities:
+- Mobile hamburger button to toggle sidebar.
+- Search input placeholder (non-functional in this file).
+- User area displaying name and role text, avatar with initial, and logout button.
+- Placeholder for notifications (modal integration point).
+
+Props:
+- None.
+
+Events:
+- toggle-sidebar: emitted to allow parent layout to control mobile sidebar.
+
+Slots:
+- None.
+
+Computed data:
+- userInitial, userName: derived from auth store.
+
+Behavior highlights:
+- Logout calls auth store logout, shows success toast, and redirects to login.
+- Notification UI is commented out but ready to integrate with NotificationsModal.
+
+Integration points:
+- useAuthStore for user data and logout.
+- useAppToast for feedback.
+- Router for navigation after logout.
+
+Customization options:
+- Replace search input behavior with a global search composable.
+- Enable notifications by uncommenting the bell button and modal binding.
+- Style user text and avatar via CSS classes or theme tokens.
+
+Example usage:
+- Placed above the main content in the dashboard layout; emits toggle-sidebar to control mobile sidebar.
+
+**Section sources**
+- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
+- [NotificationsModal.vue:1-210](file://app/components/NotificationsModal.vue#L1-L210)
+- [auth.ts](file://app/stores/auth.ts)
+
+### Dashboard Layout
+Responsibilities:
+- Provide full-height flex container with background color.
+- Manage mobile sidebar open state and close on route change.
+- Render AppSidebar and AppHeader, then a scrollable main area with a slot for pages.
+
+Props:
+- None.
+
+Events:
+- Handles internal state changes; no external events exposed.
+
+Slots:
+- Default slot for page content.
+
+Behavior highlights:
+- Backdrop overlay appears on mobile when sidebar is open; clicking backdrop closes it.
+- Route watcher resets mobileOpen to false on navigation.
+
+Customization options:
+- Adjust padding and spacing in the main area.
+- Change background color or add additional header/sidebar behaviors.
+
+**Section sources**
+- [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
+
+### Default Layout
+A minimal layout wrapper that simply renders its default slot. Useful for non-dashboard pages without sidebar/header.
 
 **Section sources**
 - [default.vue:1-6](file://app/layouts/default.vue#L1-L6)
-- [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
-- [index.vue:1-10](file://app/pages/index.vue#L1-L10)
 
-### Responsive Breakpoints
-Global CSS defines:
-- Tablet breakpoint at ≤1024px: grid columns reduce, map/billing grids stack.
-- Mobile breakpoint at ≤640px: grids become single column, header search hides, hamburger shows, sidebar becomes fixed overlay.
-- Very small screens at ≤480px: hide user text in header.
+### Notifications Modal
+Responsibilities:
+- Display a list of notifications with unread indicators, filters, mark-as-read, dismiss, and “mark all read”.
+- Close via emitting a close event.
 
-Practical guidance:
-- Prefer grid utilities (.grid-cols-*, .grid-map) for consistent layouts.
-- Use media queries sparingly; rely on utility classes where possible.
+Props:
+- None.
 
-**Section sources**
-- [main.css:86-159](file://app/assets/css/main.css#L86-L159)
-- [main.css:199-206](file://app/assets/css/main.css#L199-L206)
+Events:
+- close: emitted to dismiss the modal.
 
-### Creating Custom Layouts
-Steps:
-- Create a new file under app/layouts (e.g., wide.vue).
-- Compose header/sidebar/main areas using flex/grid as needed.
-- Apply mobile overlay logic similar to dashboard layout if sidebar is included.
-- Reference the layout from pages using definePageMeta.
+Slots:
+- None.
 
-Example reference:
-- See how index.vue opts into the dashboard layout.
+Integration points:
+- Can be conditionally rendered from AppHeader when the bell button is enabled.
 
 **Section sources**
-- [index.vue:1-10](file://app/pages/index.vue#L1-L10)
-- [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
-
-### Implementing Breadcrumb Navigation
-Approach:
-- Add a breadcrumb section above the main content in the layout or page.
-- Derive segments from route.path to build hierarchical links.
-- Ensure each segment is a NuxtLink with proper aria-labels.
-
-Guidance:
-- Keep breadcrumbs concise and avoid deep nesting.
-- Highlight the current page segment without making it clickable.
-
-[No sources needed since this section doesn't analyze specific files]
-
-### Handling Page Transitions
-Recommendations:
-- Use Nuxt’s built-in transition features for smooth page changes.
-- Avoid heavy animations during navigation to maintain performance.
-- Combine with skeleton loaders to mask network latency.
-
-[No sources needed since this section doesn't analyze specific files]
-
-### Managing Layout-Specific State
-Patterns:
-- Use reactive refs in layout components for local state (e.g., mobileOpen).
-- Persist persistent UI preferences (e.g., sidebarCollapsed) with useState.
-- Watch route changes to reset or adjust layout state (e.g., closing sidebar on navigation).
-
-**Section sources**
-- [dashboard.vue:20-24](file://app/layouts/dashboard.vue#L20-L24)
-- [AppSidebar.vue:9](file://app/components/AppSidebar.vue#L9)
+- [NotificationsModal.vue:1-210](file://app/components/NotificationsModal.vue#L1-L210)
 
 ## Dependency Analysis
-High-level relationships:
-- Dashboard layout depends on AppHeader and AppSidebar.
-- AppHeader depends on auth store and router.
-- AppSidebar depends on permissions and route state.
-- Root app shell includes global UI and accessibility announcer.
+The layout components depend on the auth store and permission utilities. The sidebar computes navigation visibility based on permissions, while the header relies on the store for user data and logout. Global CSS defines responsive breakpoints and mobile behaviors.
 
 ```mermaid
 graph LR
-Dashboard["layouts/dashboard.vue"] --> Header["components/AppHeader.vue"]
-Dashboard --> Sidebar["components/AppSidebar.vue"]
-Header --> AuthStore["auth store"]
-Header --> Router["router"]
-Sidebar --> Permissions["permissions composable"]
-Sidebar --> Route["route state"]
-AppShell["app/app.vue"] --> NuxtLayout["NuxtLayout"]
-AppShell --> NuxtPage["NuxtPage"]
+Sidebar["AppSidebar.vue"] --> Permissions["usePermissions.ts"]
+Permissions --> AuthStore["auth.ts (store)"]
+Permissions --> AuthUtils["utils/auth.ts"]
+Header["AppHeader.vue"] --> AuthStore
+Layout["dashboard.vue"] --> Sidebar
+Layout --> Header
+Styles["main.css"] --> Layout
+Styles --> Sidebar
+Styles --> Header
 ```
 
 **Diagram sources**
-- [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
-- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
 - [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
-- [app.vue:15-18](file://app/app.vue#L15-L18)
+- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
+- [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
+- [usePermissions.ts:1-43](file://app/composables/usePermissions.ts#L1-L43)
+- [auth.ts](file://app/stores/auth.ts)
+- [auth.ts](file://app/utils/auth.ts)
+- [main.css:1-206](file://app/assets/css/main.css#L1-L206)
 
 **Section sources**
-- [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
-- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
 - [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
-- [app.vue:1-33](file://app/app.vue#L1-L33)
+- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
+- [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
+- [usePermissions.ts:1-43](file://app/composables/usePermissions.ts#L1-L43)
+- [auth.ts](file://app/stores/auth.ts)
+- [auth.ts](file://app/utils/auth.ts)
+- [main.css:1-206](file://app/assets/css/main.css#L1-L206)
 
 ## Performance Considerations
-- Minimize re-renders in header and sidebar by leveraging computed properties and memoization.
-- Use skeleton placeholders to improve perceived performance during data fetching.
-- Avoid heavy DOM manipulations in mobile sidebar; prefer CSS transforms for sliding.
-- Defer non-critical UI updates until after initial paint.
-- Keep header search input lightweight; debounce any downstream processing.
+- Computed properties: navLinks and sub-links are computed and filtered once per dependency change, minimizing re-renders.
+- Collapsed state: Persisted via a shared state key to avoid unnecessary recomputation on reloads.
+- Route watchers: Expand groups only when needed; consider debouncing if many nested groups are added.
+- Icons and hover effects: Inline styles are used; extracting to CSS variables can improve maintainability and reduce style churn.
+- Notifications modal: Currently static data; when integrating real-time updates, prefer incremental updates and virtualized lists for large datasets.
 
 [No sources needed since this section provides general guidance]
 
 ## Troubleshooting Guide
-Common issues:
-- Sidebar not closing on mobile navigation: ensure route watcher resets mobileOpen state.
-- Header search not responding: verify v-model binding and focus style handlers.
-- Notifications modal not opening: confirm trigger button is enabled and modal emits close correctly.
-- Permission-driven links missing: check permission flags and filter logic in sidebar.
-
-Debugging tips:
-- Log route path changes in layout watchers.
-- Inspect computed link arrays in sidebar to validate permission filtering.
-- Verify toast messages appear after logout to confirm auth store actions.
+Common issues and resolutions:
+- Sidebar not collapsing/expanding:
+  - Ensure the shared state key is accessible globally and not overwritten elsewhere.
+  - Verify that the collapse toggle click handler is bound and not intercepted by other elements.
+- Navigation items missing:
+  - Confirm the user has required permissions; admins implicitly have all permissions.
+  - Check that the auth store has loaded user permissions before rendering the sidebar.
+- Mobile sidebar not opening/closing:
+  - Verify the dashboard layout binds mobileOpen and emits/handles toggle-sidebar correctly.
+  - Ensure the backdrop click handler sets mobileOpen to false.
+- Header user info not updating:
+  - Confirm the auth store’s user object is populated and reactive.
+  - After logout, ensure the router navigates away from protected routes.
+- Notifications modal not appearing:
+  - If enabling the bell button, ensure the modal is conditionally rendered and emits close properly.
 
 **Section sources**
-- [dashboard.vue:20-24](file://app/layouts/dashboard.vue#L20-L24)
-- [AppHeader.vue:17-22](file://app/components/AppHeader.vue#L17-L22)
-- [AppSidebar.vue:12-24](file://app/components/AppSidebar.vue#L12-L24)
+- [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
+- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
+- [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
+- [auth.ts](file://app/stores/auth.ts)
+- [usePermissions.ts:1-43](file://app/composables/usePermissions.ts#L1-L43)
+- [auth.ts](file://app/utils/auth.ts)
+- [NotificationsModal.vue:1-210](file://app/components/NotificationsModal.vue#L1-L210)
 
 ## Conclusion
-The layout system centers around a reusable dashboard layout that composes a header, sidebar, and main content area. AppHeader provides user controls and search, AppSidebar delivers permission-aware navigation, and PageSkeleton ensures consistent loading experiences. Global CSS establishes responsive breakpoints and shared utilities. By following the patterns outlined here—layout composition, responsive design, and accessibility—you can extend the system with custom layouts, breadcrumbs, transitions, and layout-specific state while maintaining performance and usability.
-
-[No sources needed since this section summarizes without analyzing specific files]
-
-## Appendices
-
-### Accessibility Compliance Checklist
-- Provide meaningful titles and labels for interactive elements.
-- Ensure keyboard navigability for header actions and sidebar links.
-- Use semantic HTML (header, nav, main) and ARIA attributes where necessary.
-- Include NuxtRouteAnnouncer for route announcements.
-
-**Section sources**
-- [app.vue:8-10](file://app/app.vue#L8-L10)
-- [AppHeader.vue:79-87](file://app/components/AppHeader.vue#L79-L87)
-- [AppSidebar.vue:139-178](file://app/components/AppSidebar.vue#L139-L178)
-
-### SEO Implications of Layout Strategies
-- Prefer server-rendered layouts to ensure content is available to crawlers.
-- Avoid hiding critical content behind client-only toggles.
-- Keep meta tags and structured data at the page level rather than layout level for clarity.
-
-[No sources needed since this section provides general guidance]
+The layout components provide a robust foundation for the application’s main shell. AppSidebar offers flexible, permission-aware navigation with collapsible behavior and mobile support. AppHeader centralizes user controls and integrates seamlessly with the auth store. Together with the dashboard layout and global responsive styles, they deliver a consistent, accessible experience across devices. Extensibility points include adding new navigation entries, enabling notifications, and customizing visual themes via CSS variables.

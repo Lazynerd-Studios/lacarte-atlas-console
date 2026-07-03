@@ -1,0 +1,15 @@
+schema_version: 1
+module_path: ""
+title: Lacarte Atlas Console (Nuxt App Shell)
+scope:
+    - README.md
+    - .gitignore
+    - package.json
+    - nuxt.config.ts
+    - tsconfig.json
+    - vitest.config.ts
+    - bun.lock
+    - skills-lock.json
+source_files: []
+depends_on: []
+related_to: []

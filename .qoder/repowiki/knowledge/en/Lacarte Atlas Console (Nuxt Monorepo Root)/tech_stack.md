@@ -1,1 +1,0 @@
-Nuxt 4 with Vue 3, Pinia (+persistedstate), @nuxt/ui v4, Vitest + happy-dom for testing, Bun lockfile (`bun.lock`).

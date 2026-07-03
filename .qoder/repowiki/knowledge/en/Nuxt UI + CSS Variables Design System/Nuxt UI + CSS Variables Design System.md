@@ -9,40 +9,17 @@ source_files:
     - nuxt.config.ts
     - package.json
     - app/layouts/dashboard.vue
-    - app/components/AppHeader.vue
+    - app/components/AppSidebar.vue
 ---
 
-The frontend styling system is a hybrid approach built on Nuxt 4 with the following layers:
+The console uses a lightweight, in-house design system layered on top of @nuxt/ui (v4) and Vue's built-in styling. There is no Tailwind or utility-first framework — styling is composed from three sources:
 
-**Core framework & component library**
-- Nuxt 4 application using `@nuxt/ui` (v4.5.1) as the primary component library, providing primitives like `<UIcon>` and base UI tokens.
-- Global stylesheet imported via `nuxt.config.ts` (`css: ['~/assets/css/main.css']`).
-- No Tailwind or utility-first framework — styles are written in plain CSS.
+1. Global CSS variables (app/assets/css/main.css) define the brand palette and typography tokens as CSS custom properties under :root: brand colors (--color-primary #ffb400), neutrals (surface #f9fafb, border #ececec, text #111, muted #6b7280), and Manrope font family loaded via Google Fonts import.
 
-**Design tokens**
-- Centralized in `app/assets/css/main.css` as CSS custom properties under `:root`:
-  - Font family: Manrope (loaded from Google Fonts).
-  - Brand color palette: `--color-primary`, `--color-primary-hover`, `--color-primary-foreground`.
-  - Neutral palette: `--color-surface`, `--color-border`, `--color-text`, `--color-text-muted`.
-- These variables are referenced throughout components for colors, borders, and typography.
+2. Shared layout and responsive utilities live in the same global stylesheet: skeleton shimmer animation, grid helpers (.grid-cols-2/3/4, .grid-map, .grid-billing-charts) with consistent 24px gaps, media queries at 1024px and 640px that collapse grids to single-column and switch the sidebar into a fixed overlay with backdrop.
 
-**Layout & responsive strategy**
-- Layouts (`layouts/dashboard.vue`, `layouts/default.vue`) provide full-viewport shell layouts with fixed header/sidebar and scrollable main content.
-- Responsive breakpoints are defined inline in `main.css` at 1024px (tablet) and 640px (mobile), plus a 480px micro-breakpoint for very small screens.
-- Grid utilities (`.grid-cols-2/3/4`, `.grid-map`, `.grid-billing-charts`) encapsulate common dashboard grid patterns; they collapse to single-column on mobile.
-- Mobile sidebar uses a fixed-position drawer with a backdrop overlay, toggled via the `sidebar-mobile-open` class.
+3. Inline styles inside Vue SFCs — many layout and navigation elements (sidebar, header, nav links) are styled directly via inline style= bindings rather than CSS classes.
 
-**Component-level styling conventions**
-- Components mix CSS classes (for layout/responsive behavior) with inline `style` attributes for precise per-component sizing, spacing, and color overrides — especially visible in `AppHeader.vue` where most visual details are applied inline.
-- Shared animations live in `main.css`: skeleton shimmer loader and spinner keyframes, reused by `PageSkeleton.vue`.
-- Icons come from `@nuxt/ui`'s icon system (`i-lucide-*` names).
+Component library: @nuxt/ui provides primitives (UIcon, form inputs, dialogs, etc.) and Lucide icons via the i-lucide-* naming convention. The Nuxt UI module is registered in nuxt.config.ts and its default light color mode is enforced via colorMode.preference: 'light'.
 
-**What is NOT used**
-- No SCSS/Sass, no CSS-in-JS, no Tailwind config, no separate theme files beyond the single `main.css` token file.
-- No dark mode switching (configured as light-only via `colorMode.preference: 'light'`).
-
-**Developer conventions**
-- Keep design tokens in `:root` CSS variables rather than hardcoding hex values.
-- Use the shared grid utility classes instead of writing ad-hoc grid layouts.
-- Apply global layout classes (`.page-content`, `.dashboard-main`) for consistent page padding and spacing.
-- Rely on `@nuxt/ui` icons and primitives; avoid importing additional icon libraries.
+No theme configuration file exists — there is no tailwind.config.*, no Nuxt UI theme override, and no separate design-token file beyond the CSS variables in main.css.

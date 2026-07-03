@@ -4,450 +4,531 @@
 **Referenced Files in This Document**
 - [AppSidebar.vue](file://app/components/AppSidebar.vue)
 - [AppHeader.vue](file://app/components/AppHeader.vue)
-- [PageSkeleton.vue](file://app/components/PageSkeleton.vue)
-- [ConfirmDialog.vue](file://app/components/ConfirmDialog.vue)
+- [AppPagination.vue](file://app/components/AppPagination.vue)
+- [AppSearch.vue](file://app/components/AppSearch.vue)
 - [AppToast.vue](file://app/components/AppToast.vue)
-- [ToastContainer.vue](file://app/components/ToastContainer.vue)
+- [ConfirmDialog.vue](file://app/components/ConfirmDialog.vue)
+- [PageSkeleton.vue](file://app/components/PageSkeleton.vue)
+- [SessionWarning.vue](file://app/components/SessionWarning.vue)
 - [useToast.ts](file://app/composables/useToast.ts)
 - [dashboard.vue](file://app/layouts/dashboard.vue)
-- [main.css](file://app/assets/css/main.css)
+- [default.vue](file://app/layouts/default.vue)
+- [app.vue](file://app/app.vue)
 </cite>
 
 ## Table of Contents
-1. [Introduction](#introduction)
-2. [Project Structure](#project-structure)
-3. [Core Components](#core-components)
-4. [Architecture Overview](#architecture-overview)
-5. [Detailed Component Analysis](#detailed-component-analysis)
-6. [Dependency Analysis](#dependency-analysis)
-7. [Performance Considerations](#performance-considerations)
-8. [Troubleshooting Guide](#troubleshooting-guide)
-9. [Conclusion](#conclusion)
-10. [Appendices](#appendices)
+1. Introduction
+2. Project Structure
+3. Core Components
+4. Architecture Overview
+5. Detailed Component Analysis
+6. Dependency Analysis
+7. Performance Considerations
+8. Troubleshooting Guide
+9. Conclusion
 
 ## Introduction
-This document describes the core UI component library used across the application. It focuses on reusable building blocks that provide a consistent user experience: responsive sidebar navigation, application header with search and user controls, page skeleton loading states, confirmation dialogs, and toast notifications. For each component, you will find props, events, slots (if any), customization options, usage patterns, accessibility considerations, styling approach, integration guidelines, performance tips, browser compatibility notes, and extension points.
+This document describes the core UI components library used across the application. It covers reusable building blocks for navigation, header and user controls, pagination, search, toast notifications, confirmation dialogs, page skeletons, and session warnings. For each component, you will find props, events, slots (if any), customization options, usage patterns, responsive behavior, accessibility notes, and integration examples with other components.
 
 ## Project Structure
-The components are organized under app/components and rely on shared composables for state management (toasts). Layouts compose these components to form the application shell. Global styles define typography, color tokens, skeleton animations, and responsive utilities.
+The UI components are organized under app/components and integrated via Nuxt layouts and the root app shell. The dashboard layout composes AppSidebar and AppHeader around page content. The root app mounts global overlays like SessionWarning and AppToast.
 
 ```mermaid
 graph TB
-subgraph "Layout"
-L["layouts/dashboard.vue"]
+subgraph "Layouts"
+D["layouts/dashboard.vue"]
+L["layouts/default.vue"]
 end
 subgraph "Components"
 S["components/AppSidebar.vue"]
 H["components/AppHeader.vue"]
-P["components/PageSkeleton.vue"]
+P["components/AppPagination.vue"]
+A["components/AppSearch.vue"]
+T["components/AppToast.vue"]
 C["components/ConfirmDialog.vue"]
-T1["components/AppToast.vue"]
-T2["components/ToastContainer.vue"]
+K["components/PageSkeleton.vue"]
+W["components/SessionWarning.vue"]
 end
 subgraph "Composables"
 U["composables/useToast.ts"]
 end
-subgraph "Styles"
-CSS["assets/css/main.css"]
+subgraph "Shell"
+R["app/app.vue"]
 end
-L --> S
-L --> H
-L --> P
-L --> C
-L --> T1
-L --> T2
-T1 --> U
-T2 --> U
-S --> CSS
-H --> CSS
-P --> CSS
-T1 --> CSS
-T2 --> CSS
+R --> D
+D --> S
+D --> H
+R --> W
+R --> T
+T --> U
+H --> U
+S --> U
+P --> R
+A --> R
+C --> R
+K --> R
 ```
 
 **Diagram sources**
 - [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
+- [default.vue:1-6](file://app/layouts/default.vue#L1-L6)
+- [app.vue:1-33](file://app/app.vue#L1-L33)
 - [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
 - [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
-- [PageSkeleton.vue:1-300](file://app/components/PageSkeleton.vue#L1-L300)
-- [ConfirmDialog.vue:1-53](file://app/components/ConfirmDialog.vue#L1-L53)
+- [AppPagination.vue:1-48](file://app/components/AppPagination.vue#L1-L48)
+- [AppSearch.vue:1-25](file://app/components/AppSearch.vue#L1-L25)
 - [AppToast.vue:1-115](file://app/components/AppToast.vue#L1-L115)
-- [ToastContainer.vue:1-120](file://app/components/ToastContainer.vue#L1-L120)
+- [ConfirmDialog.vue:1-53](file://app/components/ConfirmDialog.vue#L1-L53)
+- [PageSkeleton.vue:1-300](file://app/components/PageSkeleton.vue#L1-L300)
+- [SessionWarning.vue:1-66](file://app/components/SessionWarning.vue#L1-L66)
 - [useToast.ts:1-37](file://app/composables/useToast.ts#L1-L37)
-- [main.css:1-206](file://app/assets/css/main.css#L1-L206)
 
 **Section sources**
 - [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
-- [main.css:1-206](file://app/assets/css/main.css#L1-L206)
+- [default.vue:1-6](file://app/layouts/default.vue#L1-L6)
+- [app.vue:1-33](file://app/app.vue#L1-L33)
 
 ## Core Components
-- Responsive Sidebar Navigation: Collapsible desktop sidebar with permission-based links and mobile slide-in behavior.
-- Application Header: Top bar with hamburger toggle, global search input, and user controls including logout.
-- Page Skeleton Loading States: Predefined skeleton layouts for table, detail, dashboard, card-grid, and tracking pages.
-- Confirmation Dialog: Generic modal for destructive or important confirmations with optional loading state.
-- Toast Notification System: Global notification system with multiple visual variants and auto-dismiss.
+Below is a concise overview of each component’s purpose, props, events, slots, and key behaviors.
+
+- AppSidebar
+  - Purpose: Collapsible navigation with permission-based visibility and grouped sections.
+  - Props: mobileOpen (boolean).
+  - Events: close.
+  - Slots: none.
+  - Customization: Navigation items are defined internally; expand by editing the computed link lists.
+  - Behavior: Collapses to icon-only width on small screens; toggles groups based on route path.
+
+- AppHeader
+  - Purpose: Top bar with hamburger toggle, global search input, and user menu area.
+  - Props: none.
+  - Events: toggle-sidebar.
+  - Slots: none.
+  - Customization: Replace or extend the user menu and actions.
+  - Behavior: Emits toggle-sidebar to control sidebar on mobile.
+
+- AppPagination
+  - Purpose: Numeric pagination with range info and prev/next buttons.
+  - Props: page (number), total (number), perPage (number, optional).
+  - Events: update:page.
+  - Slots: none.
+  - Customization: Style via CSS variables or wrapper classes.
+  - Behavior: Computes totalPages and visible range; emits new page index.
+
+- AppSearch
+  - Purpose: Reusable text input with leading search icon and v-model binding.
+  - Props: placeholder (string, optional).
+  - Events: none (uses defineModel).
+  - Slots: none.
+  - Customization: Extend with clear button or debounce logic at the consumer.
+  - Behavior: Two-way binding via v-model.
+
+- AppToast
+  - Purpose: Global toast overlay driven by useAppToast composable.
+  - Props: none.
+  - Events: none.
+  - Slots: none.
+  - Customization: Modify colors/icons in the component or extend types in the composable.
+  - Behavior: Auto-dismiss after duration; supports success/error/warning/info.
+
+- ConfirmDialog
+  - Purpose: Modal dialog for destructive or important confirmations.
+  - Props: title (string), message (string), confirmText (string, optional), cancelText (string, optional), confirmColor (string, optional), loading (boolean).
+  - Events: confirm, cancel.
+  - Slots: none.
+  - Customization: Override button styles and colors via props.
+  - Behavior: Dismissed on backdrop click; shows spinner when loading.
+
+- PageSkeleton
+  - Purpose: Full-page loading placeholders for different page shapes.
+  - Props: type ('table' | 'detail' | 'dashboard' | 'card-grid' | 'tracking'), rows (number, default 6), cards (number, default 4).
+  - Events: none.
+  - Slots: none.
+  - Customization: Add new skeleton variants by extending the prop union and template branches.
+  - Behavior: Renders structured placeholders matching real page layouts.
+
+- SessionWarning
+  - Purpose: Warning banner indicating imminent session expiration.
+  - Props: timeRemaining (number, seconds).
+  - Events: extend, dismiss.
+  - Slots: none.
+  - Customization: Adjust styling and copy as needed.
+  - Behavior: Displays formatted countdown and action buttons.
 
 **Section sources**
 - [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
 - [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
-- [PageSkeleton.vue:1-300](file://app/components/PageSkeleton.vue#L1-L300)
-- [ConfirmDialog.vue:1-53](file://app/components/ConfirmDialog.vue#L1-L53)
+- [AppPagination.vue:1-48](file://app/components/AppPagination.vue#L1-L48)
+- [AppSearch.vue:1-25](file://app/components/AppSearch.vue#L1-L25)
 - [AppToast.vue:1-115](file://app/components/AppToast.vue#L1-L115)
-- [ToastContainer.vue:1-120](file://app/components/ToastContainer.vue#L1-L120)
+- [ConfirmDialog.vue:1-53](file://app/components/ConfirmDialog.vue#L1-L53)
+- [PageSkeleton.vue:1-300](file://app/components/PageSkeleton.vue#L1-L300)
+- [SessionWarning.vue:1-66](file://app/components/SessionWarning.vue#L1-L66)
 - [useToast.ts:1-37](file://app/composables/useToast.ts#L1-L37)
 
 ## Architecture Overview
-The layout composes the sidebar and header, while pages render skeletons during initial load. The toast system is driven by a composable and rendered via two alternative containers. Styles are centralized in a single CSS file providing skeleton animations and responsive grids.
+The layout orchestrates the shell and global overlays. The dashboard layout composes the sidebar and header, while the root app mounts SessionWarning and AppToast globally. Toasts are managed centrally via a composable.
 
 ```mermaid
 sequenceDiagram
 participant User as "User"
 participant Layout as "Dashboard Layout"
-participant Header as "AppHeader"
 participant Sidebar as "AppSidebar"
-participant Page as "Page Content"
-participant Toast as "useToast + Toast Container"
+participant Header as "AppHeader"
+participant Root as "Root App Shell"
+participant Toast as "AppToast + useToast"
 User->>Header : Click hamburger
-Header-->>Layout : Emit "toggle-sidebar"
-Layout->>Sidebar : Set mobileOpen flag
-User->>Sidebar : Toggle collapse / click nav link
-Sidebar-->>Layout : Update active group / route
-User->>Page : Trigger action (e.g., delete)
-Page->>Toast : show("error"/"success", title, message)
-Toast-->>User : Render toast with icon and dismiss
+Header-->>Layout : emit("toggle-sidebar")
+Layout->>Sidebar : Set mobileOpen state
+User->>Root : Trigger logout from header
+Root->>Toast : show("success", "Logged out successfully")
+Toast-->>User : Display toast notification
 ```
 
 **Diagram sources**
 - [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
 - [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
 - [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
+- [app.vue:1-33](file://app/app.vue#L1-L33)
+- [AppToast.vue:1-115](file://app/components/AppToast.vue#L1-L115)
 - [useToast.ts:1-37](file://app/composables/useToast.ts#L1-L37)
-- [ToastContainer.vue:1-120](file://app/components/ToastContainer.vue#L1-L120)
 
 ## Detailed Component Analysis
 
 ### AppSidebar
-A responsive, collapsible sidebar with permission-aware navigation and grouped sections. On mobile, it slides in from the left with a backdrop overlay.
-
+- Responsibilities
+  - Render navigation links filtered by permissions.
+  - Support collapsible mode and grouped sections (Management, Communications).
+  - Highlight active routes and manage group open states based on current path.
+  - Show user initials and name/email in footer.
 - Props
-  - mobileOpen: boolean — Controls open/close state on mobile.
+  - mobileOpen: boolean — controls mobile overlay visibility.
 - Events
-  - close: void — Emitted when closing the mobile sidebar (e.g., tapping backdrop).
-- Behavior
-  - Collapses/expands width and toggles visibility of labels and groups.
-  - Filters top-level and grouped links based on permissions.
-  - Tracks active route and expands relevant groups automatically.
-  - Displays user initials and name/email in footer; collapses to avatar-only view.
-- Styling
-  - Inline styles for layout and transitions; uses icons and brand colors.
-  - Mobile behavior controlled by CSS classes defined in main.css.
+  - close: emitted to collapse sidebar on mobile.
+- Data Flow
+  - Uses route and auth store to compute active state and user info.
+  - Uses permissions utility to filter visible links.
+- Responsive Design
+  - Collapses to narrow width; hides labels and centers icons.
+  - Mobile overlay controlled by parent layout.
 - Accessibility
-  - Uses semantic aside/nav elements.
-  - Provides titles for collapsed items and buttons.
-  - Ensure focus management is handled by parent layout when opening/closing.
-- Customization
-  - Add/remove links by editing the computed navigation arrays.
-  - Extend groups similarly to existing Management and Communications sections.
-- Usage example path
-  - See layout composition and prop binding in [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25).
+  - Provides titles for collapsed items.
+  - Use semantic nav element and keyboard-friendly links.
+- Integration
+  - Controlled by dashboard layout via mobileOpen and close event.
 
-**Section sources**
-- [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
-- [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
-- [main.css:160-197](file://app/assets/css/main.css#L160-L197)
-
-#### Class Diagram
 ```mermaid
-classDiagram
-class AppSidebar {
-+boolean mobileOpen
-+close()
--collapsed
--navLinks
--managementSubLinks
--commsSubLinks
--isManagementOpen
--isCommsOpen
--isActive(to)
--toggleGroup(group)
-}
+flowchart TD
+Start(["Mount"]) --> ComputeLinks["Compute navLinks<br/>filter by permissions"]
+ComputeLinks --> WatchRoute["Watch route.path"]
+WatchRoute --> UpdateGroups["Update group open states"]
+UpdateGroups --> Render["Render sidebar with active indicators"]
+Render --> ToggleCollapse{"Toggle collapse?"}
+ToggleCollapse --> |Yes| Collapse["Set collapsed state"]
+ToggleCollapse --> |No| Expand["Expand sidebar"]
+Collapse --> Render
+Expand --> Render
 ```
 
 **Diagram sources**
 - [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
 
-### AppHeader
-Top application bar with a mobile hamburger button, global search input, and user controls. Emits an event to toggle the sidebar on mobile.
-
-- Props
-  - None (internal state only).
-- Events
-  - toggle-sidebar: void — Emitted to open/close the mobile sidebar.
-- Behavior
-  - Renders a search input bound to local state.
-  - Provides a logout flow that triggers a success toast and navigates to login.
-- Styling
-  - Inline styles for layout and interactions; responsive rules in main.css hide/show elements at breakpoints.
-- Accessibility
-  - Buttons have descriptive titles and keyboard support.
-  - Search input has placeholder text and accessible focus states.
-- Customization
-  - Replace or extend the right-side actions (notifications, profile menu).
-- Usage example path
-  - Event binding in [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25).
-
 **Section sources**
-- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
+- [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
 - [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
-- [main.css:199-206](file://app/assets/css/main.css#L199-L206)
 
-#### Sequence Diagram
+### AppHeader
+- Responsibilities
+  - Provide hamburger button to toggle sidebar on mobile.
+  - Host global search input and user info/logout actions.
+- Props
+  - None.
+- Events
+  - toggle-sidebar: emitted to parent layout.
+- Data Flow
+  - Calls logout flow using auth store and shows a success toast before redirecting.
+- Responsive Design
+  - Hamburger visible on mobile; search input adapts to container width.
+- Accessibility
+  - Buttons have titles and icons; ensure focus styles are visible.
+- Integration
+  - Parent layout listens for toggle-sidebar to control sidebar visibility.
+
 ```mermaid
 sequenceDiagram
 participant User as "User"
 participant Header as "AppHeader"
 participant Layout as "Dashboard Layout"
-participant Router as "Router"
 participant Toast as "useToast"
-User->>Header : Click Logout
-Header->>Toast : success("Logged out successfully")
+participant Router as "Router"
+User->>Header : Click hamburger
+Header-->>Layout : emit("toggle-sidebar")
+User->>Header : Click logout
+Header->>Toast : show("success", "Logged out successfully")
 Header->>Router : push("/login")
-Header-->>Layout : Emit "toggle-sidebar" (optional)
 ```
 
 **Diagram sources**
 - [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
+- [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
 - [useToast.ts:1-37](file://app/composables/useToast.ts#L1-L37)
 
-### PageSkeleton
-Reusable full-page loading placeholders for common page shapes.
-
-- Props
-  - type: 'table' | 'detail' | 'dashboard' | 'card-grid' | 'tracking'
-  - rows?: number — Number of table rows (default 6).
-  - cards?: number — Number of stat cards (default 4).
-- Slots
-  - None.
-- Behavior
-  - Renders skeleton blocks matching the selected layout shape.
-  - Uses shimmer animation defined globally.
-- Styling
-  - Relies on .skeleton class and grid utilities from main.css.
-- Accessibility
-  - Use v-if to conditionally render real content after data loads; consider aria-busy="true" on the container while loading.
-- Customization
-  - Add new types by extending the template branches and adding corresponding CSS if needed.
-- Usage example path
-  - Example usage in a page: [customers/index.vue:175-175](file://app/pages/customers/index.vue#L175-L175).
-
 **Section sources**
-- [PageSkeleton.vue:1-300](file://app/components/PageSkeleton.vue#L1-L300)
-- [main.css:18-36](file://app/assets/css/main.css#L18-L36)
-- [customers/index.vue:175-175](file://app/pages/customers/index.vue#L175-L175)
+- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
+- [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
 
-#### Flowchart
+### AppPagination
+- Responsibilities
+  - Display current range and numeric page buttons.
+  - Emit updated page index to parent.
+- Props
+  - page: number
+  - total: number
+  - perPage?: number
+- Events
+  - update:page: number
+- Logic
+  - Computes totalPages, from/to indices, and guards invalid transitions.
+- Usage Pattern
+  - Bind :page and @update:page to local reactive state.
+- Accessibility
+  - Buttons should include aria-labels describing page numbers.
+
 ```mermaid
 flowchart TD
-Start(["Render PageSkeleton"]) --> CheckType{"type === ?"}
-CheckType --> |table| RenderTable["Render heading, stats, filters, table rows"]
-CheckType --> |detail| RenderDetail["Render back link, profile header, tabs, info columns"]
-CheckType --> |dashboard| RenderDashboard["Render heading, 3-col stats, charts, panels"]
-CheckType --> |card-grid| RenderCardGrid["Render heading, action buttons, driver cards"]
-CheckType --> |tracking| RenderTracking["Render map placeholder and sidebar list"]
-RenderTable --> End(["Done"])
-RenderDetail --> End
-RenderDashboard --> End
-RenderCardGrid --> End
-RenderTracking --> End
+Init(["Receive props"]) --> Compute["Compute totalPages, from, to"]
+Compute --> Render["Render Previous, Pages, Next"]
+Render --> Click{"Button clicked?"}
+Click --> |Previous| Prev["go(page - 1)"]
+Click --> |Next| Next["go(page + 1)"]
+Click --> |Page| GoP["go(p)"]
+Prev --> Validate{"Valid page?"}
+Next --> Validate
+GoP --> Validate
+Validate --> |Yes| Emit["emit('update:page', p)"]
+Validate --> |No| Ignore["Ignore"]
+Emit --> End(["Done"])
+Ignore --> End
 ```
 
 **Diagram sources**
-- [PageSkeleton.vue:24-296](file://app/components/PageSkeleton.vue#L24-L296)
+- [AppPagination.vue:1-48](file://app/components/AppPagination.vue#L1-L48)
+
+**Section sources**
+- [AppPagination.vue:1-48](file://app/components/AppPagination.vue#L1-L48)
+
+### AppSearch
+- Responsibilities
+  - Provide a styled search input with leading icon and two-way binding.
+- Props
+  - placeholder?: string
+- Model Binding
+  - defineModel<string> for v-model support.
+- Usage Pattern
+  - <AppSearch v-model="query" placeholder="Search..." />
+- Accessibility
+  - Ensure associated label or aria-label is provided by the consumer.
+
+**Section sources**
+- [AppSearch.vue:1-25](file://app/components/AppSearch.vue#L1-L25)
+
+### AppToast and useToast
+- Responsibilities
+  - Centralized toast management and rendering.
+- Composable API
+  - Types: ToastType = 'success' | 'error' | 'warning' | 'info'.
+  - Interface: { id, type, title, message?, duration? }.
+  - Functions:
+    - success(title, message?, duration?)
+    - error(title, message?, duration?)
+    - warning(title, message?, duration?)
+    - info(title, message?, duration?)
+    - dismiss(id)
+    - toasts: readonly array
+- Rendering
+  - AppToast reads toasts and renders them with animations and dismiss buttons.
+- Integration Examples
+  - In header logout: show success toast then navigate.
+  - In pages: call useAppToast() to display feedback after mutations.
+
+```mermaid
+classDiagram
+class Toast {
++number id
++ToastType type
++string title
++string message
++number duration
+}
+class useAppToast {
++toasts : readonly(Toast[])
++dismiss(id) : void
++success(title, message?, duration?) : void
++error(title, message?, duration?) : void
++warning(title, message?, duration?) : void
++info(title, message?, duration?) : void
+}
+class AppToast {
++renders list of toasts
++dismiss(toast.id)
+}
+AppToast --> useAppToast : "consumes"
+```
+
+**Diagram sources**
+- [useToast.ts:1-37](file://app/composables/useToast.ts#L1-L37)
+- [AppToast.vue:1-115](file://app/components/AppToast.vue#L1-L115)
+
+**Section sources**
+- [useToast.ts:1-37](file://app/composables/useToast.ts#L1-L37)
+- [AppToast.vue:1-115](file://app/components/AppToast.vue#L1-L115)
+- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
 
 ### ConfirmDialog
-Generic confirmation modal with customizable text and optional loading indicator.
-
+- Responsibilities
+  - Present a modal with title, message, and customizable confirm/cancel actions.
 - Props
   - title: string
   - message: string
   - confirmText?: string
   - cancelText?: string
   - confirmColor?: string
-  - loading?: boolean
+  - loading: boolean
 - Events
-  - confirm: void
-  - cancel: void
+  - confirm
+  - cancel
 - Behavior
-  - Dismisses on backdrop click.
-  - Disables buttons while loading.
-- Styling
-  - Inline styles for layout and colors; supports custom confirm color.
-- Accessibility
-  - Centered modal with clear headings and actionable buttons.
-  - Ensure focus trapping and Escape key handling are implemented by the parent when integrating.
-- Customization
-  - Override button text and colors via props.
-- Usage example path
-  - See similar modal patterns in [DeleteConfirmModal.vue:1-38](file://app/components/DeleteConfirmModal.vue#L1-L38).
+  - Backdrop click triggers cancel.
+  - Loading state disables buttons and shows spinner.
+- Usage Pattern
+  - Control visibility with a local boolean and bind props/events accordingly.
 
-**Section sources**
-- [ConfirmDialog.vue:1-53](file://app/components/ConfirmDialog.vue#L1-L53)
-- [DeleteConfirmModal.vue:1-38](file://app/components/DeleteConfirmModal.vue#L1-L38)
-
-#### Class Diagram
-```mermaid
-classDiagram
-class ConfirmDialog {
-+string title
-+string message
-+string? confirmText
-+string? cancelText
-+string? confirmColor
-+boolean loading
-+confirm()
-+cancel()
-}
-```
-
-**Diagram sources**
-- [ConfirmDialog.vue:1-53](file://app/components/ConfirmDialog.vue#L1-L53)
-
-### Toast Notification System
-Two rendering implementations share the same composable state. Choose one container per app.
-
-- Composable API (useToast)
-  - Types: ToastType = 'success' | 'error' | 'warning' | 'info'
-  - Interface: Toast { id, type, title, message?, duration? }
-  - Methods:
-    - success(title, message?, duration?)
-    - error(title, message?, duration?)
-    - warning(title, message?, duration?)
-    - info(title, message?, duration?)
-    - dismiss(id)
-- AppToast.vue
-  - Renders toasts fixed at top-right with animated entrance.
-  - Maps types to icons and color palettes.
-- ToastContainer.vue
-  - Teleports to body and renders toasts fixed at bottom-right with progress bars and spring-like transitions.
-- Integration
-  - Import useToast in any component and call methods to display messages.
-  - Include either AppToast or ToastContainer once in your layout.
-- Styling
-  - Both use inline styles and scoped CSS for transitions and animations.
-- Accessibility
-  - Provide role="alert" and aria-live="assertive" on the container for screen readers.
-  - Ensure dismiss buttons are keyboard accessible.
-- Customization
-  - Extend ToastType and update icon/color mappings in the chosen container.
-  - Adjust durations and positioning via props/styles.
-
-**Section sources**
-- [useToast.ts:1-37](file://app/composables/useToast.ts#L1-L37)
-- [AppToast.vue:1-115](file://app/components/AppToast.vue#L1-L115)
-- [ToastContainer.vue:1-120](file://app/components/ToastContainer.vue#L1-L120)
-
-#### Sequence Diagram
 ```mermaid
 sequenceDiagram
-participant Page as "Any Component"
-participant ToastAPI as "useToast"
-participant Container as "ToastContainer/AppToast"
-Page->>ToastAPI : success("Saved", "Changes persisted")
-ToastAPI->>ToastAPI : push({id, type, title, message, duration})
-ToastAPI-->>Container : reactive toasts array updates
-Container-->>User : Render toast with icon and dismiss button
-Note over Container : Auto-dismiss after duration if > 0
+participant Parent as "Parent Page"
+participant Dialog as "ConfirmDialog"
+Parent->>Dialog : Show with title/message/loading
+Parent->>Dialog : @confirm handler
+Dialog-->>Parent : emit("confirm")
+Parent->>Dialog : @cancel handler
+Dialog-->>Parent : emit("cancel")
+Note over Dialog : Backdrop click also emits "cancel"
 ```
 
 **Diagram sources**
-- [useToast.ts:14-36](file://app/composables/useToast.ts#L14-L36)
-- [ToastContainer.vue:18-96](file://app/components/ToastContainer.vue#L18-L96)
-- [AppToast.vue:25-84](file://app/components/AppToast.vue#L25-L84)
+- [ConfirmDialog.vue:1-53](file://app/components/ConfirmDialog.vue#L1-L53)
+
+**Section sources**
+- [ConfirmDialog.vue:1-53](file://app/components/ConfirmDialog.vue#L1-L53)
+
+### PageSkeleton
+- Responsibilities
+  - Provide full-page loading placeholders for multiple page templates.
+- Props
+  - type: 'table' | 'detail' | 'dashboard' | 'card-grid' | 'tracking'
+  - rows?: number (default 6)
+  - cards?: number (default 4)
+- Usage Pattern
+  - <PageSkeleton v-if="loading" type="table" :rows="8" :cards="0" />
+- Extensibility
+  - Add new skeleton types by extending the prop union and adding a template branch.
+
+**Section sources**
+- [PageSkeleton.vue:1-300](file://app/components/PageSkeleton.vue#L1-L300)
+
+### SessionWarning
+- Responsibilities
+  - Warn users about impending session expiration and offer actions.
+- Props
+  - timeRemaining: number (seconds)
+- Events
+  - extend: request to extend session
+  - dismiss: hide the warning
+- Formatting
+  - Displays minutes:seconds countdown.
+- Integration
+  - Mounted in root app shell and bound to auth store flags/actions.
+
+```mermaid
+sequenceDiagram
+participant Store as "Auth Store"
+participant Root as "Root App Shell"
+participant Warning as "SessionWarning"
+Store-->>Root : showSessionWarning = true
+Store-->>Root : sessionWarningTime = N
+Root->>Warning : render with timeRemaining
+Warning-->>Store : emit("extend") -> extendSession()
+Warning-->>Store : emit("dismiss") -> dismissSessionWarning()
+```
+
+**Diagram sources**
+- [SessionWarning.vue:1-66](file://app/components/SessionWarning.vue#L1-L66)
+- [app.vue:1-33](file://app/app.vue#L1-L33)
+
+**Section sources**
+- [SessionWarning.vue:1-66](file://app/components/SessionWarning.vue#L1-L66)
+- [app.vue:1-33](file://app/app.vue#L1-L33)
 
 ## Dependency Analysis
-High-level dependencies between components and shared modules:
+- Layout-to-component coupling
+  - Dashboard layout composes AppSidebar and AppHeader and manages mobile state.
+- Global overlays
+  - Root app mounts SessionWarning and AppToast globally.
+- Toast dependency chain
+  - AppToast consumes useAppToast; consumers call useAppToast() directly to trigger toasts.
 
 ```mermaid
 graph LR
-Dashboard["layouts/dashboard.vue"] --> Sidebar["components/AppSidebar.vue"]
-Dashboard --> Header["components/AppHeader.vue"]
-Pages["pages/*"] --> Skeleton["components/PageSkeleton.vue"]
-Pages --> Confirm["components/ConfirmDialog.vue"]
-Pages --> ToastAPI["composables/useToast.ts"]
-ToastAPI --> AppToast["components/AppToast.vue"]
-ToastAPI --> ToastContainer["components/ToastContainer.vue"]
-All["All Components"] --> Styles["assets/css/main.css"]
+Dashboard["dashboard.vue"] --> Sidebar["AppSidebar.vue"]
+Dashboard --> Header["AppHeader.vue"]
+Root["app.vue"] --> Session["SessionWarning.vue"]
+Root --> Toast["AppToast.vue"]
+Toast --> Compose["useToast.ts"]
+Header --> Compose
 ```
 
 **Diagram sources**
 - [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
-- [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
-- [AppHeader.vue:1-94](file://app/components/AppHeader.vue#L1-L94)
-- [PageSkeleton.vue:1-300](file://app/components/PageSkeleton.vue#L1-L300)
-- [ConfirmDialog.vue:1-53](file://app/components/ConfirmDialog.vue#L1-L53)
-- [useToast.ts:1-37](file://app/composables/useToast.ts#L1-L37)
+- [app.vue:1-33](file://app/app.vue#L1-L33)
 - [AppToast.vue:1-115](file://app/components/AppToast.vue#L1-L115)
-- [ToastContainer.vue:1-120](file://app/components/ToastContainer.vue#L1-L120)
-- [main.css:1-206](file://app/assets/css/main.css#L1-L206)
+- [useToast.ts:1-37](file://app/composables/useToast.ts#L1-L37)
 
 **Section sources**
 - [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
-- [main.css:1-206](file://app/assets/css/main.css#L1-L206)
+- [app.vue:1-33](file://app/app.vue#L1-L33)
+- [AppToast.vue:1-115](file://app/components/AppToast.vue#L1-L115)
+- [useToast.ts:1-37](file://app/composables/useToast.ts#L1-L37)
 
 ## Performance Considerations
-- Prefer lightweight skeletons for initial load to improve perceived performance.
-- Avoid heavy computations inside sidebar navigation; keep link lists static or memoized.
-- Debounce search inputs in headers to reduce re-renders.
-- Use TransitionGroup efficiently; avoid unnecessary reflows by keeping toast containers minimal.
-- Keep inline styles minimal and reuse CSS variables where possible.
-
-[No sources needed since this section provides general guidance]
+- Sidebar
+  - Avoid heavy computations inside watchers; keep navigation data static where possible.
+  - Use lazy-loaded icons if necessary.
+- Pagination
+  - Keep perPage reasonable; avoid rendering excessive page buttons for very large totals.
+- Toasts
+  - Limit concurrent toasts; consider auto-dismiss durations to prevent memory growth.
+- Skeletons
+  - Prefer lightweight placeholders; avoid complex nested structures.
 
 ## Troubleshooting Guide
 - Sidebar not closing on mobile
-  - Ensure the layout emits and listens to the close event and toggles the mobileOpen flag.
-  - Verify CSS classes for mobile overlay are applied correctly.
+  - Ensure parent layout sets mobileOpen to false on route change and handles close event.
 - Toast not appearing
-  - Confirm the toast container is mounted once in the layout.
-  - Check that the composable is imported and methods are called with correct arguments.
-- Skeleton not animating
-  - Ensure the global .skeleton class and keyframes are present in main.css.
-- Confirmation dialog not dismissing
-  - Verify @click.self handler and emitted cancel event are wired in the parent.
+  - Verify that AppToast is mounted in the root shell and that useAppToast is called correctly.
+- Pagination not updating
+  - Confirm that the parent binds :page and @update:page and updates its local state.
+- ConfirmDialog not dismissing
+  - Check that both @confirm and @cancel handlers set the controlling boolean to false.
+- SessionWarning not showing
+  - Ensure auth store flags and methods are wired in the root app shell.
 
 **Section sources**
 - [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
+- [app.vue:1-33](file://app/app.vue#L1-L33)
 - [AppToast.vue:1-115](file://app/components/AppToast.vue#L1-L115)
-- [ToastContainer.vue:1-120](file://app/components/ToastContainer.vue#L1-L120)
-- [useToast.ts:1-37](file://app/composables/useToast.ts#L1-L37)
-- [main.css:18-36](file://app/assets/css/main.css#L18-L36)
+- [AppPagination.vue:1-48](file://app/components/AppPagination.vue#L1-L48)
+- [ConfirmDialog.vue:1-53](file://app/components/ConfirmDialog.vue#L1-L53)
+- [SessionWarning.vue:1-66](file://app/components/SessionWarning.vue#L1-L66)
 
 ## Conclusion
-The core UI components provide a cohesive foundation for the application’s interface. They emphasize responsiveness, clarity, and extensibility. By following the integration and customization guidelines, teams can maintain consistency while adapting to evolving requirements.
-
-[No sources needed since this section summarizes without analyzing specific files]
-
-## Appendices
-
-### Styling Approach and Tailwind CSS
-- Current implementation primarily uses inline styles and a small set of utility classes defined in main.css.
-- If adopting Tailwind CSS, replace inline styles with utility classes and centralize design tokens in Tailwind configuration.
-- Maintain consistent spacing, radii, and shadows using Tailwind’s scale.
-
-[No sources needed since this section doesn't analyze specific files]
-
-### Browser Compatibility
-- Modern browsers supported by Nuxt/Vue ecosystem.
-- Animations and transitions rely on standard CSS features widely supported.
-- Teleport requires modern DOM APIs; ensure polyfills if targeting legacy environments.
-
-[No sources needed since this section doesn't analyze specific files]
-
-### Extension Points
-- Sidebar: Add new groups and links with permission checks.
-- Header: Integrate notifications dropdown or additional actions.
-- Skeleton: Introduce new page templates by extending the type union and template branches.
-- ConfirmDialog: Add variant props (size, icon, slot content).
-- Toast: Add new types and visuals by updating the composable and container mappings.
-
-[No sources needed since this section doesn't analyze specific files]
+The core UI components provide a cohesive foundation for navigation, user interactions, feedback, and loading states. They are designed to be composable, accessible, and responsive. By following the documented props, events, and integration patterns, teams can consistently build feature-rich pages with predictable UX and maintainable code.

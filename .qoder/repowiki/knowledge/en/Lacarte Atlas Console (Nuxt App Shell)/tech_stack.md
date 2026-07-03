@@ -1,0 +1,1 @@
+Nuxt 4 + Vue 3 + Pinia + @nuxt/ui as the shared frontend stack; Vitest with happy-dom for component testing; TomTom Maps SDK and xlsx as cross-feature dependencies.
