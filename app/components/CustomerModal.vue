@@ -58,6 +58,7 @@ const addressSuggestions = ref<TomTomPlace[]>([])
 const showSuggestions = ref(false)
 const geocoding = ref(false)
 let geocodeTimeout: ReturnType<typeof setTimeout> | null = null
+let suppressAddressWatch = false
 
 function debouncedGeocode(query: string) {
   if (geocodeTimeout) clearTimeout(geocodeTimeout)
@@ -95,6 +96,7 @@ async function fetchAddressSuggestions(query: string) {
 
 function selectAddressSuggestion(place: TomTomPlace) {
   const addr = place.properties.address || {}
+  suppressAddressWatch = true
   form.address = addr.streetNameAndNumber || addr.freeformAddress || form.address
   form.city = addr.municipality || addr.localName || ''
   form.region = addr.countrySubdivision || ''
@@ -106,17 +108,19 @@ function selectAddressSuggestion(place: TomTomPlace) {
   form.latitude = String(lat)
   showSuggestions.value = false
   addressSuggestions.value = []
+  nextTick(() => { suppressAddressWatch = false })
 }
 
 watch(() => form.address, (query) => {
+  if (suppressAddressWatch) return
   debouncedGeocode(query)
 })
 
 async function fetchCustomerTypes() {
-  const data = await api.get<{ data: CustomerType[] }>('/customer/admin/types/', 'Failed to load customer types')
-  if (data?.data) {
-    customerTypes.value = data.data
-    const first = data.data[0]
+  const data = await api.get<CustomerType[]>('/customer/admin/types/', 'Failed to load customer types')
+  if (data) {
+    customerTypes.value = data
+    const first = data[0]
     if (first && !form.customerTypeId) {
       form.customerTypeId = first.id
     }
@@ -124,9 +128,9 @@ async function fetchCustomerTypes() {
 }
 
 async function fetchZones() {
-  const data = await api.get<{ data: Zone[] }>('/zone/public/list', 'Failed to load zones')
-  if (data?.data) {
-    zones.value = data.data
+  const data = await api.get<Zone[]>('/zone/public/list', 'Failed to load zones')
+  if (data) {
+    zones.value = data
   }
 }
 
