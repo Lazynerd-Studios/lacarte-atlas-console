@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { geocode } from '@tomtom-org/maps-sdk/services'
+import type { Feature, Point } from 'geojson'
+
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'success'): void
@@ -6,9 +9,24 @@ const emit = defineEmits<{
 
 const api = useApi()
 const toast = useAppToast()
+const config = useRuntimeConfig()
 
 interface CustomerType { id: string; name: string }
 interface Zone { id: string; name: string }
+
+type TomTomPlace = Feature<Point, {
+  address?: {
+    freeformAddress?: string
+    streetNameAndNumber?: string
+    municipality?: string
+    countrySubdivision?: string
+    postalCode?: string
+    country?: string
+    countryCode?: string
+    countryCodeISO3?: string
+    localName?: string
+  }
+}>
 
 const form = reactive({
   firstName: '',
@@ -28,9 +46,71 @@ const form = reactive({
   longitude: '',
 })
 
+// Center of Ghana (approx) for biasing geocode results
+const GHANA_CENTER: [number, number] = [-1.0232, 7.9465]
+const GHANA_RADIUS_METERS = 300000
+
 const customerTypes = ref<CustomerType[]>([])
 const zones = ref<Zone[]>([])
 const loading = ref(false)
+
+const addressSuggestions = ref<TomTomPlace[]>([])
+const showSuggestions = ref(false)
+const geocoding = ref(false)
+let geocodeTimeout: ReturnType<typeof setTimeout> | null = null
+
+function debouncedGeocode(query: string) {
+  if (geocodeTimeout) clearTimeout(geocodeTimeout)
+  if (!query.trim()) {
+    addressSuggestions.value = []
+    showSuggestions.value = false
+    return
+  }
+  geocodeTimeout = setTimeout(() => fetchAddressSuggestions(query), 500)
+}
+
+async function fetchAddressSuggestions(query: string) {
+  geocoding.value = true
+  try {
+    const results = await geocode({
+      query,
+      limit: 10,
+      position: GHANA_CENTER,
+      apiKey: config.public.tomtomApiKey as string,
+    }) as { features: TomTomPlace[] }
+    const features = (results.features || []).filter((place) => {
+      const cc = place.properties.address?.countryCode
+      return !cc || cc.toUpperCase() === 'GH'
+    })
+    addressSuggestions.value = features.slice(0, 5)
+    showSuggestions.value = features.length > 0
+  } catch (err) {
+    console.error('TomTom geocode error:', err)
+    addressSuggestions.value = []
+    showSuggestions.value = false
+  } finally {
+    geocoding.value = false
+  }
+}
+
+function selectAddressSuggestion(place: TomTomPlace) {
+  const addr = place.properties.address || {}
+  form.address = addr.streetNameAndNumber || addr.freeformAddress || form.address
+  form.city = addr.municipality || addr.localName || ''
+  form.region = addr.countrySubdivision || ''
+  form.postalCode = addr.postalCode || ''
+  form.country = addr.country || ''
+  form.placeName = addr.municipality || addr.localName || ''
+  const [lng, lat] = place.geometry.coordinates
+  form.longitude = String(lng)
+  form.latitude = String(lat)
+  showSuggestions.value = false
+  addressSuggestions.value = []
+}
+
+watch(() => form.address, (query) => {
+  debouncedGeocode(query)
+})
 
 async function fetchCustomerTypes() {
   const data = await api.get<{ data: CustomerType[] }>('/customer/admin/types/', 'Failed to load customer types')
@@ -185,10 +265,39 @@ function onBlur(e: Event, field: string) {
         </div>
 
         <!-- Address -->
-        <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;flex-direction:column;gap:6px;position:relative">
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Address</label>
-          <input v-model="form.address" type="text" placeholder="123 Main Street" :style="inputStyle('address')"
-            @focus="onFocus($event, 'address')" @blur="onBlur($event, 'address')" />
+          <div style="position:relative">
+            <input
+              v-model="form.address"
+              type="text"
+              placeholder="Start typing to search (powered by TomTom)"
+              :style="inputStyle('address')"
+              @focus="onFocus($event, 'address')"
+              @blur="onBlur($event, 'address')"
+            />
+            <UIcon
+              v-if="geocoding"
+              name="i-lucide-loader-2"
+              style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#6b7280;animation:spin 1s linear infinite"
+            />
+          </div>
+          <div
+            v-if="showSuggestions && addressSuggestions.length > 0"
+            style="position:absolute;top:100%;left:0;right:0;z-index:10;background:white;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.1);margin-top:4px;max-height:200px;overflow-y:auto"
+          >
+            <button
+              v-for="(place, i) in addressSuggestions"
+              :key="i"
+              type="button"
+              style="width:100%;text-align:left;padding:10px 12px;background:none;border:none;cursor:pointer;font-size:13px;color:#1a1a1a;font-family:'Manrope',sans-serif;border-bottom:1px solid #f3f4f6"
+              @click="selectAddressSuggestion(place)"
+              @mouseover="($event.currentTarget as HTMLElement).style.background='#f9fafb'"
+              @mouseleave="($event.currentTarget as HTMLElement).style.background='white'"
+            >
+              {{ place.properties.address?.freeformAddress || place.properties.address?.streetNameAndNumber || 'Address' }}
+            </button>
+          </div>
         </div>
 
         <!-- City / Region -->
@@ -291,3 +400,10 @@ function onBlur(e: Event, field: string) {
     </div>
   </div>
 </template>
+
+<style scoped>
+@keyframes spin {
+  from { transform: translateY(-50%) rotate(0deg); }
+  to { transform: translateY(-50%) rotate(360deg); }
+}
+</style>
