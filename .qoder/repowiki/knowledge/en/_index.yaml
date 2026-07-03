@@ -3,11 +3,11 @@ schema_version: 1
 locale: en-US
 branch: main
 nodes_managed: true
-exported_at: "2026-07-03T12:01:48Z"
+exported_at: "2026-07-03T12:32:40Z"
 modules:
     "":
-        dir_name: Lacarte Atlas Console (Nuxt App Shell)
-        title: Lacarte Atlas Console (Nuxt App Shell)
+        dir_name: Nuxt 4 Dashboard Shell
+        title: Nuxt 4 Dashboard Shell
         scope:
             - README.md
             - .gitignore
@@ -23,8 +23,8 @@ modules:
         depends_on: []
         related_to: []
     auth_pages:
-        dir_name: Authentication & Access-Control Pages
-        title: Authentication & Access-Control Pages
+        dir_name: Unauthenticated Entry Pages (Login, Forgot Password, Unauthorized)
+        title: Unauthenticated Entry Pages (Login, Forgot Password, Unauthorized)
         scope:
             - app/pages/login.vue
             - app/pages/forgot-password.vue

@@ -12,6 +12,8 @@
 - [driver.ts](file://app/types/driver.ts)
 - [support.ts](file://app/types/support.ts)
 - [team.ts](file://app/types/team.ts)
+- [auth.ts](file://app/stores/auth.ts)
+- [AppPagination.vue](file://app/components/AppPagination.vue)
 - [customers/index.vue](file://app/pages/customers/index.vue)
 - [drivers/index.vue](file://app/pages/drivers/index.vue)
 - [trucks/index.vue](file://app/pages/trucks/index.vue)
@@ -26,10 +28,10 @@
 
 ## Update Summary
 **Changes Made**
-- Updated Settings module documentation to reflect interface refactoring
-- Added new Activity Logs functionality to Settings module
-- Documented disabled General and Notifications tabs with preserved code structure
-- Enhanced security features documentation with password management capabilities
+- Enhanced Security tab with password visibility toggles, improved client-side validation, real-time error feedback, and proper API integration
+- Added comprehensive Activity Logs tab with debounced search (500ms), advanced filtering by action type/module/entity type, pagination support, contextual icons, and detailed log information including timestamps and IP addresses
+- Updated password change workflow with loading states, token management, and success notifications
+- Enhanced settings interface architecture with modular tab-based design
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -444,69 +446,88 @@ Update --> End(["Done"])
 
 ### System Settings
 Purpose:
-- Admin users can manage system preferences, security settings, and monitor activity logs. The settings interface has been refactored to prioritize security features while preserving existing functionality for future expansion.
+- Admin users can manage system preferences, security settings, and monitor activity logs. The settings interface has been significantly enhanced with a modular tab-based architecture focused on security and activity monitoring.
 
 User stories:
-- As an admin, I want to change my password securely with validation and confirmation.
-- As an admin, I want to monitor system activity logs with filtering and search capabilities.
+- As an admin, I want to change my password securely with validation, confirmation, and visibility toggles.
+- As an admin, I want to monitor system activity logs with advanced filtering, search capabilities, and pagination.
 - As an admin, I want to configure general company settings and notification preferences when available.
 
-**Updated** The settings interface has undergone significant refactoring with Security tab as the default view and enhanced activity monitoring capabilities.
+**Enhanced** The settings interface has undergone major improvements with enhanced security features and comprehensive activity logging capabilities.
 
-CRUD and workflows:
-- **Security Tab (Default)**:
-  - Password change with current password verification and confirmation.
-  - Two-factor authentication toggle (currently disabled but preserved for future use).
-- **Activity Logs Tab**:
-  - Real-time activity monitoring with search and filtering.
-  - Pagination support for large datasets.
-  - Module-specific filtering (auth, customer, driver, pickup, billing, inventory, team).
-  - Entity type filtering (customer, driver, pickup, truck, rate, zone, admin).
-- **General Tab (Disabled)**: Company information and regional settings preserved for future implementation.
-- **Notifications Tab (Disabled)**: Email and SMS notification preferences preserved for future implementation.
+#### Security Tab (Default)
+- **Password Change Workflow**: 
+  - Real-time form validation with immediate error feedback
+  - Password visibility toggles for all input fields
+  - Loading states during password updates
+  - Token management for seamless session continuity
+  - Success notifications via toast messages
+- **Two-Factor Authentication**: Preserved for future implementation
+
+#### Activity Logs Tab
+- **Advanced Search and Filtering**:
+  - Debounced search functionality (500ms delay) for optimal performance
+  - Module-specific filtering (auth, customer, driver, pickup, billing, inventory, team)
+  - Entity type filtering (customer, driver, pickup, truck, rate, zone, admin)
+  - Action type filtering for specific operations
+- **Rich Log Information**:
+  - Contextual icons based on action types (create, update, delete, login, etc.)
+  - Color-coded action indicators for quick visual scanning
+  - Timestamp formatting with localized display
+  - IP address tracking for security auditing
+  - Detailed descriptions and metadata
+- **Pagination Support**: Server-side pagination for large datasets with efficient navigation
+
+#### General and Notifications Tabs (Disabled)
+- Company information and regional settings preserved for future implementation
+- Email and SMS notification preferences maintained for future expansion
 
 Data model highlights:
-- Security settings include password fields and two-factor authentication toggle.
-- ActivityLog interface tracks comprehensive audit trails with actor information, actions, modules, and metadata.
-- ActivityLogsPagination manages server-side pagination with search and filter parameters.
+- **Security Settings**: Comprehensive password management with validation rules and error handling
+- **ActivityLog Interface**: Complete audit trail tracking actor information, actions, modules, entities, and metadata
+- **ActivityLogsPagination**: Server-side pagination management with search and filter parameters
 
 Integration points:
-- Uses useApi for activity log retrieval from `/activity-logs/me` endpoint.
-- Integrates with system-wide activity tracking across all modules.
-- Debounced search functionality for optimal performance.
+- Uses useApi for secure activity log retrieval from `/activity-logs/me` endpoint
+- Integrates with system-wide activity tracking across all modules
+- Leverages useAuthStore for token management during password changes
+- Utilizes AppPagination component for consistent pagination UX
 
 ```mermaid
 flowchart TD
 SettingsStart(["Settings Interface"]) --> DefaultView["Security Tab (Default)"]
-DefaultView --> PasswordChange["Password Change Form"]
-PasswordChange --> Validation["Input Validation"]
-Validation --> SaveSuccess["Save Confirmation"]
+DefaultView --> PasswordForm["Password Change Form"]
+PasswordForm --> Validation["Real-time Validation"]
+Validation --> VisibilityToggles["Password Visibility Controls"]
+VisibilityToggles --> APIIntegration["API Integration"]
+APIIntegration --> TokenManagement["Token Management"]
+TokenManagement --> SuccessNotification["Success Toast"]
 SettingsStart --> ActivityTab["Activity Logs Tab"]
-ActivityTab --> FetchLogs["GET /activity-logs/me"]
-FetchLogs --> FilterOptions["Search & Filter Options"]
-FilterOptions --> ModuleFilter["Module Filter"]
-FilterOptions --> EntityFilter["Entity Type Filter"]
-FilterOptions --> SearchInput["Debounced Search"]
-ModuleFilter --> Results["Paginated Results"]
-EntityFilter --> Results
-SearchInput --> Results
-Results --> Pagination["Server-side Pagination"]
+ActivityTab --> AdvancedSearch["Debounced Search (500ms)"]
+AdvancedSearch --> MultiFilter["Module & Entity Filters"]
+MultiFilter --> RichDisplay["Contextual Icons & Colors"]
+RichDisplay --> Pagination["Server-side Pagination"]
 SettingsStart --> DisabledTabs["Disabled Tabs (Future Use)"]
-DisabledTabs --> GeneralTab["General Settings (Commented)"]
-DisabledTabs --> NotificationTab["Notification Preferences (Commented)"]
+DisabledTabs --> GeneralTab["General Settings (Preserved)"]
+DisabledTabs --> NotificationTab["Notification Preferences (Preserved)"]
 ```
 
 **Diagram sources**
-- [settings/index.vue:1-566](file://app/pages/settings/index.vue#L1-566)
+- [settings/index.vue:1-641](file://app/pages/settings/index.vue#L1-641)
+- [AppPagination.vue:1-48](file://app/components/AppPagination.vue#L1-48)
+- [auth.ts:1-230](file://app/stores/auth.ts#L1-230)
 
 **Section sources**
-- [settings/index.vue:1-566](file://app/pages/settings/index.vue#L1-566)
+- [settings/index.vue:1-641](file://app/pages/settings/index.vue#L1-641)
+- [AppPagination.vue:1-48](file://app/components/AppPagination.vue#L1-48)
+- [auth.ts:1-230](file://app/stores/auth.ts#L1-230)
 
 ## Dependency Analysis
 Module interactions:
 - Customers link to zones and customer types; pickups reference customers and drivers; billing references customers and plans; team manages roles and permissions affecting access to these modules.
 - Fleet management (drivers/trucks) supports pickup assignment and tracking.
 - Settings module provides system-wide configuration and monitoring capabilities that impact all other modules.
+- **Enhanced Integration**: Activity logs provide cross-module audit trails, while security features ensure consistent authentication across all modules.
 
 ```mermaid
 graph TB
@@ -520,6 +541,7 @@ Team["Team & Roles"] --> All["All Admin Pages"]
 Support["Support Tickets"] --> Customers
 Settings["System Settings"] --> All
 ActivityLogs["Activity Logs"] --> All
+Security["Security Features"] --> All
 ```
 
 [No sources needed since this diagram shows conceptual relationships]
@@ -530,7 +552,11 @@ ActivityLogs["Activity Logs"] --> All
 - Lazy-load heavy libraries like xlsx only when exporting.
 - Prefer parallel fetches (e.g., stats + lists) to improve perceived performance.
 - Cache static lookups (customer types, quantities) in composables or stores if frequently accessed.
-- **Settings Optimization**: Activity logs implement debounced search (500ms delay) and server-side pagination to handle large datasets efficiently.
+- **Settings Optimization**: 
+  - Activity logs implement debounced search (500ms delay) to prevent excessive API calls
+  - Server-side pagination handles large datasets efficiently
+  - Contextual icons and color coding provide instant visual feedback without additional network requests
+  - Password validation occurs client-side to minimize unnecessary API calls
 
 [No sources needed since this section provides general guidance]
 
@@ -541,15 +567,17 @@ Common issues and resolutions:
 - Validation errors: Some endpoints return 400 validation messages; ensure payloads match expected schemas.
 - Missing data: If fields appear empty, check backend response shape and mapping in the page component.
 - **Settings Issues**: 
-  - Activity logs not loading: Verify `/activity-logs/me` endpoint availability and proper authentication.
-  - Search not working: Check debounced search implementation and ensure input values are properly passed to API.
-  - Tab navigation: Ensure activeTab state is properly managed and tab content conditionals are correct.
+  - Activity logs not loading: Verify `/activity-logs/me` endpoint availability and proper authentication
+  - Search not working: Check debounced search implementation and ensure input values are properly passed to API
+  - Tab navigation: Ensure activeTab state is properly managed and tab content conditionals are correct
+  - Password change failures: Verify current password validation and check for proper token refresh
+  - Pagination issues: Confirm server-side pagination parameters are correctly formatted
 
 Operational tips:
 - Inspect console logs from useApi for request/response details.
 - Verify runtime config values (NUXT_PUBLIC_API_BASE) in nuxt.config.ts.
 - For permission-related blocks, confirm the user has required roles/permissions.
-- **Settings Debugging**: Monitor activity log API calls and verify pagination parameters are correctly formatted.
+- **Settings Debugging**: Monitor activity log API calls and verify pagination parameters are correctly formatted. Check browser console for validation errors and API response structures.
 
 **Section sources**
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
@@ -557,7 +585,7 @@ Operational tips:
 - [settings/index.vue:104-130](file://app/pages/settings/index.vue#L104-L130)
 
 ## Conclusion
-The Lacarte Atlas Console provides robust administrative capabilities across customers, fleet, pickups, billing, subscriptions, team, support, and system settings. Each module implements clear CRUD flows, consistent error handling, and permission checks. Integration points between modules enable end-to-end operational workflows from customer onboarding to service delivery and billing. The recent settings interface refactoring enhances security focus while maintaining extensibility for future feature additions.
+The Lacarte Atlas Console provides robust administrative capabilities across customers, fleet, pickups, billing, subscriptions, team, support, and system settings. Each module implements clear CRUD flows, consistent error handling, and permission checks. Integration points between modules enable end-to-end operational workflows from customer onboarding to service delivery and billing. The recent settings interface enhancements significantly improve security posture and operational visibility through comprehensive activity logging and enhanced password management capabilities.
 
 [No sources needed since this section summarizes without analyzing specific files]
 
@@ -602,12 +630,13 @@ The Lacarte Atlas Console provides robust administrative capabilities across cus
   - GET /support/admin/tickets
   - GET /support/admin/tickets/stats
 - **Settings**
+  - POST /auth/change-password (with token refresh)
   - GET /activity-logs/me (with pagination and filters)
 
 [No sources needed since this section aggregates endpoint usage patterns]
 
 ### Settings Interface Architecture
-The settings interface follows a modular tab-based architecture with the following structure:
+The settings interface follows a modular tab-based architecture with enhanced security and activity monitoring capabilities:
 
 ```mermaid
 graph LR
@@ -617,13 +646,25 @@ B --> D["Activity Logs Tab (Active)"]
 B --> E["General Tab (Disabled)"]
 B --> F["Notifications Tab (Disabled)"]
 C --> G["Password Management"]
-D --> H["Activity Log Viewer"]
-E --> I["Company Settings (Preserved)"]
-F --> J["Notification Preferences (Preserved)"]
-H --> K["Search & Filters"]
-K --> L["Pagination"]
+C --> H["Validation Engine"]
+C --> I["Token Management"]
+D --> J["Activity Log Viewer"]
+D --> K["Advanced Search"]
+D --> L["Multi-dimensional Filters"]
+D --> M["Pagination"]
+E --> N["Company Settings (Preserved)"]
+F --> O["Notification Preferences (Preserved)"]
+J --> P["Contextual Icons"]
+J --> Q["Timestamp Formatting"]
+J --> R["IP Address Tracking"]
+K --> S["Debounced Input (500ms)"]
+L --> T["Module Filters"]
+L --> U["Entity Type Filters"]
+L --> V["Action Type Filters"]
 ```
 
 **Diagram sources**
 - [settings/index.vue:6-11](file://app/pages/settings/index.vue#L6-L11)
 - [settings/index.vue:214-237](file://app/pages/settings/index.vue#L214-L237)
+- [settings/index.vue:176-190](file://app/pages/settings/index.vue#L176-L190)
+- [AppPagination.vue:1-48](file://app/components/AppPagination.vue#L1-48)
