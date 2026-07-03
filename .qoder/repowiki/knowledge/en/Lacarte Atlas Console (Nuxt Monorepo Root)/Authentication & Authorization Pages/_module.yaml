@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: auth_pages
+title: Authentication & Authorization Pages
+scope:
+    - app/pages/login.vue
+    - app/pages/forgot-password.vue
+    - app/pages/unauthorized.vue
+source_files: []
+depends_on: []
+related_to: []

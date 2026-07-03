@@ -1,0 +1,1 @@
+Nuxt pages for the admin login flow — sign-in, password-reset request, and an in-app access-denied screen — styled as standalone full-bleed cards.

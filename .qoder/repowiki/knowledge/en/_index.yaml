@@ -1,0 +1,35 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: en-US
+branch: main
+nodes_managed: true
+exported_at: "2026-07-03T07:35:28Z"
+modules:
+    "":
+        dir_name: Lacarte Atlas Console (Nuxt Monorepo Root)
+        title: Lacarte Atlas Console (Nuxt Monorepo Root)
+        scope:
+            - README.md
+            - .gitignore
+            - package.json
+            - nuxt.config.ts
+            - tsconfig.json
+            - bun.lock
+            - skills-lock.json
+            - vitest.config.ts
+        source_files: []
+        children:
+            - auth_pages
+        depends_on: []
+        related_to: []
+    auth_pages:
+        dir_name: Authentication & Authorization Pages
+        title: Authentication & Authorization Pages
+        scope:
+            - app/pages/login.vue
+            - app/pages/forgot-password.vue
+            - app/pages/unauthorized.vue
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []

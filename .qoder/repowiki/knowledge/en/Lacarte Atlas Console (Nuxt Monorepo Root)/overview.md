@@ -1,0 +1,1 @@
+Nuxt 4 monorepo root that wires together the admin auth pages, map/tracking UI, and payment flows into a single Nuxt application via shared modules, runtime config, and route rules.

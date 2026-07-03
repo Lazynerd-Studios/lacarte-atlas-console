@@ -1,0 +1,2 @@
+- All cross-cutting dependencies (Pinia, persistedstate, Nuxt UI) are enabled in `nuxt.config.ts` rather than per-feature imports.
+- Public API surface is accessed exclusively through `useRuntimeConfig().public.*` instead of direct env reads, keeping secrets out of the bundle.

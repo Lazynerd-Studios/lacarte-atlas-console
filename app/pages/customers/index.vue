@@ -109,10 +109,10 @@ onMounted(async () => {
   initialLoading.value = false
 })
 
-function handleAddCustomer(data: Record<string, unknown>) {
-  // TODO: call API to create customer
-  console.log('New customer:', data)
+function handleCustomerCreated() {
   showModal.value = false
+  fetchCustomers()
+  toast.success('Customer created')
 }
 
 function planBadge(plan: string | undefined) {
@@ -326,7 +326,7 @@ function statusBadge(status: string) {
   </div>
 
   <!-- Add Customer Modal -->
-  <CustomerModal v-if="showModal" @close="showModal = false" @submit="handleAddCustomer" />
+  <CustomerModal v-if="showModal" @close="showModal = false" @success="handleCustomerCreated" />
 
   <!-- Suspend Modal -->
   <SuspendModal

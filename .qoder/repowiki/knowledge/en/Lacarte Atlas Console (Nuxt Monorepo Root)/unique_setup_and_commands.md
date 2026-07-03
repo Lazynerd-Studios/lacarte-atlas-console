@@ -1,0 +1,1 @@
+`npm run dev` / `nuxt dev` boots the full Nuxt app; `npm run build` / `generate` / `preview` follow Nuxt conventions; `npm test` runs Vitest against the whole `app/` tree using the same `~`/`@` aliases as the app.

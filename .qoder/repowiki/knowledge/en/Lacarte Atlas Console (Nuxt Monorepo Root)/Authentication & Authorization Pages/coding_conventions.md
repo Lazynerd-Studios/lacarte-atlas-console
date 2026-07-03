@@ -1,0 +1,6 @@
+- Pages declare their layout intent up front with `definePageMeta({ layout: ... })` at the top of `<script setup>`.
+- Form validation is local and imperative: fields are cleared on input, error strings are stored in per-field refs, and a single `validate()` function returns a boolean before dispatching the API call.
+- Async handlers follow a try/catch/finally pattern that sets `loading = true`, catches `e instanceof Error ? e.message : fallback`, and always resets loading in `finally`.
+- User-facing errors are surfaced both as inline field-level messages and as a centered red banner `<p v-if="error">` using Tailwind color tokens (`#ef4444`, `#fef2f2`, `#fecaca`).
+- Interactive elements use inline `@mouseover`/`@mouseleave` to toggle background colors between two hex values instead of relying on CSS hover classes.
+- All typography and spacing are applied via inline style objects referencing the Manrope font family and fixed pixel sizes, keeping these pages independent of the app's design system.

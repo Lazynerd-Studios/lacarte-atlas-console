@@ -1,24 +1,59 @@
 <script setup lang="ts">
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'submit', data: Record<string, unknown>): void
+  (e: 'success'): void
 }>()
+
+const api = useApi()
+const toast = useAppToast()
+
+interface CustomerType { id: string; name: string }
+interface Zone { id: string; name: string }
 
 const form = reactive({
   firstName: '',
   lastName: '',
   email: '',
   phone: '',
-  password: '',
-  confirmPassword: '',
-  zone: '',
-  userType: 'regular',
-  entityName: '',
+  customerTypeId: '',
+  zoneId: '',
   binCount: 1,
-  sendWelcome: true,
+  address: '',
+  city: '',
+  region: '',
+  postalCode: '',
+  country: '',
+  placeName: '',
+  latitude: '',
+  longitude: '',
 })
 
-const { zones, customerTypes } = useMockData()
+const customerTypes = ref<CustomerType[]>([])
+const zones = ref<Zone[]>([])
+const loading = ref(false)
+
+async function fetchCustomerTypes() {
+  const data = await api.get<{ data: CustomerType[] }>('/customer/admin/types/', 'Failed to load customer types')
+  if (data?.data) {
+    customerTypes.value = data.data
+    const first = data.data[0]
+    if (first && !form.customerTypeId) {
+      form.customerTypeId = first.id
+    }
+  }
+}
+
+async function fetchZones() {
+  const data = await api.get<{ data: Zone[] }>('/zone/public/list', 'Failed to load zones')
+  if (data?.data) {
+    zones.value = data.data
+  }
+}
+
+onMounted(() => {
+  fetchCustomerTypes()
+  fetchZones()
+})
 
 const errors = reactive<Record<string, string>>({})
 
@@ -29,15 +64,38 @@ function validate() {
   if (!form.email.trim())      errors.email = 'Required'
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = 'Invalid email'
   if (!form.phone.trim())      errors.phone = 'Required'
-  if (!form.password)          errors.password = 'Required'
-  else if (form.password.length < 6) errors.password = 'Min 6 characters'
-  if (form.confirmPassword !== form.password) errors.confirmPassword = 'Passwords do not match'
+  if (!form.customerTypeId)    errors.customerTypeId = 'Required'
+  if (!form.zoneId)            errors.zoneId = 'Required'
   return Object.keys(errors).length === 0
 }
 
-function submit() {
+async function submit() {
   if (!validate()) return
-  emit('submit', { ...form })
+  loading.value = true
+  const payload = {
+    email: form.email.trim(),
+    name: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
+    phoneNumber: form.phone.trim(),
+    customerTypeId: form.customerTypeId,
+    zoneId: form.zoneId,
+    noBins: form.binCount,
+    address: form.address.trim(),
+    city: form.city.trim(),
+    region: form.region.trim(),
+    postalCode: form.postalCode.trim(),
+    country: form.country.trim(),
+    placeName: form.placeName.trim(),
+    location: {
+      latitude: Number(form.latitude) || 0,
+      longitude: Number(form.longitude) || 0,
+    },
+  }
+  const result = await api.post('/customer/admin/', payload, 'Failed to create customer')
+  loading.value = false
+  if (result) {
+    toast.success('Customer created successfully')
+    emit('success')
+  }
 }
 
 const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
@@ -115,59 +173,86 @@ function onBlur(e: Event, field: string) {
         <div style="display:flex;flex-direction:column;gap:6px">
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Customer Type</label>
           <select
-            v-model="form.userType"
-            :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+            v-model="form.customerTypeId"
+            :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid ${errors.customerTypeId ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:${form.customerTypeId ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+            @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+            @blur="($event.target as HTMLElement).style.borderColor=errors.customerTypeId ? '#ef4444' : '#e5e7eb'"
           >
+            <option value="" disabled>Select a customer type</option>
             <option v-for="t in customerTypes" :key="t.id" :value="t.id">{{ t.name }}</option>
           </select>
+          <span v-if="errors.customerTypeId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.customerTypeId }}</span>
         </div>
 
-        <!-- Entity Name (non-regular types only) -->
-        <div v-if="form.userType !== 'regular'" style="display:flex;flex-direction:column;gap:6px">
-          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Entity Name</label>
-          <input v-model="form.entityName" type="text" placeholder="Company / Estate / Organisation name" :style="inputStyle('entityName')"
-            @focus="onFocus($event, 'entityName')" @blur="onBlur($event, 'entityName')" />
+        <!-- Address -->
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Address</label>
+          <input v-model="form.address" type="text" placeholder="123 Main Street" :style="inputStyle('address')"
+            @focus="onFocus($event, 'address')" @blur="onBlur($event, 'address')" />
         </div>
 
-        <!-- Portal access section -->
-        <div style="background:#f9fafb;border:1px solid #ececec;border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px">
-          <div style="display:flex;align-items:center;gap:8px">
-            <UIcon name="i-lucide-lock" style="width:16px;height:16px;color:#111;flex-shrink:0" />
-            <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">Customer Portal Access</p>
-          </div>
-          <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;line-height:1.5">
-            Set an initial password for the customer to access their portal. They can change this after their first login.
-          </p>
+        <!-- City / Region -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
           <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Initial Password</label>
-            <input v-model="form.password" type="password" placeholder="Create a temporary password" :style="inputStyle('password')"
-              @focus="onFocus($event, 'password')" @blur="onBlur($event, 'password')" />
-            <span v-if="errors.password" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.password }}</span>
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">City</label>
+            <input v-model="form.city" type="text" placeholder="Accra" :style="inputStyle('city')"
+              @focus="onFocus($event, 'city')" @blur="onBlur($event, 'city')" />
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Confirm Password</label>
-            <input v-model="form.confirmPassword" type="password" placeholder="Confirm password" :style="inputStyle('confirmPassword')"
-              @focus="onFocus($event, 'confirmPassword')" @blur="onBlur($event, 'confirmPassword')" />
-            <span v-if="errors.confirmPassword" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.confirmPassword }}</span>
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Region</label>
+            <input v-model="form.region" type="text" placeholder="Greater Accra" :style="inputStyle('region')"
+              @focus="onFocus($event, 'region')" @blur="onBlur($event, 'region')" />
           </div>
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-            <input v-model="form.sendWelcome" type="checkbox" style="width:16px;height:16px;accent-color:#ffb400;cursor:pointer" />
-            <span style="font-size:12px;font-weight:500;color:#6b7280;font-family:'Manrope',sans-serif">Send welcome email with login credentials to customer</span>
-          </label>
+        </div>
+
+        <!-- Postal Code / Country -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Postal Code</label>
+            <input v-model="form.postalCode" type="text" placeholder="00233" :style="inputStyle('postalCode')"
+              @focus="onFocus($event, 'postalCode')" @blur="onBlur($event, 'postalCode')" />
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Country</label>
+            <input v-model="form.country" type="text" placeholder="Ghana" :style="inputStyle('country')"
+              @focus="onFocus($event, 'country')" @blur="onBlur($event, 'country')" />
+          </div>
+        </div>
+
+        <!-- Place Name -->
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Place Name</label>
+          <input v-model="form.placeName" type="text" placeholder="Landmark / area name" :style="inputStyle('placeName')"
+            @focus="onFocus($event, 'placeName')" @blur="onBlur($event, 'placeName')" />
+        </div>
+
+        <!-- Location -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Latitude</label>
+            <input v-model="form.latitude" type="text" placeholder="5.6037" :style="inputStyle('latitude')"
+              @focus="onFocus($event, 'latitude')" @blur="onBlur($event, 'latitude')" />
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Longitude</label>
+            <input v-model="form.longitude" type="text" placeholder="-0.1870" :style="inputStyle('longitude')"
+              @focus="onFocus($event, 'longitude')" @blur="onBlur($event, 'longitude')" />
+          </div>
         </div>
 
         <!-- Zone -->
         <div style="display:flex;flex-direction:column;gap:6px">
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Zone</label>
           <select
-            v-model="form.zone"
-            :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:${form.zone ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+            v-model="form.zoneId"
+            :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid ${errors.zoneId ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:${form.zoneId ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
             @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
-            @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
+            @blur="($event.target as HTMLElement).style.borderColor=errors.zoneId ? '#ef4444' : '#e5e7eb'"
           >
             <option value="" disabled>Select a zone</option>
             <option v-for="z in zones" :key="z.id" :value="z.id">{{ z.name }}</option>
           </select>
+          <span v-if="errors.zoneId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.zoneId }}</span>
         </div>
 
         <!-- Assigned BINs -->
@@ -198,9 +283,10 @@ function onBlur(e: Event, field: string) {
           @click="emit('close')"
         >Cancel</button>
         <button
-          style="height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
+          :disabled="loading"
+          :style="`height:40px;padding:0 20px;background:${loading ? '#f3f4f6' : '#ffb400'};border:none;border-radius:20px;font-size:14px;font-weight:500;color:${loading ? '#9ca3af' : '#0a0d12'};font-family:'Manrope',sans-serif;cursor:${loading ? 'not-allowed' : 'pointer'};box-shadow:0 1px 3px rgba(255,180,0,0.2)`"
           @click="submit"
-        >Add Customer</button>
+        >{{ loading ? 'Creating...' : 'Add Customer' }}</button>
       </div>
     </div>
   </div>
