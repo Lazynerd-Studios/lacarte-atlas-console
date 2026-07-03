@@ -33,7 +33,7 @@ async function logout() {
       <UIcon name="i-lucide-menu" style="width:20px;height:20px;color:#6b7280" />
     </button>
 
-    <!-- Search -->
+    <!-- Search (commented out)
     <div class="header-search" style="position:relative;width:448px;flex-shrink:0">
       <UIcon name="i-lucide-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#6b7280" />
       <input
@@ -45,6 +45,7 @@ async function logout() {
         @blur="($event.target as HTMLElement).style.borderColor='#ececec'"
       />
     </div>
+    -->
 
     <!-- Right side -->
     <div style="display:flex;align-items:center;gap:4px;margin-left:auto">
