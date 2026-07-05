@@ -55,6 +55,25 @@ const activeFilter = ref('All')
 const filters = ['All', 'Pending', 'Assigned', 'Completed']
 const activePaymentStatus = ref('All')
 
+const sortBy = ref<'createdAt' | 'preferredPickupDate' | 'updatedAt'>('createdAt')
+const sortOrder = ref<'asc' | 'desc'>('desc')
+
+function toggleSort(field: 'createdAt' | 'preferredPickupDate' | 'updatedAt') {
+  if (sortBy.value === field) {
+    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortBy.value = field
+    sortOrder.value = 'desc'
+  }
+  pagination.value.page = 1
+  fetchRequests()
+}
+
+function sortIcon(field: string) {
+  if (sortBy.value !== field) return 'i-lucide-arrow-up-down'
+  return sortOrder.value === 'asc' ? 'i-lucide-arrow-up' : 'i-lucide-arrow-down'
+}
+
 const filtered = computed(() => {
   let result = requests.value
   
@@ -118,6 +137,9 @@ async function fetchRequests() {
       const val = activePaymentStatus.value.toLowerCase().replace(/\s+/g, '-')
       params.append('paymentStatus', val)
     }
+    
+    params.append('sortBy', sortBy.value)
+    params.append('sortOrder', sortOrder.value)
     
     const data = await api.get<{ data: PickupRequest[]; pagination: Pagination }>(
       `/pickup-requests/admin/list?${params.toString()}`,
@@ -298,6 +320,9 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
             <th style="padding:14px 16px;text-align:left">
               <div class="skeleton" style="height:14px;width:60px" />
             </th>
+            <th style="padding:14px 16px;text-align:left">
+              <div class="skeleton" style="height:14px;width:90px" />
+            </th>
             <th style="padding:14px 16px;text-align:right">
               <div class="skeleton" style="height:14px;width:70px;margin-left:auto" />
             </th>
@@ -334,6 +359,10 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
             <!-- Status -->
             <td style="padding:20px 16px">
               <div class="skeleton" style="height:22px;width:80px;border-radius:14px" />
+            </td>
+            <!-- Created At -->
+            <td style="padding:20px 16px">
+              <div class="skeleton" style="height:14px;width:100px" />
             </td>
             <!-- Actions -->
             <td style="padding:20px 16px;text-align:right">
@@ -431,10 +460,15 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
             <th style="padding:14px 8px 14px 8px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Request ID</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Customer</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Address</th>
-            <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Pickup Date</th>
+            <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap;cursor:pointer;user-select:none" @click="toggleSort('preferredPickupDate')">
+              <span style="display:inline-flex;align-items:center;gap:4px">Pickup Date <UIcon :name="sortIcon('preferredPickupDate')" :style="`width:14px;height:14px;color:${sortBy === 'preferredPickupDate' ? '#ffb400' : '#9ca3af'}`" /></span>
+            </th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Payment Type</th>
             <th style="padding:14px 12px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Payment Status</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Status</th>
+            <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap;cursor:pointer;user-select:none" @click="toggleSort('createdAt')">
+              <span style="display:inline-flex;align-items:center;gap:4px">Created At <UIcon :name="sortIcon('createdAt')" :style="`width:14px;height:14px;color:${sortBy === 'createdAt' ? '#ffb400' : '#9ca3af'}`" /></span>
+            </th>
             <th style="padding:14px 16px;text-align:right;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Actions</th>
           </tr>
         </thead>
@@ -483,6 +517,11 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
               <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;color:${statusBadge(req.status).color};background:${statusBadge(req.status).bg};border:1px solid ${statusBadge(req.status).border}`">
                 {{ statusBadge(req.status).label }}
               </span>
+            </td>
+
+            <!-- Created At -->
+            <td style="padding:20px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">
+              {{ req.createdAt ? formatDate(req.createdAt) : '—' }}
             </td>
 
             <!-- Actions -->
