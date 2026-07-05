@@ -1,0 +1,5 @@
+- Each page declares its layout policy at the top of the script block via `definePageMeta({ layout: ... })`, opting out of the app shell for entry flows and reusing `dashboard` for in-app errors.
+- All UI is styled with inline Tailwind-like CSS strings inside the `<template>` rather than external style files or scoped CSS blocks.
+- Form validation is synchronous and field-scoped: a dedicated validator function returns a boolean, and per-field error refs are cleared on input and set inline before submitting.
+- Async handlers follow a try/catch/finally pattern that sets `loading = true` upfront, normalises caught values to strings via `e instanceof Error ? e.message : fallback`, and always resets loading in `finally`.
+- External side effects are reached exclusively through Nuxt auto-imported composables (`useApi`, `useAuthStore`, `useAppToast`, `useRouter`) rather than direct imports.
