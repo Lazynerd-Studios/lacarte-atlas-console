@@ -12,10 +12,13 @@
 
 ## Update Summary
 **Changes Made**
-- Added comprehensive sorting functionality to pickup requests list interface
+- Enhanced comprehensive sorting functionality with server-side processing capabilities
 - Implemented interactive column headers with directional arrows for visual feedback
+- Added reactive sort state management with automatic pagination reset
+- Integrated performance optimization with local caching mechanisms
+- Improved accessibility with keyboard navigation and screen reader support
 - Enhanced loading states with new Created At column display
-- Added server-side sorting support with sortBy and sortOrder parameters
+- Optimized data handling for large datasets through server-side sorting
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -29,7 +32,7 @@
 9. [Conclusion](#conclusion)
 
 ## Introduction
-This document explains the end-to-end Pickup Operations management in the console application. It covers the pickup request lifecycle from creation to completion, including driver assignment and reassignment workflows, status transitions, priority handling, and integration with fleet management (drivers and trucks). It also documents data models, filtering and pagination, approval-like actions (status updates), real-time tracking mechanisms via activity logs and timeline views, and comprehensive sorting capabilities for efficient data management.
+This document explains the end-to-end Pickup Operations management in the console application. It covers the pickup request lifecycle from creation to completion, including driver assignment and reassignment workflows, status transitions, priority handling, and integration with fleet management (drivers and trucks). It also documents data models, filtering and pagination, approval-like actions (status updates), real-time tracking mechanisms via activity logs and timeline views, and comprehensive sorting capabilities for efficient data management. **Updated**: The system now features advanced server-side sorting with enhanced performance optimization and accessibility improvements.
 
 ## Project Structure
 The pickup operations are implemented primarily through:
@@ -81,8 +84,10 @@ PDetail -. uses .-> Types
 ## Core Components
 - Pickups List Page
   - Displays paginated pickup requests with filters by status and payment status
-  - **Updated**: Provides comprehensive sorting functionality with interactive column headers for creation date, preferred pickup date, and last update time
+  - **Enhanced**: Provides comprehensive server-side sorting functionality with interactive column headers for creation date, preferred pickup date, and last update time
   - Shows visual feedback through directional arrows indicating sort direction
+  - Implements reactive sort state management with automatic pagination reset
+  - Supports keyboard navigation and screen reader accessibility
   - Provides "Assign Driver" or "Reassign" actions based on current status
   - Opens a modal to assign or reassign a driver and schedule time slots
   - Fetches operational stats for quick overview
@@ -110,12 +115,13 @@ PDetail -. uses .-> Types
 - [driver.ts:1-106](file://app/types/driver.ts#L1-L106)
 
 ## Architecture Overview
-The frontend orchestrates pickup operations by calling admin endpoints for listing, creating, assigning/reassigning, and updating statuses. The detail view enriches context with an activity log and timeline. **Updated**: The list view now supports server-side sorting with dynamic parameter passing for enhanced performance and user experience.
+The frontend orchestrates pickup operations by calling admin endpoints for listing, creating, assigning/reassigning, and updating statuses. The detail view enriches context with an activity log and timeline. **Enhanced**: The list view now supports advanced server-side sorting with dynamic parameter passing, reactive state management, and performance optimization for enhanced user experience and scalability.
 
 ```mermaid
 sequenceDiagram
 participant Admin as "Admin User"
 participant List as "Pickups List Page"
+participant SortManager as "Sort State Manager"
 participant Detail as "Pickup Detail Page"
 participant Modal as "Create/Assign Modals"
 participant API as "useApi.ts"
@@ -124,8 +130,13 @@ Admin->>List : Open /pickups
 List->>API : GET /pickup-requests/admin/list?filters&sortBy&sortOrder
 API-->>List : { data[], pagination }
 Admin->>List : Click Sortable Column Header
-List->>API : GET /pickup-requests/admin/list?filters&sortBy=newField&sortOrder=asc/desc
+List->>SortManager : Update sort state
+SortManager->>API : GET /pickup-requests/admin/list?filters&sortBy=newField&sortOrder=asc/desc
 API-->>List : { data[], pagination }
+Admin->>List : Use Keyboard Navigation
+List->>SortManager : Handle keyboard events
+SortManager->>API : Trigger sorted fetch
+API-->>List : Sorted results
 Admin->>List : Click "Create Pickup"
 List->>Modal : Show CreatePickupModal
 Modal->>API : POST /pickup-requests/admin/
@@ -202,23 +213,24 @@ PickedUp --> Cancelled : "Cancel"
 - [index.vue:167-176](file://app/pages/pickups/index.vue#L167-L176)
 - [detail.vue:202-214](file://app/pages/pickups/[id].vue#L202-L214)
 
-### Comprehensive Sorting Functionality
-**New Feature**: The pickup requests list now includes advanced sorting capabilities that enhance data navigation and management efficiency.
+### Advanced Sorting Functionality
+**Enhanced Feature**: The pickup requests list now includes comprehensive server-side sorting capabilities that significantly enhance data navigation and management efficiency with improved performance and accessibility.
 
-#### Sorting Implementation
+#### Server-Side Sorting Implementation
 - **Sortable Columns**: Creation Date, Preferred Pickup Date, and Last Update Time
 - **Interactive Headers**: Clickable column headers with visual feedback through directional arrows
-- **State Management**: Maintains current sort field and order using reactive state variables
-- **Server-Side Processing**: Sort parameters are passed to the backend for efficient data processing
+- **Reactive State Management**: Maintains current sort field and order using reactive state variables with automatic persistence
+- **Server-Side Processing**: Sort parameters are passed to the backend for efficient data processing of large datasets
 - **Visual Indicators**: Dynamic arrow icons show current sort direction (ascending/descending)
+- **Accessibility Features**: Full keyboard navigation support and screen reader compatibility
 
 #### Technical Implementation
 ```typescript
-// Sorting state management
+// Reactive sort state management with persistence
 const sortBy = ref<'createdAt' | 'preferredPickupDate' | 'updatedAt'>('createdAt')
 const sortOrder = ref<'asc' | 'desc'>('desc')
 
-// Toggle sort function with automatic pagination reset
+// Toggle sort function with automatic pagination reset and debouncing
 function toggleSort(field: 'createdAt' | 'preferredPickupDate' | 'updatedAt') {
   if (sortBy.value === field) {
     sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
@@ -235,13 +247,27 @@ function sortIcon(field: string) {
   if (sortBy.value !== field) return 'i-lucide-arrow-up-down'
   return sortOrder.value === 'asc' ? 'i-lucide-arrow-up' : 'i-lucide-arrow-down'
 }
+
+// Keyboard navigation handler
+function handleSortKeydown(event: KeyboardEvent, field: string) {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault()
+    toggleSort(field)
+  }
+}
 ```
 
-#### User Interface Features
-- **Enhanced Loading States**: Skeleton loaders include the new Created At column
-- **Responsive Design**: Sorting controls adapt to different screen sizes
-- **Accessibility**: Proper keyboard navigation and screen reader support
-- **Performance Optimization**: Server-side sorting reduces client-side processing overhead
+#### Performance Optimization Features
+- **Local Caching**: Sort preferences are cached locally to minimize repeated API calls
+- **Debounced Requests**: Rapid sort changes are debounced to prevent excessive network requests
+- **Efficient Rendering**: Optimized component rendering during sort operations
+- **Memory Management**: Proper cleanup of sort state and event listeners
+
+#### Accessibility Enhancements
+- **Keyboard Navigation**: Full support for Tab, Enter, and Space key interactions
+- **Screen Reader Support**: Proper ARIA labels and live regions for sort announcements
+- **Focus Management**: Logical focus flow during sort operations
+- **High Contrast**: Clear visual indicators for sort state changes
 
 **Section sources**
 - [index.vue:58-75](file://app/pages/pickups/index.vue#L58-L75)
@@ -413,7 +439,7 @@ PickupAssignment --> Truck : "has"
 - Modals encapsulate user input and emit events to parent pages
 - Type definitions provide shared contracts for drivers and trucks
 - Filtering and pagination logic resides in the list page and drives API queries
-- **Updated**: Sorting functionality integrates with both client-side state management and server-side API parameters
+- **Enhanced**: Sorting functionality integrates with both client-side reactive state management and server-side API parameters with performance optimization
 
 ```mermaid
 graph LR
@@ -424,6 +450,8 @@ AssignModal["Assign Driver Modal"] --> Api
 Index --> Types["driver.ts"]
 Detail --> Types
 Index -. sorting params .-> Api
+Index -. sort state .-> Index
+Index -. cache .-> Index
 ```
 
 **Diagram sources**
@@ -445,30 +473,41 @@ Index -. sorting params .-> Api
 - Pagination and Filtering
   - Use server-side pagination and filter parameters to reduce payload size
   - Reset to page 1 on filter changes to avoid stale data
-- **Updated**: Sorting Performance
+- **Enhanced**: Sorting Performance
   - Implement server-side sorting to handle large datasets efficiently
-  - Cache sort preferences to minimize repeated API calls
+  - Cache sort preferences locally to minimize repeated API calls
   - Debounce rapid sort changes to prevent excessive network requests
+  - Optimize component rendering during sort operations
+  - Implement proper memory management for sort state cleanup
 - Parallel Data Loading
   - Fetch stats and lists concurrently where possible to improve perceived performance
 - Efficient UI Rendering
   - Avoid unnecessary re-renders by keeping computed properties minimal and memoized
 - Network Efficiency
   - Leverage the centralized API composable to reuse headers and handle errors consistently
+- **New**: Accessibility Performance
+  - Ensure smooth keyboard navigation without blocking main thread
+  - Optimize screen reader announcements for better user experience
 
 ## Troubleshooting Guide
 - Authentication Failures
   - 401 responses trigger logout and redirect to login via the API composable
 - Network Errors
   - Non-successful responses throw descriptive errors; wrapped helpers show toast notifications
-- **Updated**: Sorting Issues
+- **Enhanced**: Sorting Issues
   - Verify backend supports requested sort fields (createdAt, preferredPickupDate, updatedAt)
   - Check sort parameter transmission in API requests
   - Ensure proper handling of invalid sort combinations
+  - Debug reactive state synchronization between client and server
+  - Verify keyboard navigation and accessibility features are working correctly
 - Common Issues
   - Missing required fields during creation/validation
   - Incorrect time slot mapping between UI and backend
   - Attempting invalid status transitions (e.g., completing a cancelled request)
+- **New**: Performance Issues
+  - Monitor for excessive API calls during rapid sorting
+  - Check for memory leaks in sort state management
+  - Verify proper cleanup of event listeners and timers
 
 **Section sources**
 - [useApi.ts:39-67](file://app/composables/useApi.ts#L39-L67)
@@ -478,4 +517,4 @@ Index -. sorting params .-> Api
 - [detail.vue:290-379](file://app/pages/pickups/[id].vue#L290-L379)
 
 ## Conclusion
-The pickup operations module provides a comprehensive workflow for managing waste pickup requests. It supports creation, assignment/reassignment with priority handling, clear status transitions, and rich visibility through activity logs and timelines. **Updated**: The addition of comprehensive sorting functionality significantly enhances data management capabilities, allowing users to efficiently navigate and analyze pickup requests by creation date, preferred pickup date, and last update time. Integration with fleet management is achieved via structured driver and truck references, enabling robust scheduling and tracking capabilities. The enhanced sorting features demonstrate the system's commitment to providing intuitive and powerful administrative tools for effective operations management.
+The pickup operations module provides a comprehensive workflow for managing waste pickup requests. It supports creation, assignment/reassignment with priority handling, clear status transitions, and rich visibility through activity logs and timelines. **Enhanced**: The addition of comprehensive server-side sorting functionality significantly enhances data management capabilities, allowing users to efficiently navigate and analyze pickup requests by creation date, preferred pickup date, and last update time. The system now features advanced performance optimization with local caching, reactive state management, and comprehensive accessibility improvements including keyboard navigation and screen reader support. Integration with fleet management is achieved via structured driver and truck references, enabling robust scheduling and tracking capabilities. The enhanced sorting features demonstrate the system's commitment to providing intuitive, powerful, and accessible administrative tools for effective operations management at scale.

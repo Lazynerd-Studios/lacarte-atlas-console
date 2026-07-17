@@ -14,11 +14,11 @@
 
 ## Update Summary
 **Changes Made**
-- Updated Billing Dashboard section to reflect complete transformation from static mock data to dynamic API-integrated system
-- Added new sections covering real-time KPI fetching, server-side pagination, and skeleton loading animations
-- Enhanced API endpoints documentation with new billing-specific endpoints
-- Updated architecture diagrams to show new data flow patterns
-- Added comprehensive TypeScript interface documentation for type safety
+- Updated Invoice Detail section to reflect new PDF download functionality and send invoice feature implementation
+- Enhanced data model documentation with comprehensive TypeScript interfaces for Invoice, Customer, and Items structures
+- Added detailed error handling and loading state management throughout the billing system
+- Updated API integration patterns from mock data to live backend endpoints
+- Enhanced user experience with comprehensive loading states and error handling mechanisms
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -35,11 +35,11 @@
 ## Introduction
 This document provides comprehensive documentation for the Billing and Subscription management system within the application. It covers payment processing workflows, subscription plan management, rate configuration, billing cycle handling, invoice generation, payment status tracking, subscription tier management, and revenue analytics integration. The system is implemented as a Nuxt 3 frontend with Vue 3 components that interact with backend APIs via a centralized API composable.
 
-**Updated** The billing dashboard has been completely transformed from static mock data to a fully dynamic, API-integrated system featuring real-time data fetching, server-side pagination, skeleton loading animations, and comprehensive error handling.
+**Updated** The billing system has undergone a major enhancement including complete transition from mock data to live API integration, comprehensive TypeScript interface definitions for all data models, enhanced invoice management with PDF download and send capabilities, robust error handling, and sophisticated loading state management throughout the entire billing workflow.
 
 ## Project Structure
 The billing and subscriptions features are organized by pages and utilities:
-- Billing overview and invoice detail views with real-time API integration
+- Billing overview and invoice detail views with real-time API integration and enhanced invoice management
 - Subscription plan management (prepaid/postpaid)
 - Pay-as-you-go rate management
 - Customer-facing payment portal
@@ -49,7 +49,7 @@ The billing and subscriptions features are organized by pages and utilities:
 graph TB
 subgraph "Billing"
 BIndex["Billing Dashboard<br/>Real-time KPIs, Server-side Pagination, Dynamic Charts"]
-BDetail["Invoice Detail<br/>download/send actions"]
+BDetail["Invoice Detail<br/>PDF Download, Send Invoice, Enhanced Actions"]
 end
 subgraph "Management"
 SubPlans["Subscription Plans<br/>CRUD, stats, toggle"]
@@ -62,6 +62,7 @@ subgraph "Shared"
 Api["useApi composable"]
 Currency["useCurrency composable"]
 Validation["rateValidation utils"]
+Types["TypeScript Interfaces<br/>Invoice, Customer, Items"]
 end
 BIndex --> Api
 BDetail --> Api
@@ -73,6 +74,8 @@ BDetail --> Currency
 SubPlans --> Currency
 Rates --> Currency
 Rates --> Validation
+BDetail --> Types
+BIndex --> Types
 ```
 
 **Diagram sources**
@@ -97,7 +100,7 @@ Rates --> Validation
 
 ## Core Components
 - **Billing Dashboard**: Real-time KPI display with skeleton loading, searchable paginated invoices with server-side filtering, dynamic revenue breakdown charts, and SVG-based payment aging visualization. Features comprehensive error handling and loading states.
-- Invoice Detail: Shows invoice metadata, line items, totals, and actions to download or send.
+- **Enhanced Invoice Detail**: Shows invoice metadata, line items, totals, and comprehensive actions including PDF download functionality, send invoice feature, and enhanced error handling with loading states.
 - Subscription Plan Management: Full CRUD for prepaid/postpaid plans with billing cycles, pricing, feature counts, active toggling, and statistics.
 - Rate Management: Configures pay-as-you-go pickup rates per customer type and estimated quantity tiers with effective dates and notes.
 - Customer Payment Portal: Accepts cash or mobile money payments with validation, countdown, and success states.
@@ -106,8 +109,9 @@ Key shared utilities:
 - useApi: Centralized HTTP client with authentication headers, error handling, and typed helpers.
 - useCurrency: Formats amounts in GHS using Intl.NumberFormat.
 - rateValidation: Validates and transforms rate form data into API payloads.
+- **New** Comprehensive TypeScript interfaces for Invoice, Customer, and Items structures providing compile-time type safety.
 
-**Updated** The billing dashboard now includes TypeScript interfaces for all data models, comprehensive loading states with skeleton animations, and robust error handling throughout the component lifecycle.
+**Updated** The billing system now includes comprehensive TypeScript interfaces for all data models, enhanced invoice management with PDF download and send capabilities, sophisticated loading state management, and robust error handling throughout the entire component lifecycle.
 
 **Section sources**
 - [billing/index.vue:1-599](file://app/pages/billing/index.vue#L1-L599)
@@ -120,12 +124,13 @@ Key shared utilities:
 - [rateValidation.ts:1-69](file://app/utils/rateValidation.ts#L1-L69)
 
 ## Architecture Overview
-The system follows a component-driven architecture where each page encapsulates its own state and API interactions. Data flows from backend endpoints through useApi into reactive UI state, which renders tables, charts, and forms. The billing dashboard now implements a sophisticated multi-API data fetching pattern with proper loading states and error handling.
+The system follows a component-driven architecture where each page encapsulates its own state and API interactions. Data flows from backend endpoints through useApi into reactive UI state, which renders tables, charts, and forms. The billing dashboard implements a sophisticated multi-API data fetching pattern with proper loading states and error handling, while the invoice detail view provides comprehensive invoice management capabilities.
 
 ```mermaid
 sequenceDiagram
 participant Admin as "Admin UI"
 participant BillingPage as "Billing Dashboard"
+participant InvoiceDetail as "Invoice Detail View"
 participant API as "useApi Composable"
 participant Backend as "Backend APIs"
 Admin->>BillingPage : Open /billing
@@ -133,25 +138,24 @@ BillingPage->>API : GET /invoices/admin/billing/kpis
 API->>Backend : HTTP GET
 Backend-->>API : { totalOutstanding, subscriptionRevenue, paygRevenue, avgCollectionTimeDays }
 API-->>BillingPage : KPI data with loading states
-BillingPage->>API : GET /invoices/admin?page=1&limit=10&search=query
-API->>Backend : HTTP GET with query params
-Backend-->>API : { data : Invoice[], pagination : {...} }
-API-->>BillingPage : Paginated invoices with server-side filtering
-BillingPage->>API : GET /invoices/admin/billing/revenue-breakdown
-API->>Backend : HTTP GET
-Backend-->>API : { monthlySubscriptions, payAsYouGo, outstanding }
-API-->>BillingPage : Revenue breakdown data
-BillingPage->>API : GET /invoices/admin/billing/payment-aging
-API->>Backend : HTTP GET
-Backend-->>API : { current, days1To30, days31To60, days60Plus }
-API-->>BillingPage : Payment aging data for SVG chart
+Admin->>InvoiceDetail : Open /billing/ : id
+InvoiceDetail->>API : GET /invoices/ : id
+API->>Backend : HTTP GET with auth headers
+Backend-->>API : { invoice, customer, items[] }
+API-->>InvoiceDetail : Complete invoice data with TypeScript validation
+InvoiceDetail->>API : POST /invoices/ : id/download-pdf
+API->>Backend : HTTP POST for PDF generation
+Backend-->>API : PDF binary response
+API-->>InvoiceDetail : Downloadable PDF file
+InvoiceDetail->>API : POST /invoices/ : id/send
+API->>Backend : HTTP POST to send invoice email
+Backend-->>API : { success : true, message : "Invoice sent" }
+API-->>InvoiceDetail : Success confirmation with toast notification
 ```
 
 **Diagram sources**
 - [billing/index.vue:21-38](file://app/pages/billing/index.vue#L21-L38)
-- [billing/index.vue:135-158](file://app/pages/billing/index.vue#L135-L158)
-- [billing/index.vue:194-204](file://app/pages/billing/index.vue#L194-L204)
-- [billing/index.vue:232-242](file://app/pages/billing/index.vue#L232-L242)
+- [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
 
 ## Detailed Component Analysis
@@ -201,12 +205,44 @@ API-->>BillingPage : Payment aging data for SVG chart
 - [billing/index.vue:217-261](file://app/pages/billing/index.vue#L217-L261)
 - [billing/index.vue:588-598](file://app/pages/billing/index.vue#L588-L598)
 
-### Invoice Detail
-- Displays invoice header, status badge, From/Bill To addresses, invoice/due dates, payment method, line items, subtotal/tax/total.
-- Actions: Download PDF, Send (UI only).
+### Enhanced Invoice Detail
+**Updated** The invoice detail view has been significantly enhanced with comprehensive invoice data management, PDF download functionality, send invoice feature, and robust error handling with loading states.
 
-Data model highlights:
-- Invoice: id, status, from, billTo, invoiceDate, dueDate, paymentMethod, items[], subtotal, tax, taxRate, total
+#### Comprehensive Invoice Data Model
+- **Invoice Interface**: Complete TypeScript definition with id, status, from, billTo, invoiceDate, dueDate, paymentMethod, items[], subtotal, tax, taxRate, total
+- **Customer Interface**: Structured customer data with name, address, email, phone, and company information
+- **Items Interface**: Detailed line item structure with description, quantity, unitPrice, and total calculations
+- **Type Safety**: All data structures enforced through TypeScript interfaces for compile-time validation
+
+#### PDF Download Functionality
+- **Download Handler**: Dedicated function to handle PDF file downloads from backend
+- **Binary Response Processing**: Proper handling of PDF binary data from API responses
+- **File Naming**: Intelligent filename generation based on invoice number and date
+- **Error Handling**: Graceful error handling for failed PDF generation or network issues
+
+#### Send Invoice Feature
+- **Email Integration**: Backend email service integration for sending invoices to customers
+- **Status Updates**: Automatic invoice status updates after successful sending
+- **User Feedback**: Toast notifications confirming successful invoice delivery
+- **Error Management**: Comprehensive error handling for email delivery failures
+
+#### Enhanced Loading States
+- **Loading Indicators**: Visual feedback during PDF generation and email sending operations
+- **Button States**: Disabled states during async operations to prevent duplicate submissions
+- **Progress Feedback**: User-friendly loading messages for long-running operations
+
+#### Robust Error Handling
+- **Network Errors**: Comprehensive error handling for network connectivity issues
+- **Server Errors**: Graceful handling of backend errors with user-friendly messages
+- **Validation Errors**: Client-side validation before API calls to prevent unnecessary requests
+- **Retry Logic**: Automatic retry mechanisms for transient failures
+
+**New Capabilities**:
+- **Action Buttons**: Download PDF and Send Invoice buttons with proper loading states
+- **Status Badges**: Visual indicators for invoice status with appropriate styling
+- **Address Display**: Formatted From/Bill To addresses with proper layout
+- **Line Item Tables**: Detailed line item display with quantities, prices, and totals
+- **Summary Calculations**: Automatic subtotal, tax, and total calculations
 
 **Section sources**
 - [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
@@ -315,6 +351,7 @@ Flow:
 - Rate management depends on rateValidation for consistent validation and payload mapping.
 - Subscription management uses internal transformations between API and UI models.
 - **Updated** Billing dashboard now implements multiple concurrent API calls with independent loading states and comprehensive error handling.
+- **New** Invoice detail view depends on comprehensive TypeScript interfaces for type-safe data handling.
 
 ```mermaid
 graph LR
@@ -333,6 +370,9 @@ Billing -.-> KPIs["Billing KPIs API"]
 Billing -.-> Invoices["Invoices API"]
 Billing -.-> Revenue["Revenue Breakdown API"]
 Billing -.-> Aging["Payment Aging API"]
+InvoiceDetail -.-> PDF["PDF Generation API"]
+InvoiceDetail -.-> Email["Email Service API"]
+InvoiceDetail -.-> Types["TypeScript Interfaces"]
 ```
 
 **Diagram sources**
@@ -358,6 +398,8 @@ Billing -.-> Aging["Payment Aging API"]
 - Avoid unnecessary re-renders by memoizing computed properties and minimizing deep watchers
 - **New** Concurrent API calls with independent loading states prevent blocking UI updates
 - **New** TypeScript interfaces provide compile-time type safety and better IDE support
+- **New** Efficient PDF download handling prevents memory leaks and improves file transfer performance
+- **New** Optimized error handling reduces unnecessary re-renders during error states
 
 [No sources needed since this section provides general guidance]
 
@@ -369,6 +411,9 @@ Common issues and resolutions:
 - Empty states: Ensure API endpoints return expected structures; some endpoints support multiple response formats (e.g., { plans }, { data }, or arrays).
 - **Updated** Billing dashboard loading states: Check console logs for specific API call failures and verify network connectivity to billing endpoints.
 - **Updated** TypeScript errors: Ensure all API response interfaces match actual backend response structures.
+- **New** PDF download issues: Verify backend PDF generation service is running and accessible. Check browser download permissions.
+- **New** Email sending failures: Confirm email service configuration and check spam filters for delivered invoices.
+- **New** Invoice data loading: Verify invoice ID format and ensure invoice exists in the database before attempting to load details.
 
 Operational tips:
 - Inspect console logs emitted by useApi for request/response details.
@@ -376,6 +421,8 @@ Operational tips:
 - Validate MoMo phone numbers against expected patterns.
 - **New** Monitor loading states in billing dashboard to identify slow API responses.
 - **New** Check browser network tab for detailed API request/response information when debugging billing data issues.
+- **New** Test PDF generation with sample invoices to ensure backend service is functioning properly.
+- **New** Verify email service credentials and SMTP configuration for invoice sending functionality.
 
 **Section sources**
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
@@ -383,11 +430,12 @@ Operational tips:
 - [management/rates.vue:230-387](file://app/pages/management/rates.vue#L230-L387)
 - [pay/[id].vue](file://app/pages/pay/[id].vue#L64-L97)
 - [billing/index.vue:21-31](file://app/pages/billing/index.vue#L21-L31)
+- [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
 
 ## Conclusion
 The Billing & Subscriptions module provides a robust foundation for managing subscription plans, configuring pay-as-you-go rates, viewing invoices and payment statuses, and processing customer payments. The architecture leverages reusable composables for API access and currency formatting, while maintaining clear separation of concerns across pages. 
 
-**Updated** The billing dashboard has been significantly enhanced with real-time API integration, comprehensive loading states, TypeScript type safety, and improved user experience through skeleton animations and responsive design. Future enhancements can include server-side pagination for other lists, richer analytics dashboards, and deeper integrations with external payment gateways.
+**Updated** The billing system has been significantly enhanced with comprehensive TypeScript interfaces for all data models, enhanced invoice management with PDF download and send capabilities, sophisticated loading state management, robust error handling, and seamless transition from mock data to live API integration. The invoice detail view now provides complete invoice lifecycle management with professional-grade features including document generation and distribution capabilities. Future enhancements can include server-side pagination for other lists, richer analytics dashboards, deeper integrations with external payment gateways, and advanced reporting capabilities.
 
 [No sources needed since this section summarizes without analyzing specific files]
 
@@ -399,6 +447,9 @@ The Billing & Subscriptions module provides a robust foundation for managing sub
   - GET /invoices/admin - Returns paginated invoices with search support
   - GET /invoices/admin/billing/revenue-breakdown - Returns revenue breakdown data
   - GET /invoices/admin/billing/payment-aging - Returns payment aging analytics
+  - **New** GET /invoices/:id - Returns complete invoice data with customer and items
+  - **New** POST /invoices/:id/download-pdf - Generates and returns PDF invoice document
+  - **New** POST /invoices/:id/send - Sends invoice via email to customer
 - Subscription Plans
   - GET /subscription/admin/plans?type={prepaid|postpaid}
   - POST /subscription/admin/plans
@@ -420,20 +471,24 @@ The Billing & Subscriptions module provides a robust foundation for managing sub
 - [billing/index.vue:135-158](file://app/pages/billing/index.vue#L135-L158)
 - [billing/index.vue:194-204](file://app/pages/billing/index.vue#L194-L204)
 - [billing/index.vue:232-242](file://app/pages/billing/index.vue#L232-L242)
+- [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
 - [management/subscriptions.vue:153-548](file://app/pages/management/subscriptions.vue#L153-L548)
 - [management/rates.vue:57-124](file://app/pages/management/rates.vue#L57-L124)
 
-### Data Models Overview
+### Enhanced Data Models Overview
 - **Updated** Billing Dashboard Interfaces
   - BillingKpis: totalOutstanding, subscriptionRevenue, paygRevenue, avgCollectionTimeDays
   - Invoice: id, invoiceNumber, customerId, customerName, type, status, issueDate, dueDate, totalAmount
   - InvoicePagination: page, limit, total, totalPages, hasNextPage, hasPreviousPage
   - RevenueBreakdown: monthlySubscriptions, payAsYouGo, outstanding
   - PaymentAging: current, days1To30, days31To60, days60Plus
+- **New** Invoice Detail Interfaces
+  - Invoice: id, status, from, billTo, invoiceDate, dueDate, paymentMethod, items[], subtotal, tax, taxRate, total
+  - Customer: name, address, email, phone, company
+  - Items: description, quantity, unitPrice, total
 - Plan (UI): id, name, description, billingType, billingCycle, pickupCount, binCount, price, color, subscriberCount, isActive
 - Plan (API): id, name, description, type, pickups, bins, billingCycle, price, badgeColor, subscriberCount, isActive, createdAt, updatedAt
 - Rate (UI/API): id, customerTypeId, estimatedQuantityId, rate, effectiveDate, note, isActive, createdAt, updatedAt
-- Invoice (UI): id, status, from, billTo, invoiceDate, dueDate, paymentMethod, items[], subtotal, tax, taxRate, total
 - Transfer (UI): id, customer, paymentType, amount, reference, submitted
 
 **Section sources**
@@ -441,7 +496,7 @@ The Billing & Subscriptions module provides a robust foundation for managing sub
 - [billing/index.vue:102-121](file://app/pages/billing/index.vue#L102-L121)
 - [billing/index.vue:181-185](file://app/pages/billing/index.vue#L181-L185)
 - [billing/index.vue:217-222](file://app/pages/billing/index.vue#L217-L222)
+- [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
 - [management/subscriptions.vue:1-130](file://app/pages/management/subscriptions.vue#L1-L130)
 - [management/rates.vue:1-50](file://app/pages/management/rates.vue#L1-L50)
-- [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L42)
 - [billing/index.vue:34-79](file://app/pages/billing/index.vue#L34-L79)

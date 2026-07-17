@@ -1,6 +1,6 @@
 schema_version: 1
 module_path: auth_pages
-title: Unauthenticated Entry Pages (Login, Forgot Password, Unauthorized)
+title: Unauthenticated Entry & Access-Denied Pages
 scope:
     - app/pages/login.vue
     - app/pages/forgot-password.vue

@@ -1,6 +1,6 @@
 schema_version: 1
 module_path: ""
-title: Lacarte Atlas Console (Nuxt 4 App)
+title: Nuxt 4 Dashboard Application
 scope:
     - README.md
     - .gitignore
