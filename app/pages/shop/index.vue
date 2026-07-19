@@ -11,7 +11,7 @@ const stats = [
 const sections = [
   { title: 'Products',  desc: 'Manage product catalog',  btn: 'View Products',  to: '/shop/products' },
   { title: 'Orders',    desc: 'View and manage orders',  btn: 'View Orders',    to: '/shop/orders' },
-  { title: 'Inventory', desc: 'Monitor stock levels',    btn: 'View Inventory', to: '/shop/inventory' },
+  { title: 'Inventory', desc: 'Monitor stock levels',    btn: 'View Inventory', to: '/inventory' },
 ]
 </script>
 

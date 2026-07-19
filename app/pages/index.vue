@@ -31,8 +31,6 @@ const pickupData = [
   { day: 'Sun', value: 0 },
 ]
 
-const activities: Array<Record<string, string>> = []
-
 interface PickupRequest {
   id: string
   customer: {
@@ -231,27 +229,8 @@ function barH(v: number) { return (pickupMax ? v / pickupMax : 0) * innerH }
       </div>
     </div>
 
-    <!-- Activity + Pending pickups -->
+    <!-- Pending pickups + Active trucks -->
     <div class="grid-cols-2">
-      <!-- Recent activity -->
-      <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-        <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin-bottom:16px">Recent Activity</p>
-        <div style="display:flex;flex-direction:column;gap:16px">
-          <div v-for="(a, i) in activities" :key="i" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
-            <div style="flex:1;min-width:0">
-              <p style="font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ a.text }}</p>
-              <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
-                <UIcon name="i-lucide-clock" style="width:12px;height:12px;color:#6b7280;flex-shrink:0" />
-                <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ a.time }}</span>
-              </div>
-            </div>
-            <span :style="`flex-shrink:0;font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;color:${a.badgeColor};background:${a.badgeBg};border:1px solid ${a.badgeBorder};border-radius:14px;padding:3px 11px;white-space:nowrap`">
-              {{ a.badge }}
-            </span>
-          </div>
-        </div>
-      </div>
-
       <!-- Pending pickup requests -->
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
@@ -290,10 +269,8 @@ function barH(v: number) { return (pickupMax ? v / pickupMax : 0) * innerH }
           <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No pending pickup requests</p>
         </div>
       </div>
-    </div>
 
-    <!-- Active trucks -->
-    <div class="grid-cols-2">
+      <!-- Active trucks -->
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:25px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
         <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin-bottom:16px">Active Trucks</p>
         <div v-if="trucks.length > 0" style="display:flex;flex-direction:column;gap:16px">
@@ -317,8 +294,6 @@ function barH(v: number) { return (pickupMax ? v / pickupMax : 0) * innerH }
           <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No active trucks</p>
         </div>
       </div>
-      <!-- Right col intentionally empty -->
-      <div></div>
     </div>
   </div>
 </template>

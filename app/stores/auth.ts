@@ -10,6 +10,10 @@ export const useAuthStore = defineStore('auth', () => {
   let sessionCheckInterval: ReturnType<typeof setInterval> | null = null
   let sessionWarningInterval: ReturnType<typeof setInterval> | null = null
 
+  const publicRoutes = ['/login', '/forgot-password', '/unauthorized']
+  const isPublicRoute = (path: string) =>
+    publicRoutes.includes(path) || path.startsWith('/pay')
+
   const isAuthenticated = computed(() => !!token.value)
 
   async function fetchTeamMemberProfile() {
@@ -139,6 +143,11 @@ export const useAuthStore = defineStore('auth', () => {
         // Session expired
         showSessionWarning.value = false
         logout()
+        if (import.meta.client) {
+          const router = useRouter()
+          const current = router.currentRoute.value.path
+          if (!isPublicRoute(current)) router.push('/login')
+        }
       } else {
         showSessionWarning.value = false
       }
@@ -156,8 +165,7 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('[auth] Periodic session check')
       const isValid = await checkSession()
       if (!isValid) {
-        const router = useRouter()
-        router.push('/login')
+        // logout() inside checkSession already redirects to /login
       }
     }, 5 * 60 * 1000) // 5 minutes
   }
@@ -198,6 +206,12 @@ export const useAuthStore = defineStore('auth', () => {
     sessionExpiresAt.value = null
     showSessionWarning.value = false
     sessionWarningTime.value = 0
+
+    if (import.meta.client) {
+      const router = useRouter()
+      const current = router.currentRoute.value.path
+      if (!isPublicRoute(current)) router.push('/login')
+    }
   }
 
   // Initialize session check if already authenticated
