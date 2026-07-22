@@ -126,19 +126,31 @@ async function handleDelete() {
   const toast = useAppToast()
   
   console.log('[Team Management] Sending DELETE request to /team/' + memberToDelete.value.id)
-  const response = await api.del(`/team/${memberToDelete.value.id}`)
   
-  if (response) {
-    console.log('[Team Management] Member deleted successfully')
+  try {
+    // Use raw request to handle 204 responses (returns null for no body, but is still success)
+    await api.request(`/team/${memberToDelete.value.id}`, {
+      method: 'DELETE',
+    })
+    
+    console.log('[Team Management] Member deleted successfully (204)')
     toast.success('Team member deleted successfully')
     showDeleteModal.value = false
     memberToDelete.value = null
     await fetchMembers() // Refresh the member list
-  } else {
-    console.log('[Team Management] Member deletion failed or returned null')
+  } catch (err: any) {
+    console.error('[Team Management] Member deletion failed', { error: err })
+    // 404 not found
+    if (err?.message?.toLowerCase().includes('not found')) {
+      toast.error('Member not found', 'The requested team member could not be found')
+    } else {
+      // Other errors (403, 500, network) show as toast
+      const errorMessage = err?.message || 'Failed to delete team member'
+      toast.error('Failed to delete team member', errorMessage)
+    }
+  } finally {
+    deleting.value = false
   }
-  
-  deleting.value = false
 }
 
 /**

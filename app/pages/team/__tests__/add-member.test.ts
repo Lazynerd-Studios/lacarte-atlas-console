@@ -81,8 +81,8 @@ describe('Add Team Member Page', () => {
       expect(payload.firstName).toBe('John')
       expect(payload.lastName).toBe('Doe')
       expect(payload.email).toBe('john@example.com')
-      expect(payload.phone).toBe('1234567890')
-      expect(payload.role).toBe('admin')
+      expect(payload.phoneNumber).toBe('1234567890')
+      expect(payload.roleId).toBe('admin')
       expect(payload.status).toBe('active')
     })
 
@@ -101,7 +101,7 @@ describe('Add Team Member Page', () => {
       expect(payload.firstName).toBe('Jane')
       expect(payload.lastName).toBe('Smith')
       expect(payload.email).toBe('jane@example.com')
-      expect(payload.phone).toBe('9876543210')
+      expect(payload.phoneNumber).toBe('9876543210')
     })
 
     it('should lowercase email addresses', () => {
