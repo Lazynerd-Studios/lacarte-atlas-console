@@ -103,10 +103,18 @@ function openDeleteModal(member: TeamMember) {
  * Authorization:
  * - Verifies user has admin privileges before allowing operation
  * 
+ * API Call:
+ * - DELETE /team/:id
+ * 
+ * Success Flow (204 No Content):
+ * - Show success toast
+ * - Close modal and reset state
+ * - Refresh both member list and stats
+ * 
  * Error Handling:
+ * - 404: Show "Member not found" error toast
  * - 401: Automatic redirect to login (handled by useApi)
- * - 403, 404, 500: Automatic error toast (handled by useErrorHandler)
- * - Network errors: Automatic error toast (handled by useErrorHandler)
+ * - 403, 500, network: Show error toast
  */
 async function handleDelete() {
   if (!memberToDelete.value) return

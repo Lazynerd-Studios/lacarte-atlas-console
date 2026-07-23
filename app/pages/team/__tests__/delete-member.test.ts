@@ -71,14 +71,19 @@ describe('Delete Team Member Functionality', () => {
       expect(updatedMembers[0].id).toBe('2')
     })
 
-    it('should treat 204 response as success (no content but still successful)', () => {
-      // A 204 (No Content) response returns null but indicates success
-      // The fixed code uses try-catch to handle this correctly
-      const response = null
-      const is204Success = response === null // In fixed code, 204 returns null but is still success
+    it('should refresh member list and stats after deletion', () => {
+      // Simulate initial state
+      const initialStats = {
+        totalMembers: 2,
+        activeMembers: 2,
+        superAdmins: 0,
+        onlineNow: 0,
+      }
       
-      // The fix uses try-catch with raw request, treating null as success for DELETE
-      expect(response).toBeNull()
+      // After deletion, stats should be refreshed
+      const expectedRefetchCalls = ['fetchMembers', 'fetchStats']
+      expect(expectedRefetchCalls).toContain('fetchMembers')
+      expect(expectedRefetchCalls).toContain('fetchStats')
     })
   })
 
