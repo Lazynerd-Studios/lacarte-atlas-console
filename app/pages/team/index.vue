@@ -137,7 +137,7 @@ async function handleDelete() {
     toast.success('Team member deleted successfully')
     showDeleteModal.value = false
     memberToDelete.value = null
-    await fetchMembers() // Refresh the member list
+    await Promise.all([fetchMembers(), fetchStats()]) // Refresh member list and stats
   } catch (err: any) {
     console.error('[Team Management] Member deletion failed', { error: err })
     // 404 not found
