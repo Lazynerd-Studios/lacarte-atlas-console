@@ -64,39 +64,104 @@ const statusBadgeStyle = computed(() => {
   return { bg: 'rgba(255,180,0,0.1)', border: 'rgba(255,180,0,0.2)', color: '#d49a00' }
 })
 
-const quickStats = [
-  { icon: 'i-lucide-dollar-sign', label: 'Total Revenue',    value: 'GHS 28,716.81', valueColor: '#1a1a1a' },
-  { icon: 'i-lucide-trending-up', label: 'Avg Monthly Sales', value: '53 units',      valueColor: '#1a1a1a' },
-  { icon: 'i-lucide-package',     label: 'Stock Status',     value: 'In Stock',      valueColor: '#22c55e' },
-  { icon: 'i-lucide-trending-up', label: 'Stock Turnover',   value: '7.1x/year',     valueColor: '#1a1a1a' },
-]
+// Product stats
+interface ProductStats {
+  productId: string
+  productName: string
+  months: number
+  monthlySales: { month: string; label: string; unitsSold: number }[]
+  quickStats: {
+    totalRevenue: { amount: number; currency: string; label: string }
+    avgMonthlySales: { units: number; label: string }
+    stockStatus: { status: string; stockQuantity: number; label: string }
+    stockTurnover: { rate: number; unit: string; label: string }
+  }
+}
 
-const monthlySales = [
-  { month: 'Sep', units: 38 },
-  { month: 'Oct', units: 45 },
-  { month: 'Nov', units: 42 },
-  { month: 'Dec', units: 60 },
-  { month: 'Jan', units: 50 },
-  { month: 'Feb', units: 48 },
-]
+const productStats = ref<ProductStats | null>(null)
 
-const maxUnits = Math.max(...monthlySales.map(s => s.units))
+async function fetchProductStats() {
+  try {
+    const data = await api.get<{ success: boolean; data: ProductStats }>(
+      `/store/admin/products/${route.params.id}/stats`,
+      'Failed to load product stats'
+    )
+    if (data?.data) {
+      productStats.value = data.data
+    }
+  } catch (err) {
+    console.error('Error fetching product stats:', err)
+  }
+}
 
-const recentSales = [
-  { date: '2026-03-01', customer: 'Sarah Johnson',  qty: 2, total: 'GHS 179.98', status: 'delivered' },
-  { date: '2026-02-28', customer: 'Michael Chen',   qty: 1, total: 'GHS 89.99',  status: 'delivered' },
-  { date: '2026-02-25', customer: 'Emma Williams',  qty: 3, total: 'GHS 269.97', status: 'in-transit' },
-  { date: '2026-02-20', customer: 'James Martinez', qty: 1, total: 'GHS 89.99',  status: 'delivered' },
-]
+const monthlySales = computed(() => {
+  if (productStats.value?.monthlySales?.length) return productStats.value.monthlySales
+  return []
+})
+
+const maxUnits = computed(() => Math.max(...monthlySales.value.map(s => s.unitsSold), 1))
+
+const quickStats = computed(() => {
+  const qs = productStats.value?.quickStats
+  if (!qs) return []
+  const stockColor = qs.stockStatus.status === 'ok' ? '#22c55e' : qs.stockStatus.status === 'low' ? '#d49a00' : '#ef4444'
+  const stockLabel = qs.stockStatus.status === 'ok' ? 'In Stock' : qs.stockStatus.status === 'low' ? 'Low Stock' : 'Critical'
+  return [
+    { icon: 'i-lucide-dollar-sign', label: qs.totalRevenue.label, value: `${qs.totalRevenue.currency} ${qs.totalRevenue.amount.toLocaleString()}`, valueColor: '#1a1a1a' },
+    { icon: 'i-lucide-trending-up', label: qs.avgMonthlySales.label, value: `${qs.avgMonthlySales.units} units`, valueColor: '#1a1a1a' },
+    { icon: 'i-lucide-package', label: qs.stockStatus.label, value: stockLabel, valueColor: stockColor },
+    { icon: 'i-lucide-refresh-cw', label: qs.stockTurnover.label, value: `${qs.stockTurnover.rate}${qs.stockTurnover.unit}`, valueColor: '#1a1a1a' },
+  ]
+})
+
+// Recent Sales
+interface SaleItem {
+  orderId: string
+  orderNumber: string
+  date: string
+  customerName: string
+  quantity: number
+  total: { amount: number; currency: string }
+  status: string
+}
+
+interface SalesResponse {
+  success: boolean
+  data: {
+    productId: string
+    productName: string
+    sales: SaleItem[]
+    pagination: { page: number; limit: number; total: number; totalPages: number; hasNextPage: boolean; hasPreviousPage: boolean }
+  }
+}
+
+const recentSales = ref<SaleItem[]>([])
+
+async function fetchRecentSales() {
+  try {
+    const data = await api.get<SalesResponse>(
+      `/store/admin/products/${route.params.id}/sales?limit=5`,
+      'Failed to load recent sales'
+    )
+    if (data?.data?.sales) {
+      recentSales.value = data.data.sales
+    }
+  } catch (err) {
+    console.error('Error fetching recent sales:', err)
+  }
+}
 
 function statusBadge(s: string) {
   if (s === 'delivered')  return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e' }
   if (s === 'in-transit') return { bg: 'rgba(255,180,0,0.1)',  border: 'rgba(255,180,0,0.2)',  color: '#d49a00' }
+  if (s === 'processing') return { bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)', color: '#3b82f6' }
   return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280' }
 }
 
 onMounted(() => {
   fetchProduct()
+  fetchProductStats()
+  fetchRecentSales()
 })
 </script>
 
@@ -217,11 +282,14 @@ onMounted(() => {
             :key="s.month"
             style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;height:100%"
           >
-            <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ s.units }}</span>
+            <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ s.unitsSold }}</span>
             <div
-              :style="`width:100%;background:#ffb400;border-radius:6px 6px 0 0;height:${(s.units / maxUnits) * 140}px`"
+              :style="`width:100%;background:#ffb400;border-radius:6px 6px 0 0;height:${(s.unitsSold / maxUnits) * 140}px`"
             ></div>
-            <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ s.month }}</span>
+            <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ s.label }}</span>
+          </div>
+          <div v-if="monthlySales.length === 0" style="width:100%;display:flex;align-items:center;justify-content:center;height:100%">
+            <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No sales data available</p>
           </div>
         </div>
       </div>
@@ -252,6 +320,7 @@ onMounted(() => {
         <thead>
           <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Date</th>
+            <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Order #</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Customer</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Quantity</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Total</th>
@@ -261,20 +330,24 @@ onMounted(() => {
         <tbody>
           <tr
             v-for="(sale, i) in recentSales"
-            :key="i"
+            :key="sale.orderId"
             :style="`border-bottom:${i < recentSales.length - 1 ? '1px solid #e5e7eb' : 'none'}`"
             @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
           >
-            <td style="padding:18px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ sale.date }}</td>
-            <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ sale.customer }}</td>
-            <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ sale.qty }}</td>
-            <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ sale.total }}</td>
+            <td style="padding:18px 16px;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;white-space:nowrap">{{ sale.date ? new Date(sale.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '\u2014' }}</td>
+            <td style="padding:18px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ sale.orderNumber }}</td>
+            <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ sale.customerName }}</td>
+            <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ sale.quantity }}</td>
+            <td style="padding:18px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ sale.total.currency }} {{ sale.total.amount.toFixed(2) }}</td>
             <td style="padding:18px 16px">
               <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;background:${statusBadge(sale.status).bg};color:${statusBadge(sale.status).color};border:1px solid ${statusBadge(sale.status).border}`">
                 {{ sale.status }}
               </span>
             </td>
+          </tr>
+          <tr v-if="recentSales.length === 0">
+            <td colspan="6" style="padding:32px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No sales recorded yet</td>
           </tr>
         </tbody>
       </table>

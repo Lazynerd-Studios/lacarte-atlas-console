@@ -1,48 +1,78 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'dashboard' })
 
+const api = useApi()
 const { format } = useCurrency()
 
-const inventory = ref([
-  { id: 1, name: 'Standard Waste Bin',           sku: 'WB-120-STD',  category: 'Bins',     stock: 45, reorder: 20, unitCost: 85  },
-  { id: 2, name: 'Recycling Bin',                sku: 'RB-80-STD',   category: 'Bins',     stock: 32, reorder: 20, unitCost: 75  },
-  { id: 3, name: 'Heavy Duty Bin Bags (50 pack)',sku: 'BB-50-HD',    category: 'Bin Bags', stock: 15, reorder: 20, unitCost: 22  },
-  { id: 4, name: 'Eco-Friendly Bin Bags (100 pack)', sku: 'BB-100-ECO', category: 'Bin Bags', stock: 8, reorder: 15, unitCost: 35 },
-  { id: 5, name: 'Bin Cleaning Brush',           sku: 'BR-001',      category: 'Brush',    stock: 67, reorder: 25, unitCost: 18  },
-  { id: 6, name: 'Bin Deodorizer Soap (3 pack)', sku: 'SP-003',      category: 'Soap',     stock: 89, reorder: 30, unitCost: 12  },
-  { id: 7, name: 'Large Waste Bin 240L',         sku: 'WB-240-LG',   category: 'Bins',     stock: 28, reorder: 15, unitCost: 120 },
-  { id: 8, name: 'Compost Bin',                  sku: 'CB-60-STD',   category: 'Bins',     stock: 19, reorder: 10, unitCost: 65  },
-  { id: 9, name: 'Bin Liner Rolls (20 pack)',    sku: 'BL-020-STD',  category: 'Bin Bags', stock: 54, reorder: 25, unitCost: 15  },
-  { id: 10, name: 'Disinfectant Spray 500ml',    sku: 'DS-500',      category: 'Soap',     stock: 41, reorder: 20, unitCost: 9   },
-])
+interface InventoryItem {
+  id: string
+  name: string
+  sku: string
+  category: { id: string; name: string }
+  stockQuantity: number
+  reorderPoint: number
+  unitCost: number
+  stockStatus: string
+  status: string
+  updatedAt: string
+}
 
-const categories = computed(() => ['All Categories', ...new Set(inventory.value.map(i => i.category))])
+interface InventoryResponse {
+  data: InventoryItem[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+    hasNextPage: boolean
+    hasPreviousPage: boolean
+  }
+}
+
+const inventory = ref<InventoryItem[]>([])
+const inventoryLoading = ref(false)
+const totalItems = ref(0)
+const currentPage = ref(1)
+const perPage = 20
+
+async function fetchInventory() {
+  inventoryLoading.value = true
+  try {
+    const data = await api.get<InventoryResponse>(
+      `/store/admin/inventory/?page=${currentPage.value}&limit=${perPage}`,
+      'Failed to load inventory'
+    )
+    if (data?.data) {
+      inventory.value = data.data
+      totalItems.value = data.pagination?.total ?? data.data.length
+    }
+  } catch (err) {
+    console.error('Error fetching inventory:', err)
+  }
+  inventoryLoading.value = false
+}
+
+const categories = computed(() => ['All Categories', ...new Set(inventory.value.map(i => i.category.name))])
 const statuses = ['All Status', 'ok', 'low', 'critical']
 
 const categoryFilter = ref('All Categories')
 const statusFilter = ref('All Status')
 const searchQuery = ref('')
 
-function stockStatus(item: { stock: number; reorder: number }) {
-  if (item.stock < item.reorder * 0.6) return 'critical'
-  if (item.stock < item.reorder) return 'low'
-  return 'ok'
-}
-
 const filtered = computed(() => {
   return inventory.value.filter(item => {
-    const matchCat = categoryFilter.value === 'All Categories' || item.category === categoryFilter.value
-    const matchStatus = statusFilter.value === 'All Status' || stockStatus(item) === statusFilter.value
+    const matchCat = categoryFilter.value === 'All Categories' || item.category.name === categoryFilter.value
+    const matchStatus = statusFilter.value === 'All Status' || item.stockStatus === statusFilter.value
     const matchSearch = !searchQuery.value || item.name.toLowerCase().includes(searchQuery.value.toLowerCase()) || item.sku.toLowerCase().includes(searchQuery.value.toLowerCase())
     return matchCat && matchStatus && matchSearch
   })
 })
 
-const lowStockCount = computed(() => inventory.value.filter(i => stockStatus(i) !== 'ok').length)
+const lowStockCount = computed(() => inventory.value.filter(i => i.stockStatus !== 'ok').length)
 
 // Update stock modal
 const showUpdateModal = ref(false)
-const selectedItem = ref<typeof inventory.value[0] | null>(null)
+const selectedItem = ref<InventoryItem | null>(null)
 const addQty = ref(0)
 const removeQty = ref(0)
 const updateReason = ref('')
@@ -50,10 +80,16 @@ const updateNotes = ref('')
 
 const previewStock = computed(() => {
   if (!selectedItem.value) return 0
-  return Math.max(0, selectedItem.value.stock + (addQty.value || 0) - (removeQty.value || 0))
+  return Math.max(0, selectedItem.value.stockQuantity + (addQty.value || 0) - (removeQty.value || 0))
 })
 
-function openUpdate(item: typeof inventory.value[0]) {
+function previewStockStatus(stock: number, reorder: number) {
+  if (stock < reorder * 0.6) return 'critical'
+  if (stock < reorder) return 'low'
+  return 'ok'
+}
+
+function openUpdate(item: InventoryItem) {
   selectedItem.value = item
   addQty.value = 0
   removeQty.value = 0
@@ -62,11 +98,31 @@ function openUpdate(item: typeof inventory.value[0]) {
   showUpdateModal.value = true
 }
 
-function confirmUpdate() {
+const updatingStock = ref(false)
+
+async function confirmUpdate() {
   if (!selectedItem.value) return
-  const idx = inventory.value.findIndex(i => i.id === selectedItem.value!.id)
-  if (idx !== -1) inventory.value[idx]!.stock = previewStock.value
-  showUpdateModal.value = false
+  updatingStock.value = true
+  try {
+    const data = await api.patch<InventoryItem>(
+      `/store/admin/inventory/${selectedItem.value.id}/stock`,
+      {
+        addStock: addQty.value || 0,
+        removeStock: removeQty.value || 0,
+        reason: updateReason.value || 'other',
+        notes: updateNotes.value || '',
+      },
+      'Failed to update stock'
+    )
+    if (data) {
+      const idx = inventory.value.findIndex(i => i.id === data.id)
+      if (idx !== -1) inventory.value[idx] = data
+    }
+    showUpdateModal.value = false
+  } catch (err) {
+    console.error('Error updating stock:', err)
+  }
+  updatingStock.value = false
 }
 
 function statusBadgeStyle(status: string) {
@@ -75,25 +131,48 @@ function statusBadgeStyle(status: string) {
   return                            { bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.2)',  color: '#ef4444' }
 }
 
-function stockColor(item: { stock: number; reorder: number }) {
-  const s = stockStatus(item)
-  if (s === 'critical') return '#ef4444'
-  if (s === 'low')      return '#ffb400'
+function stockColor(status: string) {
+  if (status === 'critical') return '#ef4444'
+  if (status === 'low')      return '#ffb400'
   return '#1a1a1a'
 }
 
 const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
 
-function exportCSV() {
-  const headers = ['Product', 'SKU', 'Category', 'Current Stock', 'Reorder Point', 'Status', 'Unit Cost']
-  const rows = inventory.value.map(i => [i.name, i.sku, i.category, i.stock, i.reorder, stockStatus(i), i.unitCost])
-  const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
-  const blob = new Blob([csv], { type: 'text/csv' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url; a.download = 'inventory.csv'; a.click()
-  URL.revokeObjectURL(url)
+const exporting = ref(false)
+
+async function exportCSV() {
+  exporting.value = true
+  try {
+    const config = useRuntimeConfig()
+    const authStore = useAuthStore()
+    const res = await fetch(`${config.public.apiBase}/store/admin/inventory/export`, {
+      headers: {
+        'Authorization': `Bearer ${authStore.token}`,
+      },
+    })
+    if (!res.ok) throw new Error('Export failed')
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'inventory.csv'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch {
+    console.error('Failed to export inventory')
+  } finally {
+    exporting.value = false
+  }
 }
+
+watch(currentPage, () => { fetchInventory() })
+
+onMounted(() => {
+  fetchInventory()
+})
 </script>
 
 <template>
@@ -106,13 +185,14 @@ function exportCSV() {
         <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">Monitor and manage stock levels</p>
       </div>
       <button
+        :disabled="exporting"
         style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px"
         @click="exportCSV"
         @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
         @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
       >
         <UIcon name="i-lucide-download" style="width:16px;height:16px;color:#111" />
-        Export CSV
+        {{ exporting ? 'Exporting...' : 'Export CSV' }}
       </button>
     </div>
 
@@ -191,21 +271,21 @@ function exportCSV() {
             <td style="padding:18px 16px;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;white-space:nowrap">{{ item.sku }}</td>
             <td style="padding:18px 16px">
               <span style="font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;color:#6b7280;background:#e5e7eb;border:1px solid #e5e7eb">
-                {{ item.category }}
+                {{ item.category.name }}
               </span>
             </td>
-            <td style="padding:18px 16px;font-size:14px;font-weight:500;font-family:'Manrope',sans-serif;white-space:nowrap" :style="`color:${stockColor(item)}`">
-              {{ item.stock }}
+            <td style="padding:18px 16px;font-size:14px;font-weight:500;font-family:'Manrope',sans-serif;white-space:nowrap" :style="`color:${stockColor(item.stockStatus)}`">
+              {{ item.stockQuantity }}
             </td>
-            <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ item.reorder }}</td>
+            <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ item.reorderPoint }}</td>
             <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ format(item.unitCost) }}</td>
             <td style="padding:18px 16px">
               <span
                 :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;
-                  color:${statusBadgeStyle(stockStatus(item)).color};
-                  background:${statusBadgeStyle(stockStatus(item)).bg};
-                  border:1px solid ${statusBadgeStyle(stockStatus(item)).border}`"
-              >{{ stockStatus(item) }}</span>
+                  color:${statusBadgeStyle(item.stockStatus).color};
+                  background:${statusBadgeStyle(item.stockStatus).bg};
+                  border:1px solid ${statusBadgeStyle(item.stockStatus).border}`"
+              >{{ item.stockStatus }}</span>
             </td>
             <td style="padding:18px 16px;text-align:right">
               <button
@@ -216,11 +296,24 @@ function exportCSV() {
               >Update Stock</button>
             </td>
           </tr>
-          <tr v-if="filtered.length === 0">
+          <tr v-if="filtered.length === 0 && !inventoryLoading">
             <td colspan="8" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No items match your filters</td>
+          </tr>
+          <tr v-if="inventoryLoading">
+            <td colspan="8" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Loading inventory...</td>
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- Pagination -->
+    <div v-if="totalItems > perPage" style="background:white;border:1px solid #ececec;border-radius:16px;padding:16px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+      <AppPagination
+        :page="currentPage"
+        :total="totalItems"
+        :per-page="perPage"
+        @update:page="currentPage = $event"
+      />
     </div>
 
   </div>
@@ -259,7 +352,7 @@ function exportCSV() {
         <!-- Current stock -->
         <div style="display:flex;flex-direction:column;gap:4px">
           <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">Current Stock</p>
-          <p style="font-size:24px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0">{{ selectedItem.stock }}</p>
+          <p style="font-size:24px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0">{{ selectedItem.stockQuantity }}</p>
         </div>
 
         <!-- Add / Remove -->
@@ -296,10 +389,10 @@ function exportCSV() {
           <span style="font-size:16px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ previewStock }}</span>
           <span
             :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;
-              color:${statusBadgeStyle(stockStatus({ stock: previewStock, reorder: selectedItem.reorder })).color};
-              background:${statusBadgeStyle(stockStatus({ stock: previewStock, reorder: selectedItem.reorder })).bg};
-              border:1px solid ${statusBadgeStyle(stockStatus({ stock: previewStock, reorder: selectedItem.reorder })).border}`"
-          >{{ stockStatus({ stock: previewStock, reorder: selectedItem.reorder }) }}</span>
+              color:${statusBadgeStyle(previewStockStatus(previewStock, selectedItem.reorderPoint)).color};
+              background:${statusBadgeStyle(previewStockStatus(previewStock, selectedItem.reorderPoint)).bg};
+              border:1px solid ${statusBadgeStyle(previewStockStatus(previewStock, selectedItem.reorderPoint)).border}`"
+          >{{ previewStockStatus(previewStock, selectedItem.reorderPoint) }}</span>
         </div>
 
         <!-- Reason -->
@@ -342,9 +435,10 @@ function exportCSV() {
           @click="showUpdateModal = false"
         >Cancel</button>
         <button
+          :disabled="updatingStock"
           style="height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
           @click="confirmUpdate"
-        >Update Stock</button>
+        >{{ updatingStock ? 'Updating...' : 'Update Stock' }}</button>
       </div>
     </div>
   </div>

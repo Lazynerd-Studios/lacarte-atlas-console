@@ -22,7 +22,15 @@ interface RevenueResponse {
 
 const analytics = ref<AnalyticsResponse | null>(null)
 const revenueAnalytics = ref<RevenueResponse | null>(null)
-const revenueChartData = ref<RevenueResponse | null>(null)
+
+interface ShopOverviewResponse {
+  success: boolean
+  data: {
+    metrics: { count: number; percentageChange: number; label: string }[]
+  }
+}
+
+const shopOverview = ref<ShopOverviewResponse | null>(null)
 
 const stats = computed(() => [
   { label: 'Active Customers', value: analytics.value ? `${analytics.value.activeCustomersPercentage}%` : '0%', change: analytics.value ? `${analytics.value.newCustomersPercentage}% new` : '0%', positive: analytics.value && analytics.value.newCustomersPercentage > 0 ? true : null, icon: 'i-lucide-users' },
@@ -30,28 +38,26 @@ const stats = computed(() => [
   { label: "Today's Pickups",  value: analytics.value ? String(analytics.value.todayPickups.count) : '0', change: '0%', positive: null, icon: 'i-lucide-package' },
   { label: 'Outstanding Payments', value: analytics.value ? `GHS ${analytics.value.outstandingPaymentsGhs.toLocaleString()}` : 'GHS 0', change: '0%', positive: null, icon: 'i-lucide-credit-card' },
   { label: 'Revenue This Month',   value: revenueAnalytics.value ? `GHS ${revenueAnalytics.value.data.summary.totalRevenue.toLocaleString()}` : 'GHS 0', change: currentMonthGrowth.value, positive: null, icon: 'i-lucide-bar-chart-2' },
-  { label: 'Shop Orders Today',    value: '0', change: '0%', positive: null, icon: 'i-lucide-shopping-bag' },
+  { label: 'Shop Orders Today',    value: shopOverview.value?.data?.metrics?.[0]?.count != null ? String(shopOverview.value.data.metrics[0].count) : '0', change: shopOverview.value?.data?.metrics?.[0]?.percentageChange != null ? `${shopOverview.value.data.metrics[0].percentageChange}%` : '0%', positive: shopOverview.value?.data?.metrics?.[0]?.percentageChange ? shopOverview.value.data.metrics[0].percentageChange > 0 : null, icon: 'i-lucide-shopping-bag' },
 ])
 
 const monthShortNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 const revenueData = computed(() => {
-  if (revenueChartData.value?.data?.monthlyData?.length) {
-    return revenueChartData.value.data.monthlyData.map(item => {
-      const monthStr = item.month.split('-')[1]
-      const monthIndex = parseInt(monthStr!, 10) - 1
-      return { month: monthShortNames[monthIndex], value: item.revenue, transactionCount: item.transactionCount }
-    })
-  }
-  return [
-    { month: 'Jan', value: 0, transactionCount: 0 },
-    { month: 'Feb', value: 0, transactionCount: 0 },
-    { month: 'Mar', value: 0, transactionCount: 0 },
-    { month: 'Apr', value: 0, transactionCount: 0 },
-    { month: 'May', value: 0, transactionCount: 0 },
-    { month: 'Jun', value: 0, transactionCount: 0 },
-  ]
+  if (revenueTab.value === 'pickup') return pickupChartData.value.length ? pickupChartData.value : emptyRevenueData
+  if (revenueTab.value === 'store') return storeChartData.value.length ? storeChartData.value : emptyRevenueData
+  // combined: use pickup as primary (both shown as separate lines)
+  return pickupChartData.value.length ? pickupChartData.value : emptyRevenueData
 })
+
+const emptyRevenueData = [
+  { month: 'Jan', value: 0, transactionCount: 0 },
+  { month: 'Feb', value: 0, transactionCount: 0 },
+  { month: 'Mar', value: 0, transactionCount: 0 },
+  { month: 'Apr', value: 0, transactionCount: 0 },
+  { month: 'May', value: 0, transactionCount: 0 },
+  { month: 'Jun', value: 0, transactionCount: 0 },
+]
 
 const currentMonthGrowth = computed(() => {
   if (!revenueAnalytics.value?.data?.monthlyData?.length) return '0%'
@@ -177,22 +183,51 @@ async function fetchRevenue() {
   }
 }
 
+const revenueTab = ref<'combined' | 'pickup' | 'store'>('combined')
+
+const pickupRevenueData = ref<RevenueResponse | null>(null)
+const storeRevenueData = ref<RevenueResponse | null>(null)
+
 async function fetchRevenueChart() {
   try {
-    // Unfiltered call for revenue chart (all available data)
-    const data = await api.get<RevenueResponse>(
-      '/admin/analytics/revenue',
-      'Failed to load revenue chart'
-    )
-    if (data) {
-      revenueChartData.value = data
-    }
+    const [pickupRes, storeRes] = await Promise.all([
+      api.get<RevenueResponse>('/admin/analytics/revenue?revenue_type=pickup', 'Failed to load pickup revenue'),
+      api.get<RevenueResponse>('/admin/analytics/revenue?revenue_type=store', 'Failed to load store revenue'),
+    ])
+    if (pickupRes) pickupRevenueData.value = pickupRes
+    if (storeRes) storeRevenueData.value = storeRes
   } catch (err) {
     console.error('Error fetching revenue chart:', err)
   }
 }
 
-const hoveredRevenueIndex = ref<number | null>(null)
+function mapMonthlyData(response: RevenueResponse | null) {
+  if (response?.data?.monthlyData?.length) {
+    return response.data.monthlyData.map(item => {
+      const monthStr = item.month.split('-')[1]
+      const monthIndex = parseInt(monthStr!, 10) - 1
+      return { month: monthShortNames[monthIndex], value: item.revenue, transactionCount: item.transactionCount }
+    })
+  }
+  return []
+}
+
+const pickupChartData = computed(() => mapMonthlyData(pickupRevenueData.value))
+const storeChartData = computed(() => mapMonthlyData(storeRevenueData.value))
+
+async function fetchShopOverview() {
+  try {
+    const data = await api.get<ShopOverviewResponse>(
+      '/store/admin/dashboard/overview',
+      'Failed to load shop overview'
+    )
+    if (data) {
+      shopOverview.value = data
+    }
+  } catch (err) {
+    console.error('Error fetching shop overview:', err)
+  }
+}
 
 onMounted(() => {
   fetchAnalytics()
@@ -200,10 +235,17 @@ onMounted(() => {
   fetchRevenueChart()
   fetchPendingPickups()
   fetchActiveTrucks()
+  fetchShopOverview()
 })
 
 // Chart helpers
-const revenueMax = computed(() => Math.max(...revenueData.value.map(d => d.value), 1))
+const revenueMax = computed(() => {
+  const pickupMax = Math.max(...pickupChartData.value.map(d => d.value), 0)
+  const storeMax = Math.max(...storeChartData.value.map(d => d.value), 0)
+  if (revenueTab.value === 'pickup') return Math.max(pickupMax, 1)
+  if (revenueTab.value === 'store') return Math.max(storeMax, 1)
+  return Math.max(pickupMax, storeMax, 1)
+})
 const pickupMax  = computed(() => Math.max(...pickupData.value.map(d => d.value), 1))
 const chartW = 478
 const chartH = 260
@@ -211,9 +253,8 @@ const padL = 50, padB = 30, padT = 10, padR = 10
 const innerW = chartW - padL - padR
 const innerH = chartH - padT - padB
 
-function revenuePoints() {
-  const data = revenueData.value
-  const max = revenueMax.value
+function makePoints(data: { value: number }[], max: number) {
+  if (data.length < 2) return ''
   return data.map((d, i) => {
     const x = padL + (i / (data.length - 1)) * innerW
     const y = padT + innerH - (max ? d.value / max : 0) * innerH
@@ -221,9 +262,8 @@ function revenuePoints() {
   }).join(' ')
 }
 
-function revenueArea() {
-  const data = revenueData.value
-  const max = revenueMax.value
+function makeArea(data: { value: number }[], max: number) {
+  if (data.length < 2) return ''
   const pts = data.map((d, i) => {
     const x = padL + (i / (data.length - 1)) * innerW
     const y = padT + innerH - (max ? d.value / max : 0) * innerH
@@ -232,6 +272,22 @@ function revenueArea() {
   const first = pts[0]!.split(',')
   const last  = pts[pts.length - 1]!.split(',')
   return `${pts.join(' ')} ${last[0]},${padT + innerH} ${first[0]},${padT + innerH}`
+}
+
+function revenuePoints() {
+  return makePoints(revenueData.value, revenueMax.value)
+}
+
+function revenueArea() {
+  return makeArea(revenueData.value, revenueMax.value)
+}
+
+function storePoints() {
+  return makePoints(storeChartData.value, revenueMax.value)
+}
+
+function storeArea() {
+  return makeArea(storeChartData.value, revenueMax.value)
 }
 
 function barX(i: number) { return padL + (i / pickupData.value.length) * innerW + 10 }
@@ -281,8 +337,18 @@ function barH(v: number) { return (pickupMax.value ? v / pickupMax.value : 0) * 
     <div class="grid-cols-2">
       <!-- Revenue chart -->
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-        <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Revenue Overview</p>
-        <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:4px;margin-bottom:16px">Monthly revenue for the past 6 months</p>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Revenue Overview</p>
+          <div style="display:flex;align-items:center;gap:4px;background:#f3f4f6;border-radius:20px;padding:3px">
+            <button
+              v-for="tab in (['combined', 'pickup', 'store'] as const)"
+              :key="tab"
+              :style="`height:30px;padding:0 14px;border:none;border-radius:16px;font-size:13px;font-weight:500;font-family:'Manrope',sans-serif;cursor:pointer;transition:all 0.15s;${revenueTab === tab ? 'background:white;color:#111;box-shadow:0 1px 2px rgba(0,0,0,0.08)' : 'background:transparent;color:#6b7280'}`"
+              @click="revenueTab = tab"
+            >{{ tab === 'combined' ? 'All' : tab.charAt(0).toUpperCase() + tab.slice(1) }}</button>
+          </div>
+        </div>
+        <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:16px">Monthly revenue for the past 6 months</p>
         <svg :viewBox="`0 0 ${chartW} ${chartH}`" style="overflow:visible;width:100%;height:auto">
           <!-- Grid lines -->
           <line v-for="i in 4" :key="i" :x1="padL" :x2="chartW - padR" :y1="padT + (innerH / 4) * (i-1)" :y2="padT + (innerH / 4) * (i-1)" stroke="#f0f0f0" stroke-width="1" />
@@ -290,25 +356,29 @@ function barH(v: number) { return (pickupMax.value ? v / pickupMax.value : 0) * 
           <text v-for="i in 5" :key="i" :x="padL - 8" :y="padT + (innerH / 4) * (i-1) + 4" text-anchor="end" font-size="11" fill="#6b7280" font-family="Manrope,sans-serif">
             {{ revenueMax >= 1000 ? `${Number((revenueMax - (revenueMax / 4) * (i-1)).toFixed(0)) / 1000}k` : (revenueMax - (revenueMax / 4) * (i-1)).toFixed(2) }}
           </text>
-          <!-- Area fill -->
-          <polygon :points="revenueArea()" fill="rgba(255,180,0,0.08)" />
-          <!-- Line -->
-          <polyline :points="revenuePoints()" fill="none" stroke="#ffb400" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
-          <!-- Dots -->
-          <circle v-for="(d, i) in revenueData" :key="i"
-            :cx="padL + (i / (revenueData.length - 1)) * innerW"
-            :cy="padT + innerH - (d.value / revenueMax) * innerH"
-            r="6" :fill="hoveredRevenueIndex === i ? '#e6a000' : '#ffb400'" stroke="white" stroke-width="2"
-            style="cursor:pointer"
-            @mouseenter="hoveredRevenueIndex = i"
-            @mouseleave="hoveredRevenueIndex = null"
-          />
-          <!-- Tooltip -->
-          <g v-if="hoveredRevenueIndex !== null && revenueData[hoveredRevenueIndex]" :transform="`translate(${padL + (hoveredRevenueIndex / (revenueData.length - 1)) * innerW}, ${padT + innerH - (revenueData[hoveredRevenueIndex]!.value / revenueMax) * innerH - 48})`">
-            <rect x="-60" y="0" width="120" height="40" rx="8" fill="#1a1a1a" opacity="0.9" />
-            <text x="0" y="16" text-anchor="middle" font-size="11" fill="white" font-family="Manrope,sans-serif">GHS {{ revenueData[hoveredRevenueIndex]!.value.toFixed(2) }}</text>
-            <text x="0" y="32" text-anchor="middle" font-size="10" fill="#a3a3a3" font-family="Manrope,sans-serif">{{ revenueData[hoveredRevenueIndex]!.transactionCount }} transactions</text>
-          </g>
+
+          <!-- Pickup line (gold) - shown on All & Pickup tabs -->
+          <template v-if="revenueTab === 'combined' || revenueTab === 'pickup'">
+            <polygon :points="revenueArea()" fill="rgba(255,180,0,0.08)" />
+            <polyline :points="revenuePoints()" fill="none" stroke="#ffb400" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
+            <circle v-for="(d, i) in revenueData" :key="'p'+i"
+              :cx="padL + (i / (revenueData.length - 1)) * innerW"
+              :cy="padT + innerH - (d.value / revenueMax) * innerH"
+              r="5" fill="#ffb400" stroke="white" stroke-width="2"
+            />
+          </template>
+
+          <!-- Store line (blue) - shown on All & Store tabs -->
+          <template v-if="(revenueTab === 'combined' || revenueTab === 'store') && storeChartData.length">
+            <polygon :points="storeArea()" fill="rgba(59,130,246,0.08)" />
+            <polyline :points="storePoints()" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
+            <circle v-for="(d, i) in storeChartData" :key="'s'+i"
+              :cx="padL + (i / (storeChartData.length - 1)) * innerW"
+              :cy="padT + innerH - (d.value / revenueMax) * innerH"
+              r="5" fill="#3b82f6" stroke="white" stroke-width="2"
+            />
+          </template>
+
           <!-- X labels -->
           <text v-for="(d, i) in revenueData" :key="i"
             :x="padL + (i / (revenueData.length - 1)) * innerW"
@@ -316,6 +386,18 @@ function barH(v: number) { return (pickupMax.value ? v / pickupMax.value : 0) * 
             text-anchor="middle" font-size="11" fill="#6b7280" font-family="Manrope,sans-serif"
           >{{ d.month }}</text>
         </svg>
+
+        <!-- Legend -->
+        <div v-if="revenueTab === 'combined'" style="display:flex;align-items:center;gap:16px;margin-top:12px;justify-content:center">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="width:12px;height:3px;background:#ffb400;border-radius:2px"></span>
+            <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Pickup</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="width:12px;height:3px;background:#3b82f6;border-radius:2px"></span>
+            <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Store</span>
+          </div>
+        </div>
       </div>
 
       <!-- Pickup bar chart -->
