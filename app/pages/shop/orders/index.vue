@@ -1,43 +1,69 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'dashboard' })
 
-const orders = ref([
-  { id: 'ORD-2026-001', customer: 'Sarah Johnson',  items: '2x Waste Bins',               total: 'GHS 179.98', paymentStatus: 'paid',    deliveryStatus: 'delivered',  date: '2026-03-01' },
-  { id: 'ORD-2026-002', customer: 'Michael Chen',   items: '1x Bin Bags (50 pack)',        total: 'GHS 24.99',  paymentStatus: 'paid',    deliveryStatus: 'in-transit', date: '2026-03-02' },
-  { id: 'ORD-2026-003', customer: 'Emma Williams',  items: '1x Recycling Bin, 1x Brush',   total: 'GHS 94.98',  paymentStatus: 'paid',    deliveryStatus: 'processing', date: '2026-03-02' },
-  { id: 'ORD-2026-004', customer: 'James Martinez', items: '2x Soap (3 pack)',              total: 'GHS 25.98',  paymentStatus: 'pending', deliveryStatus: 'pending',    date: '2026-03-02' },
-  { id: 'ORD-2026-005', customer: 'Olivia Brown',   items: '1x Large Waste Bin 240L',      total: 'GHS 129.99', paymentStatus: 'paid',    deliveryStatus: 'delivered',  date: '2026-03-03' },
-  { id: 'ORD-2026-006', customer: 'David Wilson',   items: '3x Bin Liner Roll 100pk',      total: 'GHS 59.97',  paymentStatus: 'paid',    deliveryStatus: 'in-transit', date: '2026-03-03' },
-  { id: 'ORD-2026-007', customer: 'Lisa Anderson',  items: '1x Odour Control Spray',       total: 'GHS 9.99',   paymentStatus: 'pending', deliveryStatus: 'pending',    date: '2026-03-04' },
-  { id: 'ORD-2026-008', customer: 'Robert Taylor',  items: '2x Eco-Friendly Bin Bags',     total: 'GHS 79.98',  paymentStatus: 'paid',    deliveryStatus: 'processing', date: '2026-03-04' },
-  { id: 'ORD-2026-009', customer: 'Karen White',    items: '1x Mini Recycling Bin 40L',    total: 'GHS 49.99',  paymentStatus: 'paid',    deliveryStatus: 'delivered',  date: '2026-03-05' },
-  { id: 'ORD-2026-010', customer: 'Chris Harris',   items: '1x Long Handle Bin Brush',     total: 'GHS 18.99',  paymentStatus: 'paid',    deliveryStatus: 'delivered',  date: '2026-03-05' },
-  { id: 'ORD-2026-011', customer: 'Amanda Clark',   items: '2x Standard Waste Bin',        total: 'GHS 179.98', paymentStatus: 'pending', deliveryStatus: 'pending',    date: '2026-03-06' },
-  { id: 'ORD-2026-012', customer: 'Daniel Lewis',   items: '1x Bin Cleaning Brush',        total: 'GHS 14.99',  paymentStatus: 'paid',    deliveryStatus: 'in-transit', date: '2026-03-06' },
-])
+const api = useApi()
+
+interface Order {
+  id: string
+  orderNumber: string
+  customerName: string
+  itemCount: string
+  total: number
+  paymentStatus: string
+  deliveryStatus: string
+  createdAt: string | null
+}
+
+interface OrdersResponse {
+  data: Order[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+    hasNextPage: boolean
+    hasPreviousPage: boolean
+  }
+}
+
+const orders = ref<Order[]>([])
+const ordersLoading = ref(false)
+const totalOrders = ref(0)
 
 const search = ref('')
 const currentPage = ref(1)
-const perPage = 10
+const perPage = 20
+
+async function fetchOrders() {
+  ordersLoading.value = true
+  try {
+    const data = await api.get<OrdersResponse>(
+      `/store-orders/admin/orders/?page=${currentPage.value}&limit=${perPage}`,
+      'Failed to load orders'
+    )
+    if (data?.data) {
+      orders.value = data.data
+      totalOrders.value = data.pagination?.total ?? data.data.length
+    }
+  } catch (err) {
+    console.error('Error fetching orders:', err)
+  }
+  ordersLoading.value = false
+}
 
 const filtered = computed(() => {
   const q = search.value.toLowerCase()
   if (!q) return orders.value
   return orders.value.filter(o =>
-    o.customer.toLowerCase().includes(q) ||
-    o.id.toLowerCase().includes(q) ||
-    o.items.toLowerCase().includes(q) ||
+    o.customerName.toLowerCase().includes(q) ||
+    o.orderNumber.toLowerCase().includes(q) ||
     o.deliveryStatus.toLowerCase().includes(q) ||
     o.paymentStatus.toLowerCase().includes(q)
   )
 })
 
-const paginated = computed(() => {
-  const start = (currentPage.value - 1) * perPage
-  return filtered.value.slice(start, start + perPage)
-})
-
 watch(search, () => { currentPage.value = 1 })
+watch(currentPage, () => { fetchOrders() })
 
 function paymentBadge(s: string) {
   if (s === 'paid')    return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e' }
@@ -48,8 +74,13 @@ function paymentBadge(s: string) {
 function deliveryBadge(s: string) {
   if (s === 'delivered')  return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e' }
   if (s === 'in-transit') return { bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)', color: '#3b82f6' }
+  if (s === 'processing') return { bg: 'rgba(255,180,0,0.1)',  border: 'rgba(255,180,0,0.2)',  color: '#d49a00' }
   return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280' }
 }
+
+onMounted(() => {
+  fetchOrders()
+})
 </script>
 
 <template>
@@ -86,28 +117,28 @@ function deliveryBadge(s: string) {
       <table style="width:100%;border-collapse:collapse">
         <thead>
           <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
-            <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Order ID</th>
+            <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Order #</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Customer</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Items</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Total</th>
-            <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Payment Status</th>
-            <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Delivery Status</th>
+            <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Payment</th>
+            <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Delivery</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Date</th>
             <th style="padding:14px 16px;text-align:right;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr
-            v-for="(order, i) in paginated"
+            v-for="(order, i) in filtered"
             :key="order.id"
-            :style="`border-bottom:${i < paginated.length - 1 ? '1px solid #e5e7eb' : 'none'}`"
+            :style="`border-bottom:${i < filtered.length - 1 ? '1px solid #e5e7eb' : 'none'}`"
             @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
           >
-            <td style="padding:20px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ order.id }}</td>
-            <td style="padding:20px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ order.customer }}</td>
-            <td style="padding:20px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ order.items }}</td>
-            <td style="padding:20px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ order.total }}</td>
+            <td style="padding:20px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ order.orderNumber }}</td>
+            <td style="padding:20px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ order.customerName }}</td>
+            <td style="padding:20px 16px;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ order.itemCount }}</td>
+            <td style="padding:20px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">GHS {{ order.total.toFixed(2) }}</td>
             <td style="padding:20px 16px">
               <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;background:${paymentBadge(order.paymentStatus).bg};color:${paymentBadge(order.paymentStatus).color};border:1px solid ${paymentBadge(order.paymentStatus).border}`">
                 {{ order.paymentStatus }}
@@ -118,7 +149,7 @@ function deliveryBadge(s: string) {
                 {{ order.deliveryStatus }}
               </span>
             </td>
-            <td style="padding:20px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ order.date }}</td>
+            <td style="padding:20px 16px;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;white-space:nowrap">{{ order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—' }}</td>
             <td style="padding:20px 16px;text-align:right">
               <NuxtLink :to="`/shop/orders/${order.id}`" style="text-decoration:none">
                 <button
@@ -132,8 +163,11 @@ function deliveryBadge(s: string) {
               </NuxtLink>
             </td>
           </tr>
-          <tr v-if="paginated.length === 0">
-            <td colspan="8" style="padding:32px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No orders match your search.</td>
+          <tr v-if="filtered.length === 0 && !ordersLoading">
+            <td colspan="8" style="padding:32px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No orders found.</td>
+          </tr>
+          <tr v-if="ordersLoading">
+            <td colspan="8" style="padding:32px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Loading orders...</td>
           </tr>
         </tbody>
       </table>
@@ -142,7 +176,7 @@ function deliveryBadge(s: string) {
       <div style="padding-top:16px;border-top:1px solid #e5e7eb;margin-top:4px">
         <AppPagination
           :page="currentPage"
-          :total="filtered.length"
+          :total="totalOrders"
           :per-page="perPage"
           @update:page="currentPage = $event"
         />

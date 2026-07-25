@@ -1,19 +1,68 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'dashboard' })
 
-const product = {
-  name: 'Standard Waste Bin',
-  sku: 'WB-120-STD',
-  category: 'Bins',
-  status: 'active',
-  description: 'Durable 120-liter waste bin designed for residential and commercial use. Features weather-resistant construction, easy-lift handles, and compatible with standard waste collection vehicles.',
-  price: 'GHS 89.99',
-  costPrice: 'GHS 55.00',
-  profitMargin: '63.6%',
-  stock: 45,
-  reorderPoint: '20 units',
-  totalSold: '319 units',
+const route = useRoute()
+const router = useRouter()
+const api = useApi()
+const toast = useAppToast()
+
+interface Product {
+  id: string
+  name: string
+  sku: string
+  description: string
+  price: number
+  stockQuantity: number
+  reorderPoint: number
+  unitCost: number
+  profitMargin: number
+  totalSold: number
+  isLowStock: boolean
+  status: string
+  images: string[]
+  category: { id: string; name: string }
+  createdAt: string | null
+  updatedAt: string | null
 }
+
+const product = ref<Product | null>(null)
+const loading = ref(true)
+
+async function fetchProduct() {
+  loading.value = true
+  try {
+    const data = await api.get<Product>(
+      `/store/admin/products/${route.params.id}`,
+      'Failed to load product'
+    )
+    if (data) {
+      product.value = data
+    }
+  } catch (err) {
+    console.error('Error fetching product:', err)
+  }
+  loading.value = false
+}
+
+async function handleDelete() {
+  try {
+    await api.del(
+      `/store/admin/products/${route.params.id}`,
+      'Failed to delete product'
+    )
+    toast.success('Product deleted', 'Product has been removed successfully.')
+    router.push('/shop/products')
+  } catch (err) {
+    console.error('Error deleting product:', err)
+  }
+}
+
+const statusBadgeStyle = computed(() => {
+  const s = product.value?.status
+  if (s === 'active') return { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#22c55e' }
+  if (s === 'inactive') return { bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)', color: '#ef4444' }
+  return { bg: 'rgba(255,180,0,0.1)', border: 'rgba(255,180,0,0.2)', color: '#d49a00' }
+})
 
 const quickStats = [
   { icon: 'i-lucide-dollar-sign', label: 'Total Revenue',    value: 'GHS 28,716.81', valueColor: '#1a1a1a' },
@@ -45,6 +94,10 @@ function statusBadge(s: string) {
   if (s === 'in-transit') return { bg: 'rgba(255,180,0,0.1)',  border: 'rgba(255,180,0,0.2)',  color: '#d49a00' }
   return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280' }
 }
+
+onMounted(() => {
+  fetchProduct()
+})
 </script>
 
 <template>
@@ -56,6 +109,12 @@ function statusBadge(s: string) {
       Back to Products
     </NuxtLink>
 
+    <!-- Loading state -->
+    <div v-if="loading" style="display:flex;align-items:center;justify-content:center;padding:64px">
+      <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Loading product...</p>
+    </div>
+
+    <template v-else-if="product">
     <!-- Top row: product card + right sidebar -->
     <div style="display:grid;grid-template-columns:1fr 344px;gap:24px;align-items:start">
 
@@ -72,15 +131,15 @@ function statusBadge(s: string) {
             <div>
               <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
                 <h1 style="font-size:24px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;line-height:1.3">{{ product.name }}</h1>
-                <span style="font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 11px;background:rgba(34,197,94,0.1);color:#22c55e;border:1px solid rgba(34,197,94,0.2)">Active</span>
+                <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 11px;background:${statusBadgeStyle.bg};color:${statusBadgeStyle.color};border:1px solid ${statusBadgeStyle.border}`">{{ product.status.charAt(0).toUpperCase() + product.status.slice(1) }}</span>
               </div>
               <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">SKU: {{ product.sku }}</p>
-              <span style="font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;background:#e5e7eb;color:#6b7280;border:1px solid #e5e7eb">{{ product.category }}</span>
+              <span style="font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;background:#e5e7eb;color:#6b7280;border:1px solid #e5e7eb">{{ product.category.name }}</span>
             </div>
             <!-- Description -->
             <div>
               <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin-bottom:8px">Description</p>
-              <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;line-height:1.5">{{ product.description }}</p>
+              <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;line-height:1.5">{{ product.description || 'No description provided.' }}</p>
             </div>
           </div>
         </div>
@@ -93,17 +152,17 @@ function statusBadge(s: string) {
         <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
           <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin-bottom:16px">Pricing</p>
           <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:16px">
-            <span style="font-size:30px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ product.price }}</span>
+            <span style="font-size:30px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">GHS {{ product.price.toFixed(2) }}</span>
             <span style="font-size:16px;color:#6b7280;font-family:'Manrope',sans-serif">per unit</span>
           </div>
           <div style="display:flex;flex-direction:column;gap:8px">
             <div style="display:flex;justify-content:space-between">
-              <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Cost Price:</span>
-              <span style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">{{ product.costPrice }}</span>
+              <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Unit Cost:</span>
+              <span style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">GHS {{ product.unitCost.toFixed(2) }}</span>
             </div>
             <div style="display:flex;justify-content:space-between">
               <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Profit Margin:</span>
-              <span style="font-size:14px;font-weight:500;color:#22c55e;font-family:'Manrope',sans-serif">{{ product.profitMargin }}</span>
+              <span style="font-size:14px;font-weight:500;color:#22c55e;font-family:'Manrope',sans-serif">{{ product.profitMargin }}%</span>
             </div>
           </div>
         </div>
@@ -114,22 +173,22 @@ function statusBadge(s: string) {
           <div style="display:flex;flex-direction:column;gap:12px">
             <div>
               <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:2px">Current Stock</p>
-              <p style="font-size:24px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ product.stock }}</p>
+              <p :style="`font-size:24px;font-weight:700;font-family:'Manrope',sans-serif;color:${product.isLowStock ? '#ef4444' : '#1a1a1a'}`">{{ product.stockQuantity }}</p>
             </div>
             <div>
               <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:2px">Reorder Point</p>
-              <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ product.reorderPoint }}</p>
+              <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ product.reorderPoint }} units</p>
             </div>
             <div>
               <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:2px">Total Sold</p>
-              <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ product.totalSold }}</p>
+              <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ product.totalSold }} units</p>
             </div>
           </div>
         </div>
 
         <!-- Action buttons -->
         <div style="display:flex;flex-direction:column;gap:12px">
-          <NuxtLink :to="`/shop/products/${$route.params.id}/edit`" style="text-decoration:none">
+          <NuxtLink :to="`/shop/products/${route.params.id}/edit`" style="text-decoration:none">
             <button
               style="width:100%;height:40px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
               @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
@@ -138,6 +197,7 @@ function statusBadge(s: string) {
           </NuxtLink>
           <button
             style="width:100%;height:40px;background:#ef4444;border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:pointer"
+            @click="handleDelete"
             @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
             @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
           >Delete Product</button>
@@ -219,6 +279,8 @@ function statusBadge(s: string) {
         </tbody>
       </table>
     </div>
+
+    </template>
 
   </div>
 </template>

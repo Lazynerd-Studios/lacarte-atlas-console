@@ -3,33 +3,82 @@ definePageMeta({ layout: 'dashboard' })
 
 const api = useApi()
 
-const stats = [
-  { label: 'Active Customers', value: '0', change: '0%', positive: null, icon: 'i-lucide-users' },
+// Analytics data from API
+interface AnalyticsResponse {
+  activeCustomersPercentage: number
+  newCustomersPercentage: number
+  todayPickups: { count: number }
+  outstandingPaymentsGhs: number
+  pickupVolume: { date: string; pickupCount: number }[]
+}
+
+interface RevenueResponse {
+  success: boolean
+  data: {
+    summary: { totalRevenue: number; averageMonthlyRevenue: number; currency: string }
+    monthlyData: { month: string; revenue: number; transactionCount: number; monthOverMonthGrowth: number | null }[]
+  }
+}
+
+const analytics = ref<AnalyticsResponse | null>(null)
+const revenueAnalytics = ref<RevenueResponse | null>(null)
+const revenueChartData = ref<RevenueResponse | null>(null)
+
+const stats = computed(() => [
+  { label: 'Active Customers', value: analytics.value ? `${analytics.value.activeCustomersPercentage}%` : '0%', change: analytics.value ? `${analytics.value.newCustomersPercentage}% new` : '0%', positive: analytics.value && analytics.value.newCustomersPercentage > 0 ? true : null, icon: 'i-lucide-users' },
   { label: 'Drivers on Duty',  value: '0', change: '0%', positive: null, icon: 'i-lucide-truck' },
-  { label: "Today's Pickups",  value: '0', change: '0%', positive: null, icon: 'i-lucide-package' },
-  { label: 'Outstanding Payments', value: 'GHS 0', change: '0%', positive: null, icon: 'i-lucide-credit-card' },
-  { label: 'Revenue This Month',   value: 'GHS 0', change: '0%', positive: null, icon: 'i-lucide-bar-chart-2' },
+  { label: "Today's Pickups",  value: analytics.value ? String(analytics.value.todayPickups.count) : '0', change: '0%', positive: null, icon: 'i-lucide-package' },
+  { label: 'Outstanding Payments', value: analytics.value ? `GHS ${analytics.value.outstandingPaymentsGhs.toLocaleString()}` : 'GHS 0', change: '0%', positive: null, icon: 'i-lucide-credit-card' },
+  { label: 'Revenue This Month',   value: revenueAnalytics.value ? `GHS ${revenueAnalytics.value.data.summary.totalRevenue.toLocaleString()}` : 'GHS 0', change: currentMonthGrowth.value, positive: null, icon: 'i-lucide-bar-chart-2' },
   { label: 'Shop Orders Today',    value: '0', change: '0%', positive: null, icon: 'i-lucide-shopping-bag' },
-]
+])
 
-const revenueData = [
-  { month: 'Jan', value: 0 },
-  { month: 'Feb', value: 0 },
-  { month: 'Mar', value: 0 },
-  { month: 'Apr', value: 0 },
-  { month: 'May', value: 0 },
-  { month: 'Jun', value: 0 },
-]
+const monthShortNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-const pickupData = [
-  { day: 'Mon', value: 0 },
-  { day: 'Tue', value: 0 },
-  { day: 'Wed', value: 0 },
-  { day: 'Thu', value: 0 },
-  { day: 'Fri', value: 0 },
-  { day: 'Sat', value: 0 },
-  { day: 'Sun', value: 0 },
-]
+const revenueData = computed(() => {
+  if (revenueChartData.value?.data?.monthlyData?.length) {
+    return revenueChartData.value.data.monthlyData.map(item => {
+      const monthStr = item.month.split('-')[1]
+      const monthIndex = parseInt(monthStr!, 10) - 1
+      return { month: monthShortNames[monthIndex], value: item.revenue, transactionCount: item.transactionCount }
+    })
+  }
+  return [
+    { month: 'Jan', value: 0, transactionCount: 0 },
+    { month: 'Feb', value: 0, transactionCount: 0 },
+    { month: 'Mar', value: 0, transactionCount: 0 },
+    { month: 'Apr', value: 0, transactionCount: 0 },
+    { month: 'May', value: 0, transactionCount: 0 },
+    { month: 'Jun', value: 0, transactionCount: 0 },
+  ]
+})
+
+const currentMonthGrowth = computed(() => {
+  if (!revenueAnalytics.value?.data?.monthlyData?.length) return '0%'
+  const last = revenueAnalytics.value.data.monthlyData[revenueAnalytics.value.data.monthlyData.length - 1]
+  if (last?.monthOverMonthGrowth !== null && last?.monthOverMonthGrowth !== undefined) return `${last.monthOverMonthGrowth}%`
+  return '0%'
+})
+
+const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+const pickupData = computed(() => {
+  if (analytics.value?.pickupVolume?.length) {
+    return analytics.value.pickupVolume.map(item => {
+      const date = new Date(item.date)
+      return { day: dayNames[date.getDay()], value: item.pickupCount }
+    })
+  }
+  return [
+    { day: 'Mon', value: 0 },
+    { day: 'Tue', value: 0 },
+    { day: 'Wed', value: 0 },
+    { day: 'Thu', value: 0 },
+    { day: 'Fri', value: 0 },
+    { day: 'Sat', value: 0 },
+    { day: 'Sun', value: 0 },
+  ]
+})
 
 interface PickupRequest {
   id: string
@@ -96,14 +145,66 @@ function paymentTypeBadge(type: string) {
   return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: 'Pay as you go' }
 }
 
+async function fetchAnalytics() {
+  try {
+    const data = await api.get<AnalyticsResponse>(
+      '/dashboard/admin/analytics',
+      'Failed to load analytics'
+    )
+    if (data) {
+      analytics.value = data
+    }
+  } catch (err) {
+    console.error('Error fetching analytics:', err)
+  }
+}
+
+async function fetchRevenue() {
+  try {
+    // Filtered call for KPI card (current month only)
+    const now = new Date()
+    const startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+    const endDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    const data = await api.get<RevenueResponse>(
+      `/admin/analytics/revenue?startDate=${startDate}&endDate=${endDate}`,
+      'Failed to load revenue analytics'
+    )
+    if (data) {
+      revenueAnalytics.value = data
+    }
+  } catch (err) {
+    console.error('Error fetching revenue:', err)
+  }
+}
+
+async function fetchRevenueChart() {
+  try {
+    // Unfiltered call for revenue chart (all available data)
+    const data = await api.get<RevenueResponse>(
+      '/admin/analytics/revenue',
+      'Failed to load revenue chart'
+    )
+    if (data) {
+      revenueChartData.value = data
+    }
+  } catch (err) {
+    console.error('Error fetching revenue chart:', err)
+  }
+}
+
+const hoveredRevenueIndex = ref<number | null>(null)
+
 onMounted(() => {
+  fetchAnalytics()
+  fetchRevenue()
+  fetchRevenueChart()
   fetchPendingPickups()
   fetchActiveTrucks()
 })
 
 // Chart helpers
-const revenueMax = Math.max(...revenueData.map(d => d.value))
-const pickupMax  = Math.max(...pickupData.map(d => d.value))
+const revenueMax = computed(() => Math.max(...revenueData.value.map(d => d.value), 1))
+const pickupMax  = computed(() => Math.max(...pickupData.value.map(d => d.value), 1))
 const chartW = 478
 const chartH = 260
 const padL = 50, padB = 30, padT = 10, padR = 10
@@ -111,17 +212,21 @@ const innerW = chartW - padL - padR
 const innerH = chartH - padT - padB
 
 function revenuePoints() {
-  return revenueData.map((d, i) => {
-    const x = padL + (i / (revenueData.length - 1)) * innerW
-    const y = padT + innerH - (revenueMax ? d.value / revenueMax : 0) * innerH
+  const data = revenueData.value
+  const max = revenueMax.value
+  return data.map((d, i) => {
+    const x = padL + (i / (data.length - 1)) * innerW
+    const y = padT + innerH - (max ? d.value / max : 0) * innerH
     return `${x},${y}`
   }).join(' ')
 }
 
 function revenueArea() {
-  const pts = revenueData.map((d, i) => {
-    const x = padL + (i / (revenueData.length - 1)) * innerW
-    const y = padT + innerH - (revenueMax ? d.value / revenueMax : 0) * innerH
+  const data = revenueData.value
+  const max = revenueMax.value
+  const pts = data.map((d, i) => {
+    const x = padL + (i / (data.length - 1)) * innerW
+    const y = padT + innerH - (max ? d.value / max : 0) * innerH
     return `${x},${y}`
   })
   const first = pts[0]!.split(',')
@@ -129,10 +234,10 @@ function revenueArea() {
   return `${pts.join(' ')} ${last[0]},${padT + innerH} ${first[0]},${padT + innerH}`
 }
 
-function barX(i: number) { return padL + (i / pickupData.length) * innerW + 10 }
-function barW() { return (innerW / pickupData.length) - 14 }
-function barY(v: number) { return padT + innerH - (pickupMax ? v / pickupMax : 0) * innerH }
-function barH(v: number) { return (pickupMax ? v / pickupMax : 0) * innerH }
+function barX(i: number) { return padL + (i / pickupData.value.length) * innerW + 10 }
+function barW() { return (innerW / pickupData.value.length) - 14 }
+function barY(v: number) { return padT + innerH - (pickupMax.value ? v / pickupMax.value : 0) * innerH }
+function barH(v: number) { return (pickupMax.value ? v / pickupMax.value : 0) * innerH }
 </script>
 
 <template>
@@ -183,7 +288,7 @@ function barH(v: number) { return (pickupMax ? v / pickupMax : 0) * innerH }
           <line v-for="i in 4" :key="i" :x1="padL" :x2="chartW - padR" :y1="padT + (innerH / 4) * (i-1)" :y2="padT + (innerH / 4) * (i-1)" stroke="#f0f0f0" stroke-width="1" />
           <!-- Y labels -->
           <text v-for="i in 5" :key="i" :x="padL - 8" :y="padT + (innerH / 4) * (i-1) + 4" text-anchor="end" font-size="11" fill="#6b7280" font-family="Manrope,sans-serif">
-            {{ Math.round(revenueMax - (revenueMax / 4) * (i-1) / 1000) }}k
+            {{ revenueMax >= 1000 ? `${Number((revenueMax - (revenueMax / 4) * (i-1)).toFixed(0)) / 1000}k` : (revenueMax - (revenueMax / 4) * (i-1)).toFixed(2) }}
           </text>
           <!-- Area fill -->
           <polygon :points="revenueArea()" fill="rgba(255,180,0,0.08)" />
@@ -193,8 +298,17 @@ function barH(v: number) { return (pickupMax ? v / pickupMax : 0) * innerH }
           <circle v-for="(d, i) in revenueData" :key="i"
             :cx="padL + (i / (revenueData.length - 1)) * innerW"
             :cy="padT + innerH - (d.value / revenueMax) * innerH"
-            r="4" fill="#ffb400" stroke="white" stroke-width="2"
+            r="6" :fill="hoveredRevenueIndex === i ? '#e6a000' : '#ffb400'" stroke="white" stroke-width="2"
+            style="cursor:pointer"
+            @mouseenter="hoveredRevenueIndex = i"
+            @mouseleave="hoveredRevenueIndex = null"
           />
+          <!-- Tooltip -->
+          <g v-if="hoveredRevenueIndex !== null && revenueData[hoveredRevenueIndex]" :transform="`translate(${padL + (hoveredRevenueIndex / (revenueData.length - 1)) * innerW}, ${padT + innerH - (revenueData[hoveredRevenueIndex]!.value / revenueMax) * innerH - 48})`">
+            <rect x="-60" y="0" width="120" height="40" rx="8" fill="#1a1a1a" opacity="0.9" />
+            <text x="0" y="16" text-anchor="middle" font-size="11" fill="white" font-family="Manrope,sans-serif">GHS {{ revenueData[hoveredRevenueIndex]!.value.toFixed(2) }}</text>
+            <text x="0" y="32" text-anchor="middle" font-size="10" fill="#a3a3a3" font-family="Manrope,sans-serif">{{ revenueData[hoveredRevenueIndex]!.transactionCount }} transactions</text>
+          </g>
           <!-- X labels -->
           <text v-for="(d, i) in revenueData" :key="i"
             :x="padL + (i / (revenueData.length - 1)) * innerW"
@@ -218,7 +332,7 @@ function barH(v: number) { return (pickupMax ? v / pickupMax : 0) * innerH }
           <!-- Bars -->
           <rect v-for="(d, i) in pickupData" :key="i"
             :x="barX(i)" :y="barY(d.value)" :width="barW()" :height="barH(d.value)"
-            rx="6" :fill="d.day === 'Thu' ? '#ffb400' : 'rgba(255,180,0,0.25)'"
+            rx="6" :fill="d.day === dayNames[new Date().getDay()] ? '#ffb400' : 'rgba(255,180,0,0.25)'"
           />
           <!-- X labels -->
           <text v-for="(d, i) in pickupData" :key="i"

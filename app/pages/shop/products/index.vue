@@ -1,24 +1,62 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'dashboard' })
 
-const products = ref([
-  { id: 1, name: 'Standard Waste Bin',           sku: 'WB-120-STD',  category: 'Bins',     price: 'GHS 89.99',  stock: 45, status: 'active' },
-  { id: 2, name: 'Recycling Bin',                sku: 'RB-80-STD',   category: 'Bins',     price: 'GHS 79.99',  stock: 32, status: 'active' },
-  { id: 3, name: 'Heavy Duty Bin Bags 50pk',     sku: 'BB-50-HD',    category: 'Bin Bags', price: 'GHS 24.99',  stock: 15, status: 'active' },
-  { id: 4, name: 'Eco-Friendly Bin Bags 100pk',  sku: 'BB-100-ECO',  category: 'Bin Bags', price: 'GHS 39.99',  stock: 8,  status: 'active' },
-  { id: 5, name: 'Bin Cleaning Brush',           sku: 'BR-001',      category: 'Brush',    price: 'GHS 14.99',  stock: 67, status: 'active' },
-  { id: 6, name: 'Bin Deodorizer Soap 3pk',      sku: 'SP-003',      category: 'Soap',     price: 'GHS 12.99',  stock: 89, status: 'active' },
-  { id: 7, name: 'Large Waste Bin 240L',         sku: 'WB-240-LG',   category: 'Bins',     price: 'GHS 129.99', stock: 20, status: 'active' },
-  { id: 8, name: 'Compostable Bin Bags 50pk',    sku: 'BB-50-COM',   category: 'Bin Bags', price: 'GHS 29.99',  stock: 5,  status: 'active' },
-  { id: 9, name: 'Bin Liner Roll 100pk',         sku: 'BL-100-STD',  category: 'Bin Bags', price: 'GHS 19.99',  stock: 54, status: 'active' },
-  { id: 10, name: 'Odour Control Spray',         sku: 'OC-001',      category: 'Soap',     price: 'GHS 9.99',   stock: 3,  status: 'active' },
-  { id: 11, name: 'Mini Recycling Bin 40L',      sku: 'RB-40-MINI',  category: 'Bins',     price: 'GHS 49.99',  stock: 28, status: 'active' },
-  { id: 12, name: 'Long Handle Bin Brush',       sku: 'BR-002-LH',   category: 'Brush',    price: 'GHS 18.99',  stock: 41, status: 'active' },
-])
+const api = useApi()
+const toast = useAppToast()
+
+interface Product {
+  id: string
+  name: string
+  sku: string
+  description: string
+  price: number
+  stockQuantity: number
+  reorderPoint: number
+  unitCost: number
+  isLowStock: boolean
+  status: string
+  images: string[]
+  category: { id: string; name: string }
+  createdAt: string
+  updatedAt: string
+}
+
+interface ProductsResponse {
+  data: Product[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+    hasNextPage: boolean
+    hasPreviousPage: boolean
+  }
+}
+
+const products = ref<Product[]>([])
+const productsLoading = ref(false)
+const totalProducts = ref(0)
 
 const search = ref('')
 const currentPage = ref(1)
-const perPage = 10
+const perPage = 20
+
+async function fetchProducts() {
+  productsLoading.value = true
+  try {
+    const data = await api.get<ProductsResponse>(
+      `/store/admin/products/?page=${currentPage.value}&limit=${perPage}`,
+      'Failed to load products'
+    )
+    if (data?.data) {
+      products.value = data.data
+      totalProducts.value = data.pagination?.total ?? data.data.length
+    }
+  } catch (err) {
+    console.error('Error fetching products:', err)
+  }
+  productsLoading.value = false
+}
 
 const filtered = computed(() => {
   const q = search.value.toLowerCase()
@@ -26,37 +64,114 @@ const filtered = computed(() => {
   return products.value.filter(p =>
     p.name.toLowerCase().includes(q) ||
     p.sku.toLowerCase().includes(q) ||
-    p.category.toLowerCase().includes(q)
+    p.category.name.toLowerCase().includes(q)
   )
 })
 
-const paginated = computed(() => {
-  const start = (currentPage.value - 1) * perPage
-  return filtered.value.slice(start, start + perPage)
-})
-
 watch(search, () => { currentPage.value = 1 })
+watch(currentPage, () => { fetchProducts() })
+
+// Tabs
+const activeTab = ref<'products' | 'categories'>('products')
+
+// Categories list from API
+interface Category {
+  id: string
+  name: string
+  description: string
+  createdAt: string | null
+  updatedAt: string | null
+}
 
 // Add Category
 const showAddCategoryModal = ref(false)
-const categories = ref(['Bins', 'Bin Bags', 'Brush', 'Soap'])
+const categories = ref<Category[]>([])
+const categoriesLoading = ref(false)
 
-function handleAddCategory(name: string) {
-  if (!categories.value.includes(name)) categories.value.push(name)
+async function fetchCategories() {
+  categoriesLoading.value = true
+  try {
+    const data = await api.get<{ data: Category[] }>(
+      '/store/admin/categories/',
+      'Failed to load categories'
+    )
+    if (data?.data) {
+      categories.value = data.data
+    }
+  } catch (err) {
+    console.error('Error fetching categories:', err)
+  }
+  categoriesLoading.value = false
+}
+
+async function handleAddCategory(payload: { name: string; description: string }) {
+  try {
+    const data = await api.post<Category>(
+      '/store/admin/categories/',
+      payload,
+      'Failed to create category'
+    )
+    if (data) {
+      categories.value.push(data)
+      toast.success('Category created', `"${data.name}" has been added successfully.`)
+    }
+  } catch (err) {
+    console.error('Error creating category:', err)
+  }
   showAddCategoryModal.value = false
+}
+
+onMounted(() => {
+  fetchProducts()
+  fetchCategories()
+})
+
+// Delete Category
+const showDeleteCategoryModal = ref(false)
+const selectedCategory = ref<Category | null>(null)
+
+function openDeleteCategory(cat: Category) {
+  selectedCategory.value = cat
+  showDeleteCategoryModal.value = true
+}
+
+async function handleDeleteCategory() {
+  if (!selectedCategory.value) return
+  try {
+    await api.del(
+      `/store/admin/categories/${selectedCategory.value.id}`,
+      'Failed to delete category'
+    )
+    categories.value = categories.value.filter(c => c.id !== selectedCategory.value!.id)
+    toast.success('Category deleted', `"${selectedCategory.value.name}" has been removed.`)
+  } catch (err) {
+    console.error('Error deleting category:', err)
+  }
+  showDeleteCategoryModal.value = false
+  selectedCategory.value = null
 }
 
 // Delete Product
 const showDeleteModal = ref(false)
-const selectedProduct = ref<typeof products.value[0] | null>(null)
+const selectedProduct = ref<Product | null>(null)
 
-function openDelete(p: typeof products.value[0]) {
+function openDelete(p: Product) {
   selectedProduct.value = p
   showDeleteModal.value = true
 }
 
-function handleDelete(id: number) {
-  products.value = products.value.filter(p => p.id !== id)
+async function handleDelete(id: string) {
+  try {
+    await api.del(
+      `/store/admin/products/${id}`,
+      'Failed to delete product'
+    )
+    products.value = products.value.filter(p => p.id !== id)
+    totalProducts.value--
+    toast.success('Product deleted', 'Product has been removed successfully.')
+  } catch (err) {
+    console.error('Error deleting product:', err)
+  }
   showDeleteModal.value = false
   selectedProduct.value = null
 }
@@ -79,15 +194,16 @@ function handleDelete(id: number) {
       </div>
       <div style="display:flex;gap:8px">
         <button
-          style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px"
+          v-if="activeTab === 'categories'"
+          style="height:40px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px"
           @click="showAddCategoryModal = true"
-          @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
-          @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
+          @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
+          @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
         >
           <UIcon name="i-lucide-plus" style="width:16px;height:16px" />
           Add Category
         </button>
-        <NuxtLink to="/shop/products/add" style="text-decoration:none">
+        <NuxtLink v-if="activeTab === 'products'" to="/shop/products/add" style="text-decoration:none">
           <button
             style="height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px"
             @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
@@ -100,6 +216,20 @@ function handleDelete(id: number) {
       </div>
     </div>
 
+    <!-- Tabs -->
+    <div style="display:flex;gap:4px;background:#f3f4f6;border-radius:12px;padding:4px;width:fit-content">
+      <button @click="activeTab='products'"
+        :style="`padding:8px 24px;border:none;border-radius:9px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer;transition:all 0.15s;${activeTab==='products' ? 'background:#fff;color:#1a1a1a;box-shadow:0 1px 4px rgba(0,0,0,0.1)' : 'background:transparent;color:#6b7280'}`">
+        Products
+      </button>
+      <button @click="activeTab='categories'"
+        :style="`padding:8px 24px;border:none;border-radius:9px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer;transition:all 0.15s;${activeTab==='categories' ? 'background:#fff;color:#1a1a1a;box-shadow:0 1px 4px rgba(0,0,0,0.1)' : 'background:transparent;color:#6b7280'}`">
+        Categories
+      </button>
+    </div>
+
+    <!-- Products Tab -->
+    <div v-if="activeTab === 'products'">
     <!-- Table card -->
     <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:25px 25px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
 
@@ -130,9 +260,9 @@ function handleDelete(id: number) {
         </thead>
         <tbody>
           <tr
-            v-for="(p, i) in paginated"
+            v-for="(p, i) in filtered"
             :key="p.id"
-            :style="`border-bottom:${i < paginated.length - 1 ? '1px solid #e5e7eb' : 'none'}`"
+            :style="`border-bottom:${i < filtered.length - 1 ? '1px solid #e5e7eb' : 'none'}`"
             @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
           >
@@ -140,13 +270,13 @@ function handleDelete(id: number) {
             <td style="padding:20px 16px;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ p.sku }}</td>
             <td style="padding:20px 16px">
               <span style="font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;background:#e5e7eb;color:#6b7280;border:1px solid #e5e7eb">
-                {{ p.category }}
+                {{ p.category.name }}
               </span>
             </td>
-            <td style="padding:20px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ p.price }}</td>
+            <td style="padding:20px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">GHS {{ p.price.toFixed(2) }}</td>
             <td style="padding:20px 16px">
-              <span :style="`font-size:14px;font-weight:500;font-family:'Manrope',sans-serif;color:${p.stock <= 10 ? '#ef4444' : p.stock <= 20 ? '#d49a00' : '#1a1a1a'}`">
-                {{ p.stock }}
+              <span :style="`font-size:14px;font-weight:500;font-family:'Manrope',sans-serif;color:${p.isLowStock ? '#ef4444' : p.stockQuantity <= 20 ? '#d49a00' : '#1a1a1a'}`">
+                {{ p.stockQuantity }}
               </span>
             </td>
             <td style="padding:20px 16px">
@@ -188,8 +318,11 @@ function handleDelete(id: number) {
               </div>
             </td>
           </tr>
-          <tr v-if="paginated.length === 0">
-            <td colspan="7" style="padding:32px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No products match your search.</td>
+          <tr v-if="filtered.length === 0 && !productsLoading">
+            <td colspan="7" style="padding:32px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No products found.</td>
+          </tr>
+          <tr v-if="productsLoading">
+            <td colspan="7" style="padding:32px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Loading products...</td>
           </tr>
         </tbody>
       </table>
@@ -198,10 +331,57 @@ function handleDelete(id: number) {
       <div style="padding-top:16px;border-top:1px solid #e5e7eb;margin-top:4px">
         <AppPagination
           :page="currentPage"
-          :total="filtered.length"
+          :total="totalProducts"
           :per-page="perPage"
           @update:page="currentPage = $event"
         />
+      </div>
+    </div>
+    </div>
+
+    <!-- Categories Tab -->
+    <div v-if="activeTab === 'categories'">
+      <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:25px 25px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
+              <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Name</th>
+              <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Description</th>
+              <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Created</th>
+              <th style="padding:14px 16px;text-align:right;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="(cat, i) in categories"
+              :key="cat.id"
+              :style="`border-bottom:${i < categories.length - 1 ? '1px solid #e5e7eb' : 'none'}`"
+              @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
+              @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
+            >
+              <td style="padding:20px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ cat.name }}</td>
+              <td style="padding:20px 16px;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ cat.description || '—' }}</td>
+              <td style="padding:20px 16px;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ cat.createdAt ? new Date(cat.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—' }}</td>
+              <td style="padding:20px 16px;text-align:right">
+                <button
+                  style="width:32px;height:32px;background:none;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;margin-left:auto"
+                  title="Delete"
+                  @click="openDeleteCategory(cat)"
+                  @mouseover="($event.currentTarget as HTMLElement).style.background='rgba(239,68,68,0.1)'"
+                  @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
+                >
+                  <UIcon name="i-lucide-trash-2" style="width:16px;height:16px;color:#ef4444" />
+                </button>
+              </td>
+            </tr>
+            <tr v-if="categories.length === 0 && !categoriesLoading">
+              <td colspan="4" style="padding:32px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No categories yet. Click "Add Category" to create one.</td>
+            </tr>
+            <tr v-if="categoriesLoading">
+              <td colspan="4" style="padding:32px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Loading categories...</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -218,7 +398,29 @@ function handleDelete(id: number) {
     :product-name="selectedProduct.name"
     :product-id="selectedProduct.id"
     @close="showDeleteModal = false"
-    @confirm="handleDelete"
+    @confirm="(id) => handleDelete(String(id))"
   />
+
+  <!-- Delete Category Confirmation -->
+  <div
+    v-if="showDeleteCategoryModal && selectedCategory"
+    style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:50;display:flex;align-items:center;justify-content:center;padding:24px"
+    @click.self="showDeleteCategoryModal = false"
+  >
+    <div style="background:white;border-radius:16px;width:400px;padding:24px;box-shadow:0 10px 15px rgba(0,0,0,0.1)">
+      <p style="font-size:20px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;margin-bottom:12px">Delete Category</p>
+      <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:24px">Are you sure you want to delete <strong>"{{ selectedCategory.name }}"</strong>? This action cannot be undone.</p>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button
+          style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
+          @click="showDeleteCategoryModal = false"
+        >Cancel</button>
+        <button
+          style="height:40px;padding:0 20px;background:#ef4444;border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:pointer"
+          @click="handleDeleteCategory"
+        >Delete</button>
+      </div>
+    </div>
+  </div>
 
 </template>

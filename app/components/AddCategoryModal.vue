@@ -1,16 +1,19 @@
 <script setup lang="ts">
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'submit', name: string): void
+  (e: 'submit', payload: { name: string; description: string }): void
 }>()
 
 const name = ref('')
+const description = ref('')
+const loading = ref(false)
 
 const inputStyle = `width:100%;height:42px;padding:0 12px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box`
 
 function submit() {
   if (!name.value.trim()) return
-  emit('submit', name.value.trim())
+  loading.value = true
+  emit('submit', { name: name.value.trim(), description: description.value.trim() })
 }
 </script>
 
@@ -50,6 +53,16 @@ function submit() {
             @keyup.enter="submit"
           />
         </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">Description</label>
+          <textarea
+            v-model="description"
+            placeholder="Brief description of the category"
+            style="width:100%;min-height:80px;padding:12px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;resize:vertical"
+            @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+            @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
+          />
+        </div>
       </div>
 
       <!-- Footer -->
@@ -62,10 +75,11 @@ function submit() {
         >Cancel</button>
         <button
           style="height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
+          :disabled="loading"
           @click="submit"
           @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
           @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
-        >Add Category</button>
+        >{{ loading ? 'Adding...' : 'Add Category' }}</button>
       </div>
     </div>
   </div>

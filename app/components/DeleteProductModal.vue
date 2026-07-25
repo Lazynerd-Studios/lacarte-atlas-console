@@ -1,8 +1,8 @@
 <script setup lang="ts">
-const props = defineProps<{ productName: string; productId: number }>()
+const props = defineProps<{ productName: string; productId: string | number }>()
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'confirm', id: number): void
+  (e: 'confirm', id: string | number): void
 }>()
 </script>
 
