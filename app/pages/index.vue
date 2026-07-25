@@ -322,11 +322,11 @@ function barH(v: number) { return (pickupMax.value ? v / pickupMax.value : 0) * 
             </span>
           </div>
           <!-- Label -->
-          <p style="position:absolute;top:64px;left:24px;font-size:14px;font-weight:400;color:#6b7280;font-family:'Manrope',sans-serif;line-height:20px;white-space:nowrap">
+          <p style="position:absolute;top:60px;left:24px;font-size:14px;font-weight:400;color:#6b7280;font-family:'Manrope',sans-serif;line-height:20px;white-space:nowrap">
             {{ stat.label }}
           </p>
           <!-- Value -->
-          <p style="position:absolute;top:88px;left:24px;font-size:24px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif;line-height:32px;white-space:nowrap">
+          <p style="position:absolute;top:82px;left:24px;font-size:24px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif;line-height:32px;white-space:nowrap">
             {{ stat.value }}
           </p>
         </div>
@@ -470,7 +470,7 @@ function barH(v: number) { return (pickupMax.value ? v / pickupMax.value : 0) * 
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:25px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
         <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin-bottom:16px">Active Trucks</p>
         <div v-if="trucks.length > 0" style="display:flex;flex-direction:column;gap:16px">
-          <NuxtLink v-for="truck in trucks" :key="truck.id" :to="`/trucks/${truck.id}`" style="height:64px;background:#f8f9fa;border-radius:16px;padding:0 12px;display:flex;align-items:center;gap:12px;text-decoration:none;transition:background 0.15s" @mouseover="($event.currentTarget as HTMLElement).style.background='#f0f1f3'" @mouseleave="($event.currentTarget as HTMLElement).style.background='#f8f9fa'">
+          <NuxtLink v-for="truck in trucks" :key="truck.id" :to="`/trucks/${truck.id}`" style="height:72px;background:#f8f9fa;border-radius:16px;padding:0 16px;display:flex;align-items:center;gap:12px;text-decoration:none;transition:background 0.15s" @mouseover="($event.currentTarget as HTMLElement).style.background='#f0f1f3'" @mouseleave="($event.currentTarget as HTMLElement).style.background='#f8f9fa'">
             <div style="width:40px;height:40px;background:#22c55e;border-radius:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
               <UIcon name="i-lucide-truck" style="width:20px;height:20px;color:white" />
             </div>
