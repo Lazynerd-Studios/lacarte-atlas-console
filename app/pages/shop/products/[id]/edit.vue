@@ -42,13 +42,14 @@ const statuses = ['active', 'inactive', 'draft']
 const loading = ref(true)
 const submitting = ref(false)
 
-// Image upload
-const imageFiles = ref<File[]>([])
+// Image upload — files are uploaded on select, previews use the returned hosted URLs
 const imagePreviews = ref<string[]>([])
+const uploading = ref(false)
 const isDragging = ref(false)
 
 function handleFileSelect(event: Event) {
   const input = event.target as HTMLInputElement
+  console.log('[edit-product] File input changed, files:', input.files?.length)
   if (input.files) {
     addFiles(Array.from(input.files))
   }
@@ -60,6 +61,7 @@ function handleDrop(event: DragEvent) {
   isDragging.value = false
   if (event.dataTransfer?.files) {
     const files = Array.from(event.dataTransfer.files).filter(f => f.type.startsWith('image/'))
+    console.log('[edit-product] Files dropped:', files.length)
     addFiles(files)
   }
 }
@@ -73,25 +75,47 @@ function handleDragLeave() {
   isDragging.value = false
 }
 
-function addFiles(files: File[]) {
-  for (const file of files) {
-    if (!file.type.startsWith('image/')) continue
-    if (imageFiles.value.length >= 5) {
-      toast.error('Limit reached', 'You can upload a maximum of 5 images.')
-      break
+async function addFiles(files: File[]) {
+  console.log('[edit-product] addFiles called with', files.length, 'file(s):', files.map(f => `${f.name} (${f.type}, ${f.size} bytes)`))
+  const images = files.filter(f => f.type.startsWith('image/'))
+  if (images.length === 0) return
+  if (imagePreviews.value.length + images.length > 5) {
+    toast.error('Limit reached', 'You can upload a maximum of 5 images.')
+    return
+  }
+
+  uploading.value = true
+  try {
+    const formData = new FormData()
+    for (const file of images) formData.append('files', file)
+
+    const config = useRuntimeConfig()
+    const authStore = useAuthStore()
+    console.log('[edit-product] Uploading', images.length, 'image(s) to /store/admin/products/images')
+    const res = await fetch(`${config.public.apiBase}/store/admin/products/images`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${authStore.token}` },
+      body: formData,
+    })
+    if (!res.ok) {
+      let detail = `Upload failed (${res.status})`
+      try { detail = (await res.json()).message || detail } catch {}
+      throw new Error(detail)
     }
-    imageFiles.value.push(file)
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      imagePreviews.value.push(e.target?.result as string)
-    }
-    reader.readAsDataURL(file)
+    const data = await res.json() as { urls: string[] }
+    console.log('[edit-product] Upload response:', data)
+    imagePreviews.value.push(...data.urls)
+  } catch (err: any) {
+    console.error('[edit-product] Image upload failed:', err)
+    toast.error('Upload failed', err?.message || 'Could not upload images.')
+  } finally {
+    uploading.value = false
   }
 }
 
 function removeImage(index: number) {
-  imageFiles.value.splice(index, 1)
   imagePreviews.value.splice(index, 1)
+  console.log('[edit-product] Image removed at index', index, '. Total previews:', imagePreviews.value.length)
 }
 
 function openFilePicker() {
@@ -116,6 +140,11 @@ async function fetchProduct() {
       form.reorderPoint = String(data.reorderPoint)
       form.unitCost = String(data.unitCost)
       form.status = data.status
+      // Load existing product images into previews
+      if (data.images?.length) {
+        imagePreviews.value = [...data.images]
+      }
+      console.log('[edit-product] Loaded product:', data)
     }
   } catch (err) {
     console.error('Error fetching product:', err)
@@ -141,6 +170,7 @@ async function handleUpdate() {
 
   submitting.value = true
   try {
+    // Images are already uploaded on select — previews hold the hosted URLs
     const payload = {
       name: form.name.trim(),
       sku: form.sku.trim(),
@@ -151,13 +181,15 @@ async function handleUpdate() {
       reorderPoint: Number(form.reorderPoint) || 0,
       unitCost: Number(form.unitCost) || 0,
       status: form.status,
-      images: [],
+      images: imagePreviews.value,
     }
+    console.log('[edit-product] Updating product with payload:', payload)
     const data = await api.patch(
       `/store/admin/products/${route.params.id}`,
       payload,
       'Failed to update product'
     )
+    console.log('[edit-product] Update product response:', data)
     if (data) {
       toast.success('Product updated', `"${form.name}" has been updated successfully.`)
       router.push(`/shop/products/${route.params.id}`)
@@ -352,8 +384,8 @@ onMounted(() => {
             @dragleave="handleDragLeave"
             @drop="handleDrop"
           >
-            <UIcon name="i-lucide-upload-cloud" :style="`width:48px;height:48px;color:${isDragging ? '#ffb400' : '#6b7280'}`" />
-            <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;text-align:center">Drag and drop images here or click to browse</p>
+            <UIcon :name="uploading ? 'i-lucide-loader-2' : 'i-lucide-upload-cloud'" :style="`width:48px;height:48px;color:${isDragging || uploading ? '#ffb400' : '#6b7280'};${uploading ? 'animation:spin 1s linear infinite' : ''}`" />
+            <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;text-align:center">{{ uploading ? 'Uploading images...' : 'Drag and drop images here or click to browse' }}</p>
             <p style="font-size:12px;color:#9ca3af;font-family:'Manrope',sans-serif">PNG, JPG up to 5 images</p>
           </div>
 

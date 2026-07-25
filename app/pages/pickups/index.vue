@@ -579,6 +579,7 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
       paymentDetail: '',
       notes: '',
     }"
+    :customer-id="selectedRequest.customerId"
     @close="showAssignDriverModal = false"
     @submit="handleAssignDriver"
   />

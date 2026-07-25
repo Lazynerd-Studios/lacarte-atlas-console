@@ -5,6 +5,7 @@ const props = defineProps<{
     date: string; timeSlot: string; binType: string
     paymentType: string; paymentDetail: string; notes: string
   }
+  customerId?: string
 }>()
 
 const emit = defineEmits<{
@@ -31,18 +32,35 @@ const drivers = ref<Driver[]>([])
 const loadingDrivers = ref(false)
 const api = useApi()
 
-// Fetch available drivers
+// Fetch drivers in the customer's zone (falls back to all drivers)
 async function fetchDrivers() {
   loadingDrivers.value = true
   try {
-    const data = await api.get<{ data: Driver[] }>(
-      '/drivers/admin/',
+    let zoneId: string | null = null
+
+    // Resolve the customer's zone from the customer record
+    if (props.customerId) {
+      try {
+        const customer = await api.get<{ zoneId?: string; zone?: { id: string } }>(
+          `/customer/admin/${props.customerId}`,
+          'Failed to load customer zone'
+        )
+        zoneId = customer?.zoneId || customer?.zone?.id || null
+      } catch (err) {
+        console.error('Error fetching customer zone:', err)
+      }
+    }
+
+    const endpoint = zoneId ? `/drivers/admin/by-zone/${zoneId}` : '/drivers/admin/'
+    const data = await api.get<{ data: Driver[] } | Driver[]>(
+      endpoint,
       'Failed to load drivers'
     )
-    
-    if (data?.data) {
+
+    const list = Array.isArray(data) ? data : data?.data
+    if (list) {
       // Filter to only show active drivers
-      drivers.value = data.data.filter(d => d.status === 'active' || d.status === 'online')
+      drivers.value = list.filter(d => d.status === 'active' || d.status === 'online')
     }
   } catch (err) {
     console.error('Error fetching drivers:', err)

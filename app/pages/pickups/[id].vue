@@ -727,6 +727,7 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
       paymentDetail: paymentTypeLabel,
       notes: pickup.notes,
     }"
+    :customer-id="pickupData?.customer?.id"
     @close="showReassignModal = false"
     @submit="handleReassign"
   />
