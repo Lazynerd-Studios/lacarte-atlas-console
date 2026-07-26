@@ -6,6 +6,8 @@ const driver = ref<any>(null)
 const loading = ref(true)
 const notFound = ref(false)
 const toast = useAppToast()
+
+const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
 const todayPickups = ref<any[]>([])
 const loadingPickups = ref(false)
 const pickupHistory = ref<any[]>([])
@@ -406,7 +408,7 @@ function stopBadge(status: string) {
           <UIcon name="i-lucide-dollar-sign" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
           <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Period Earnings</p>
         </div>
-        <p style="font-size:20px;font-weight:700;color:#22c55e;font-family:'Manrope',sans-serif">{{ driver?.stats?.periodEarnings ?? 'N/A' }}</p>
+        <p style="font-size:20px;font-weight:700;color:#22c55e;font-family:'Manrope',sans-serif">{{ driver?.stats?.periodEarnings?.totalEarned != null ? `GHS ${driver.stats.periodEarnings.totalEarned}` : 'N/A' }}</p>
       </div>
     </div>
 
@@ -585,7 +587,7 @@ function stopBadge(status: string) {
             <span style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Months:</span>
             <select
               v-model="performanceMonths"
-              style="height:36px;padding:0 32px 0 12px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E&quot;);background-repeat:no-repeat;background-position:right 10px center"
+              :style="`height:36px;padding:0 32px 0 12px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 10px center`"
               @change="fetchPerformance"
             >
               <option :value="3">3 months</option>

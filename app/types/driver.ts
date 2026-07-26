@@ -45,6 +45,10 @@ export interface CreateDriverPayload {
   licenseExpiry?: string
   zoneId?: string
   status?: string
+  perTripRate: number
+  expectedTripsPerMonth: number
+  minimumFillRate: number
+  paymentFrequency: 'weekly' | 'bi_weekly' | 'monthly'
 }
 
 export interface UpdateDriverPayload {

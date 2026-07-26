@@ -13,6 +13,10 @@ const form = reactive({
   licenseExpiry: '',
   zoneId: '',
   status: 'active',
+  perTripRate: '',
+  expectedTripsPerMonth: '',
+  minimumFillRate: '',
+  paymentFrequency: 'weekly',
 })
 
 const zones = ref<{ id: string; name: string; color: string }[]>([])
@@ -34,6 +38,9 @@ function validate() {
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = 'Invalid email'
   if (!form.phoneNumber.trim())   errors.phoneNumber = 'Required'
   if (!form.licenseExpiry)        errors.licenseExpiry = 'Required'
+  if (form.perTripRate === '' || Number(form.perTripRate) < 0) errors.perTripRate = 'Required'
+  if (form.expectedTripsPerMonth === '' || Number(form.expectedTripsPerMonth) < 1) errors.expectedTripsPerMonth = 'Must be at least 1'
+  if (form.minimumFillRate === '' || Number(form.minimumFillRate) < 0 || Number(form.minimumFillRate) > 100) errors.minimumFillRate = 'Must be 0-100'
   return Object.keys(errors).length === 0
 }
 
@@ -48,6 +55,11 @@ function submit() {
     licenseExpiry: form.licenseExpiry,
     zoneId: form.zoneId || undefined,
     status: form.status,
+    perTripRate: Number(form.perTripRate) || 0,
+    expectedTripsPerMonth: Number(form.expectedTripsPerMonth) || 1,
+    // API expects 0-1, UI collects percentage
+    minimumFillRate: Number(form.minimumFillRate) / 100,
+    paymentFrequency: form.paymentFrequency,
   })
 }
 
@@ -162,6 +174,48 @@ function onBlur(e: Event, field: string) {
               <option value="active">Active</option>
               <option value="on_leave">On Leave</option>
               <option value="inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Compensation -->
+        <p style="font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;margin-top:4px;padding-top:12px;border-top:1px solid #f0f0f0">Compensation</p>
+
+        <!-- Per Trip Rate / Expected Trips -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Per Trip Rate (GHS)</label>
+            <input v-model="form.perTripRate" type="number" min="0" placeholder="0" :style="inputStyle('perTripRate')"
+              @focus="onFocus($event, 'perTripRate')" @blur="onBlur($event, 'perTripRate')" />
+            <span v-if="errors.perTripRate" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.perTripRate }}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Expected Trips / Month</label>
+            <input v-model="form.expectedTripsPerMonth" type="number" min="1" placeholder="1" :style="inputStyle('expectedTripsPerMonth')"
+              @focus="onFocus($event, 'expectedTripsPerMonth')" @blur="onBlur($event, 'expectedTripsPerMonth')" />
+            <span v-if="errors.expectedTripsPerMonth" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.expectedTripsPerMonth }}</span>
+          </div>
+        </div>
+
+        <!-- Minimum Fill Rate / Payment Frequency -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Minimum Fill Rate (%)</label>
+            <input v-model="form.minimumFillRate" type="number" min="0" max="100" placeholder="e.g. 80" :style="inputStyle('minimumFillRate')"
+              @focus="onFocus($event, 'minimumFillRate')" @blur="onBlur($event, 'minimumFillRate')" />
+            <span v-if="errors.minimumFillRate" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.minimumFillRate }}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Payment Frequency</label>
+            <select
+              v-model="form.paymentFrequency"
+              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+              @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+              @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
+            >
+              <option value="weekly">Weekly</option>
+              <option value="bi_weekly">Bi-weekly</option>
+              <option value="monthly">Monthly</option>
             </select>
           </div>
         </div>
