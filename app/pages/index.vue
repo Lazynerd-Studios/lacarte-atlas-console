@@ -246,7 +246,11 @@ const revenueMax = computed(() => {
   if (revenueTab.value === 'store') return Math.max(storeMax, 1)
   return Math.max(pickupMax, storeMax, 1)
 })
-const pickupMax  = computed(() => Math.max(...pickupData.value.map(d => d.value), 1))
+const pickupMax  = computed(() => {
+  const max = Math.max(...pickupData.value.map(d => d.value), 1)
+  // Round up to a multiple of 4 so the 5 y-axis labels are distinct integers
+  return Math.ceil(max / 4) * 4
+})
 const chartW = 478
 const chartH = 260
 const padL = 50, padB = 30, padT = 10, padR = 10
