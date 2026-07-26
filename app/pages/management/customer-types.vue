@@ -195,6 +195,13 @@ async function handleDelete() {
 
 const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444','#ffb400','#ec4899','#14b8a6']
 
+// Summary stats (fixed 3 cards)
+const totalCustomers = computed(() => customerTypes.value.reduce((sum, ct) => sum + ct.customerCount, 0))
+const largestType = computed(() => {
+  if (customerTypes.value.length === 0) return null
+  return customerTypes.value.reduce((max, ct) => ct.customerCount > max.customerCount ? ct : max)
+})
+
 // Fetch data on mount
 onMounted(fetchCustomerTypes)
 </script>
@@ -231,35 +238,25 @@ onMounted(fetchCustomerTypes)
       </div>
 
       <!-- Stats row skeleton -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px">
-        <div v-for="i in 4" :key="i" style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-            <div class="skeleton" style="width:10px;height:10px;border-radius:50%" />
-            <div class="skeleton" style="height:12px;width:80px" />
-          </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
+        <div v-for="i in 3" :key="i" style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
+          <div class="skeleton" style="height:12px;width:80px;margin-bottom:10px" />
           <div class="skeleton" style="height:28px;width:60px;margin-bottom:4px" />
           <div class="skeleton" style="height:11px;width:70px" />
         </div>
       </div>
 
-      <!-- Types list skeleton -->
-      <div style="display:flex;flex-direction:column;gap:16px">
-        <div v-for="i in 3" :key="i" style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;padding:24px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
-          <!-- Left -->
-          <div style="display:flex;align-items:flex-start;gap:16px;flex:1;min-width:200px">
-            <div class="skeleton" style="width:44px;height:44px;border-radius:12px" />
-            <div style="flex:1">
-              <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-                <div class="skeleton" style="height:16px;width:140px" />
-                <div class="skeleton" style="height:20px;width:100px;border-radius:20px" />
-              </div>
-              <div class="skeleton" style="height:13px;width:70%;max-width:320px" />
-            </div>
+      <!-- Types table skeleton -->
+      <div style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;padding:24px">
+        <div v-for="i in 4" :key="i" style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0">
+          <div style="display:flex;align-items:center;gap:12px;flex:1">
+            <div class="skeleton" style="width:32px;height:32px;border-radius:10px" />
+            <div class="skeleton" style="height:15px;width:140px" />
           </div>
-          <!-- Right -->
-          <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
-            <div class="skeleton" style="height:36px;width:70px;border-radius:8px" />
-            <div class="skeleton" style="height:36px;width:80px;border-radius:8px" />
+          <div class="skeleton" style="height:20px;width:100px;border-radius:20px" />
+          <div style="display:flex;gap:8px">
+            <div class="skeleton" style="height:34px;width:60px;border-radius:8px" />
+            <div class="skeleton" style="height:34px;width:70px;border-radius:8px" />
           </div>
         </div>
       </div>
@@ -280,55 +277,71 @@ onMounted(fetchCustomerTypes)
       </button>
     </div>
 
-    <!-- Stats row -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px">
+    <!-- Stats row: 3 fixed cards -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
       <div style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
         <p style="font-size:12px;color:#6b7280;margin:0 0 6px;font-weight:500">Total Types</p>
         <p style="font-size:28px;font-weight:700;color:#1a1a1a;margin:0">{{ customerTypes.length }}</p>
       </div>
-      <div v-for="ct in customerTypes" :key="ct.id" style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <span :style="`width:10px;height:10px;border-radius:50%;background:${ct.color};display:inline-block`"></span>
-          <p style="font-size:12px;color:#6b7280;margin:0;font-weight:500">{{ ct.name }}</p>
+      <div style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
+        <p style="font-size:12px;color:#6b7280;margin:0 0 6px;font-weight:500">Total Customers</p>
+        <p style="font-size:28px;font-weight:700;color:#1a1a1a;margin:0">{{ totalCustomers }}</p>
+        <p style="font-size:11px;color:#9ca3af;margin:4px 0 0">across all types</p>
+      </div>
+      <div style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
+        <p style="font-size:12px;color:#6b7280;margin:0 0 6px;font-weight:500">Largest Type</p>
+        <div v-if="largestType" style="display:flex;align-items:center;gap:8px">
+          <span :style="`width:10px;height:10px;border-radius:50%;background:${largestType.color};display:inline-block;flex-shrink:0`"></span>
+          <p style="font-size:22px;font-weight:700;color:#1a1a1a;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ largestType.name }}</p>
         </div>
-        <p style="font-size:28px;font-weight:700;color:#1a1a1a;margin:0">{{ ct.customerCount }}</p>
-        <p style="font-size:11px;color:#9ca3af;margin:4px 0 0">customers</p>
+        <p v-else style="font-size:22px;font-weight:700;color:#1a1a1a;margin:0">—</p>
+        <p style="font-size:11px;color:#9ca3af;margin:4px 0 0">{{ largestType ? `${largestType.customerCount} customers` : 'no types yet' }}</p>
       </div>
     </div>
 
-    <!-- Types list -->
-    <div style="display:flex;flex-direction:column;gap:16px">
-      <div v-for="ct in customerTypes" :key="ct.id"
-        style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;padding:24px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
-
-        <!-- Left: badge + info -->
-        <div style="display:flex;align-items:flex-start;gap:16px;flex:1;min-width:200px">
-          <div :style="`width:44px;height:44px;border-radius:12px;background:${ct.color}22;display:flex;align-items:center;justify-content:center;flex-shrink:0`">
-            <span :style="`width:16px;height:16px;border-radius:50%;background:${ct.color};display:inline-block`"></span>
-          </div>
-          <div>
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-              <span style="font-size:16px;font-weight:700;color:#1a1a1a">{{ ct.name }}</span>
-              <span :style="`background:${ct.color}22;color:${ct.color};font-size:11px;font-weight:600;padding:2px 10px;border-radius:20px`">{{ ct.customerCount }} customers</span>
-            </div>
-            <p style="font-size:13px;color:#6b7280;margin:0;max-width:480px">{{ ct.description }}</p>
-          </div>
-        </div>
-
-        <!-- Right: actions -->
-        <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
-          <button @click="openEdit(ct)" :disabled="submitting || deleting" 
-            :style="`display:flex;align-items:center;gap:6px;background:#ececec;color:#1a1a1a;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting || deleting ? 'not-allowed' : 'pointer'};opacity:${submitting || deleting ? '0.5' : '1'}`">
-            <Icon name="lucide:pencil" style="width:14px;height:14px" />
-            Edit
-          </button>
-          <button @click="openDelete(ct)" :disabled="ct.customerCount > 0 || submitting || deleting" 
-            :style="`display:flex;align-items:center;gap:6px;background:${ct.customerCount > 0 || submitting || deleting ? '#f5f5f5' : '#fef2f2'};color:${ct.customerCount > 0 || submitting || deleting ? '#9ca3af' : '#ef4444'};border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${ct.customerCount > 0 || submitting || deleting ? 'not-allowed' : 'pointer'}`">
-            <Icon name="lucide:trash-2" style="width:14px;height:14px" />
-            Delete
-          </button>
-        </div>
-      </div>
+    <!-- Types table -->
+    <div v-if="customerTypes.length > 0" style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;padding:8px 0;overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="border-bottom:1px solid #f0f0f0">
+            <th style="padding:14px 24px;text-align:left;font-size:13px;font-weight:600;color:#6b7280">Type</th>
+            <th style="padding:14px 16px;text-align:left;font-size:13px;font-weight:600;color:#6b7280">Customers</th>
+            <th style="padding:14px 24px;text-align:right;font-size:13px;font-weight:600;color:#6b7280">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(ct, i) in customerTypes" :key="ct.id"
+            :style="`border-bottom:${i < customerTypes.length - 1 ? '1px solid #f5f5f5' : 'none'}`"
+            @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
+            @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'">
+            <td style="padding:14px 24px">
+              <div style="display:flex;align-items:center;gap:12px">
+                <div :style="`width:32px;height:32px;border-radius:10px;background:${ct.color}22;display:flex;align-items:center;justify-content:center;flex-shrink:0`">
+                  <span :style="`width:12px;height:12px;border-radius:50%;background:${ct.color};display:inline-block`"></span>
+                </div>
+                <span style="font-size:14px;font-weight:600;color:#1a1a1a">{{ ct.name }}</span>
+              </div>
+            </td>
+            <td style="padding:14px 16px">
+              <span :style="`background:${ct.color}22;color:${ct.color};font-size:12px;font-weight:600;padding:3px 12px;border-radius:20px;white-space:nowrap`">{{ ct.customerCount }} customers</span>
+            </td>
+            <td style="padding:14px 24px">
+              <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end">
+                <button @click="openEdit(ct)" :disabled="submitting || deleting"
+                  :style="`display:flex;align-items:center;gap:6px;background:#ececec;color:#1a1a1a;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting || deleting ? 'not-allowed' : 'pointer'};opacity:${submitting || deleting ? '0.5' : '1'}`">
+                  <Icon name="lucide:pencil" style="width:14px;height:14px" />
+                  Edit
+                </button>
+                <button @click="openDelete(ct)" :disabled="ct.customerCount > 0 || submitting || deleting"
+                  :style="`display:flex;align-items:center;gap:6px;background:${ct.customerCount > 0 || submitting || deleting ? '#f5f5f5' : '#fef2f2'};color:${ct.customerCount > 0 || submitting || deleting ? '#9ca3af' : '#ef4444'};border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${ct.customerCount > 0 || submitting || deleting ? 'not-allowed' : 'pointer'}`">
+                  <Icon name="lucide:trash-2" style="width:14px;height:14px" />
+                  Delete
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <!-- Empty state -->

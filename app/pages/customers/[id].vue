@@ -449,6 +449,7 @@ const billingHistory = ref<any[]>([])
             <UIcon name="i-lucide-qr-code" style="width:16px;height:16px;color:#0a0d12" />
           </button>
           -->
+          <!-- Copy payment link (hidden for now)
           <div style="position:relative;display:inline-flex">
             <button
               :style="`height:40px;width:40px;background:${linkCopied ? '#22c55e' : '#3b82f6'};border:none;border-radius:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background 0.2s`"
@@ -457,7 +458,6 @@ const billingHistory = ref<any[]>([])
             >
               <UIcon :name="linkCopied ? 'i-lucide-check' : 'i-lucide-link'" style="width:16px;height:16px;color:white" />
             </button>
-            <!-- Tooltip -->
             <div
               v-if="linkCopied"
               style="position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#1a1a1a;color:white;font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;padding:4px 10px;border-radius:8px;white-space:nowrap;pointer-events:none"
@@ -466,6 +466,8 @@ const billingHistory = ref<any[]>([])
               <div style="position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#1a1a1a"></div>
             </div>
           </div>
+          -->
+          <!-- Make Payment (hidden for now)
           <button
             style="height:40px;padding:0 16px;background:#22c55e;border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px"
             @click="$router.push(`/pay/${customer.id}`)"
@@ -473,6 +475,7 @@ const billingHistory = ref<any[]>([])
             <UIcon name="i-lucide-credit-card" style="width:16px;height:16px;color:white" />
             Make Payment
           </button>
+          -->
           <button
             style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
             @click="showEditModal = true"

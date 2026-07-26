@@ -42,7 +42,12 @@ const downloading = ref(false)
 const deliveryStatus = ref('')
 const statusNotes = ref('')
 const updatingStatus = ref(false)
-const deliveryStatuses = ['pending', 'processing', 'in-transit', 'out-for-delivery', 'delivered']
+const deliveryStatuses = [
+  { value: 'processing', label: 'Processing' },
+  { value: 'out_for_delivery', label: 'Out for Delivery' },
+  { value: 'delivered', label: 'Delivered' },
+  { value: 'cancelled', label: 'Cancelled' },
+]
 
 async function fetchOrder() {
   loading.value = true
@@ -282,7 +287,7 @@ onMounted(() => {
                   @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
                   @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
                 >
-                  <option v-for="s in deliveryStatuses" :key="s" :value="s">{{ s.charAt(0).toUpperCase() + s.slice(1) }}</option>
+                  <option v-for="s in deliveryStatuses" :key="s.value" :value="s.value">{{ s.label }}</option>
                 </select>
                 <UIcon name="i-lucide-chevron-down" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#6b7280;pointer-events:none" />
               </div>
