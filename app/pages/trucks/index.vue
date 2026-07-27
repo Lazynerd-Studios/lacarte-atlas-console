@@ -4,6 +4,7 @@ import type { Truck, CreateTruckPayload } from '~/types/driver'
 definePageMeta({ layout: 'dashboard' })
 
 const showAddTruckModal = ref(false)
+const addTruckModalRef = ref<{ stopSubmitting: () => void } | null>(null)
 const showDeleteModal = ref(false)
 const deleteTarget = ref<Truck | null>(null)
 const trucks = ref<Truck[]>([])
@@ -30,6 +31,9 @@ async function handleAddTruck(formData: CreateTruckPayload) {
   if (result !== null) {
     showAddTruckModal.value = false
     await fetchTrucks()
+  } else {
+    // Request failed — stop the button spinner so the user can retry
+    addTruckModalRef.value?.stopSubmitting()
   }
 }
 
@@ -169,6 +173,7 @@ function statusBadge(s: string) {
 
   <AddTruckModal
     v-if="showAddTruckModal"
+    ref="addTruckModalRef"
     @close="showAddTruckModal = false"
     @submit="handleAddTruck"
   />

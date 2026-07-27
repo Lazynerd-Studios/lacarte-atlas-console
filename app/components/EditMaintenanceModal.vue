@@ -42,6 +42,13 @@ function validate() {
   return Object.keys(errors).length === 0
 }
 
+// Allow the parent to stop the loading state when the API call fails
+function stopSubmitting() {
+  submitting.value = false
+}
+
+defineExpose({ stopSubmitting })
+
 function submit() {
   if (!validate()) return
   

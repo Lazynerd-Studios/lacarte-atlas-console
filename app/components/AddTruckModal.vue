@@ -92,8 +92,15 @@ function submit() {
   
   submitting.value = true
   emit('submit', { ...form })
-  // Note: submitting will be reset when modal closes
+  // Note: submitting is reset by the parent via stopSubmitting() if the request fails
 }
+
+// Allow the parent to stop the loading state when the API call fails
+function stopSubmitting() {
+  submitting.value = false
+}
+
+defineExpose({ stopSubmitting })
 
 const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
 const selectStyle = `width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`
@@ -172,7 +179,7 @@ function onBlur(e: Event)  { (e.target as HTMLElement).style.borderColor = '#e5e
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
             <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Capacity <span style="color:#ef4444">*</span></label>
-            <input v-model="form.capacity" type="text" placeholder="e.g., 10 tons" :style="inputStyle" @focus="onFocus" @blur="onBlur" />
+            <input v-model="form.capacity" type="text" placeholder="e.g., 10 bins" :style="inputStyle" @focus="onFocus" @blur="onBlur" />
             <p v-if="errors.capacity" style="font-size:12px;color:#ef4444;margin:0">{{ errors.capacity }}</p>
           </div>
         </div>

@@ -112,8 +112,8 @@ onMounted(async () => {
   const data = await api.get<any>(`/drivers/admin/${route.params.id}`)
   if (data) {
     driver.value = data
-    // Fetch today's pickups, history, and performance after driver data is loaded
-    await Promise.all([fetchTodayPickups(), fetchPickupHistory(), fetchPerformance()])
+    // Fetch today's pickups, history, performance, payout and earnings after driver data is loaded
+    await Promise.all([fetchTodayPickups(), fetchPickupHistory(), fetchPerformance(), fetchCurrentPayout(), fetchEarningsHistory()])
   } else {
     notFound.value = true
   }
@@ -246,27 +246,164 @@ function linePoints(data: { month: string; value: number }[], totalW: number) {
   }))
 }
 
-const currentPeriod = {
-  label: 'Current Pay Period (Feb 17 – Mar 2, 2026)',
-  total: 'GHS 1,955.00',
-  status: 'In Progress',
-  basePay: 'GHS 2,000.00',
-  tasks: '142/145',
-  deductions: '-GHS 45.00',
-  deductionNote: '3 incomplete × GHS 15',
-  bonus: '+GHS 0.00',
-  paymentSchedule: 'Bi-weekly (every 2 weeks)',
-  deductionPolicy: 'GHS 15 deducted per incomplete assigned task. Complete 100% of tasks to avoid deductions and earn a GHS 50 bonus.',
+// Current pay period from payout calculation API
+const payout = ref<any>(null)
+const loadingPayout = ref(false)
+
+async function fetchCurrentPayout() {
+  loadingPayout.value = true
+  try {
+    const api = useApi()
+    const month = new Date().toISOString().slice(0, 7)
+    const data = await api.get<{ success: boolean; data: any }>(
+      `/driver-earning/admin/payouts/calculate?driverId=${route.params.id}&periodMonth=${month}`,
+      'Failed to load current pay period'
+    )
+    if (data?.data) payout.value = data.data
+  } catch (err) {
+    console.error('[driver-detail] Error fetching current payout:', err)
+  }
+  loadingPayout.value = false
 }
 
-const earningsHistory = [
-  { period: 'Feb 3 – Feb 16, 2026',  basePay: 'GHS 2,000.00', tasks: '145/145', tasksColor: '#22c55e', deductions: '-GHS 0.00',  deductionsColor: '#6b7280', bonus: '+GHS 50.00',  bonusColor: '#22c55e', total: 'GHS 2,050.00', status: 'paid' },
-  { period: 'Jan 20 – Feb 2, 2026',  basePay: 'GHS 2,000.00', tasks: '148/150', tasksColor: '#ffb400', deductions: '-GHS 30.00', deductionsColor: '#dc2626', bonus: '+GHS 0.00',   bonusColor: '#6b7280', total: 'GHS 1,970.00', status: 'paid' },
-  { period: 'Jan 6 – Jan 19, 2026',  basePay: 'GHS 2,000.00', tasks: '147/148', tasksColor: '#ffb400', deductions: '-GHS 15.00', deductionsColor: '#dc2626', bonus: '+GHS 50.00',  bonusColor: '#22c55e', total: 'GHS 2,035.00', status: 'paid' },
-  { period: 'Dec 23 – Jan 5, 2026',  basePay: 'GHS 2,000.00', tasks: '140/140', tasksColor: '#22c55e', deductions: '-GHS 0.00',  deductionsColor: '#6b7280', bonus: '+GHS 100.00', bonusColor: '#22c55e', total: 'GHS 2,100.00', status: 'paid' },
-]
+const currentPeriod = computed(() => {
+  const p = payout.value
+  if (!p) return null
+  const cur = p.currency || 'GHS'
+  const monthLabel = new Date(`${p.periodMonth}-01`).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  const deductionsTotal = (p.performanceDeduction || 0) + (p.manualDeductions || 0)
+  return {
+    label: `Current Pay Period (${monthLabel})`,
+    total: `${cur} ${p.totalPayout}`,
+    status: p.status,
+    basePay: `${cur} ${p.monthlySalary}`,
+    tasks: `${p.binsCompleted}/${p.binsAssigned}`,
+    deductions: `-${cur} ${deductionsTotal}`,
+    deductionNote: `Performance: ${cur} ${p.performanceDeduction || 0} · Manual: ${cur} ${p.manualDeductions || 0}`,
+    bonus: `+${cur} ${p.manualBonuses || 0}`,
+    paymentSchedule: p.paymentSchedule,
+    deductionPolicy: `Monthly bin target: ${p.monthlyBinTarget}. Minimum threshold: ${p.minimumBinThreshold} bins (minimum fill rate ${Math.round((p.minimumFillRate || 0) * 100)}%).`,
+  }
+})
+
+// Earnings history from API
+interface EarningsHistoryItem {
+  id: string
+  period: string
+  periodStart: string
+  periodEnd: string
+  periodMonth: string
+  basePay: string
+  pickupsCompleted: string
+  pickupsTarget: string
+  deductions: string
+  bonus: string
+  totalEarnings: string
+  currency: string
+  status: string
+}
+
+const earningsHistory = ref<EarningsHistoryItem[]>([])
+const earningsSchedule = ref('')
+const loadingEarnings = ref(false)
+
+async function fetchEarningsHistory() {
+  loadingEarnings.value = true
+  try {
+    const api = useApi()
+    const data = await api.get<{ success: boolean; data: { paymentSchedule: string; items: EarningsHistoryItem[] } }>(
+      `/driver-earning/admin/drivers/${route.params.id}/history`,
+      'Failed to load earnings history'
+    )
+    if (data?.data) {
+      earningsHistory.value = data.data.items || []
+      earningsSchedule.value = data.data.paymentSchedule || ''
+    }
+  } catch (err) {
+    console.error('[driver-detail] Error fetching earnings history:', err)
+  }
+  loadingEarnings.value = false
+}
+
+function tasksColor(row: EarningsHistoryItem) {
+  return Number(row.pickupsCompleted) >= Number(row.pickupsTarget) ? '#22c55e' : '#ffb400'
+}
+function deductionsColor(row: EarningsHistoryItem) {
+  return Number(row.deductions) > 0 ? '#dc2626' : '#6b7280'
+}
+function bonusColor(row: EarningsHistoryItem) {
+  return Number(row.bonus) > 0 ? '#22c55e' : '#6b7280'
+}
+function earningStatusBadge(s: string) {
+  if (s === 'paid')  return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e' }
+  if (s === 'draft') return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280' }
+  return { bg: 'rgba(255,180,0,0.1)', border: 'rgba(255,180,0,0.2)', color: '#d49a00' }
+}
 
 const showEditModal = ref(false)
+const editDriverModalRef = ref<{ stopSubmitting: () => void } | null>(null)
+
+// Manual bonus / deduction
+const showAdjustmentModal = ref(false)
+const adjustmentType = ref<'bonus' | 'deduction'>('bonus')
+const adjustmentAmount = ref('')
+const adjustmentReason = ref('')
+const adjustmentMonth = ref('')
+const adjustmentError = ref('')
+const submittingAdjustment = ref(false)
+
+function openAdjustment(type: 'bonus' | 'deduction') {
+  adjustmentType.value = type
+  adjustmentAmount.value = ''
+  adjustmentReason.value = ''
+  // Default to current month (YYYY-MM)
+  adjustmentMonth.value = new Date().toISOString().slice(0, 7)
+  adjustmentError.value = ''
+  showAdjustmentModal.value = true
+}
+
+async function submitAdjustment() {
+  if (adjustmentAmount.value === '' || Number(adjustmentAmount.value) <= 0) {
+    adjustmentError.value = 'Enter an amount greater than 0.'
+    return
+  }
+  if (!adjustmentReason.value.trim()) {
+    adjustmentError.value = 'Description is required.'
+    return
+  }
+  if (!adjustmentMonth.value) {
+    adjustmentError.value = 'Period month is required.'
+    return
+  }
+
+  submittingAdjustment.value = true
+  adjustmentError.value = ''
+  try {
+    const api = useApi()
+    const payload = {
+      driverId: route.params.id as string,
+      type: adjustmentType.value,
+      amount: Number(adjustmentAmount.value),
+      description: adjustmentReason.value.trim(),
+      periodMonth: adjustmentMonth.value,
+    }
+    console.log('[driver-detail] Adding manual earning adjustment:', payload)
+    const result = await api.post('/driver-earning/admin/earnings', payload, `Failed to add ${adjustmentType.value}`)
+    console.log('[driver-detail] Manual earning adjustment response:', result)
+    if (result !== null) {
+      toast.success(`${adjustmentType.value === 'bonus' ? 'Bonus' : 'Deduction'} added successfully`)
+      showAdjustmentModal.value = false
+      // Refresh driver data, payout and earnings history so the adjustment is reflected
+      const updated = await api.get<any>(`/drivers/admin/${route.params.id}`)
+      if (updated) driver.value = updated
+      await Promise.all([fetchCurrentPayout(), fetchEarningsHistory()])
+    }
+  } catch (err) {
+    console.error(`[driver-detail] Failed to add ${adjustmentType.value}:`, err)
+  } finally {
+    submittingAdjustment.value = false
+  }
+}
 const showDeleteConfirm = ref(false)
 const deleting = ref(false)
 
@@ -280,6 +417,9 @@ async function handleEditDriver(data: Record<string, unknown>) {
     toast.success('Driver updated successfully')
     const updated = await api.get<any>(`/drivers/admin/${route.params.id}`)
     if (updated) driver.value = updated
+  } else {
+    // Request failed — stop the button spinner so the user can retry
+    editDriverModalRef.value?.stopSubmitting()
   }
 }
 
@@ -408,7 +548,7 @@ function stopBadge(status: string) {
           <UIcon name="i-lucide-dollar-sign" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
           <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Period Earnings</p>
         </div>
-        <p style="font-size:20px;font-weight:700;color:#22c55e;font-family:'Manrope',sans-serif">{{ driver?.stats?.periodEarnings?.totalEarned != null ? `GHS ${driver.stats.periodEarnings.totalEarned}` : 'N/A' }}</p>
+        <p style="font-size:20px;font-weight:700;color:#22c55e;font-family:'Manrope',sans-serif">{{ driver?.stats?.periodEarnings?.projectedSalary != null ? `GHS ${driver.stats.periodEarnings.projectedSalary}` : 'N/A' }}</p>
       </div>
     </div>
 
@@ -666,8 +806,30 @@ function stopBadge(status: string) {
         <!-- Earnings -->
         <div v-else-if="activeTab === 'Earnings'" style="display:flex;flex-direction:column;gap:24px">
 
+          <!-- Manual adjustment actions -->
+          <div style="display:flex;justify-content:flex-end;gap:8px">
+            <button
+              style="height:40px;padding:0 16px;background:#22c55e;border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px"
+              @click="openAdjustment('bonus')"
+              @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
+              @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
+            >
+              <UIcon name="i-lucide-plus" style="width:16px;height:16px" />
+              Add Bonus
+            </button>
+            <button
+              style="height:40px;padding:0 16px;background:#fef2f2;border:1px solid #fecaca;border-radius:20px;font-size:14px;font-weight:500;color:#ef4444;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px"
+              @click="openAdjustment('deduction')"
+              @mouseover="($event.currentTarget as HTMLElement).style.background='#fee2e2'"
+              @mouseleave="($event.currentTarget as HTMLElement).style.background='#fef2f2'"
+            >
+              <UIcon name="i-lucide-minus" style="width:16px;height:16px" />
+              Add Deduction
+            </button>
+          </div>
+
           <!-- Current period summary card -->
-          <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:16px;padding:25px;display:flex;flex-direction:column;gap:16px">
+          <div v-if="currentPeriod" style="background:#f0fdf4;border:1px solid #86efac;border-radius:16px;padding:25px;display:flex;flex-direction:column;gap:16px">
             <!-- Header row -->
             <div style="display:flex;align-items:center;justify-content:space-between">
               <div style="display:flex;flex-direction:column;gap:4px">
@@ -708,6 +870,9 @@ function stopBadge(status: string) {
               </p>
             </div>
           </div>
+          <div v-else style="background:#f8f9fa;border:1px solid #ececec;border-radius:16px;padding:32px;text-align:center">
+            <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ loadingPayout ? 'Loading current pay period...' : 'No payout data for the current period' }}</p>
+          </div>
 
           <!-- Earnings History heading -->
           <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Earnings History</p>
@@ -727,25 +892,33 @@ function stopBadge(status: string) {
                 </tr>
               </thead>
               <tbody>
-                <tr
-                  v-for="(row, i) in earningsHistory"
-                  :key="i"
-                  style="border-bottom:1px solid #e5e7eb"
-                  @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
-                  @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
-                >
-                  <td style="padding:18px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ row.period }}</td>
-                  <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ row.basePay }}</td>
-                  <td style="padding:18px 16px;font-size:14px;font-family:'Manrope',sans-serif;white-space:nowrap" :style="`color:${row.tasksColor}`">{{ row.tasks }}</td>
-                  <td style="padding:18px 16px;font-size:14px;font-family:'Manrope',sans-serif;white-space:nowrap" :style="`color:${row.deductionsColor}`">{{ row.deductions }}</td>
-                  <td style="padding:18px 16px;font-size:14px;font-family:'Manrope',sans-serif;white-space:nowrap" :style="`color:${row.bonusColor}`">{{ row.bonus }}</td>
-                  <td style="padding:18px 16px;font-size:14px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ row.total }}</td>
-                  <td style="padding:18px 16px">
-                    <span style="font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;color:#22c55e;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2)">
-                      {{ row.status }}
-                    </span>
-                  </td>
+                <tr v-if="loadingEarnings">
+                  <td colspan="7" style="padding:32px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Loading earnings history...</td>
                 </tr>
+                <tr v-else-if="earningsHistory.length === 0">
+                  <td colspan="7" style="padding:32px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No earnings history yet</td>
+                </tr>
+                <template v-else>
+                  <tr
+                    v-for="row in earningsHistory"
+                    :key="row.id"
+                    style="border-bottom:1px solid #e5e7eb"
+                    @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
+                    @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
+                  >
+                    <td style="padding:18px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ row.period }}</td>
+                    <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ row.currency || 'GHS' }} {{ row.basePay }}</td>
+                    <td style="padding:18px 16px;font-size:14px;font-family:'Manrope',sans-serif;white-space:nowrap" :style="`color:${tasksColor(row)}`">{{ row.pickupsCompleted }}/{{ row.pickupsTarget }}</td>
+                    <td style="padding:18px 16px;font-size:14px;font-family:'Manrope',sans-serif;white-space:nowrap" :style="`color:${deductionsColor(row)}`">-{{ row.currency || 'GHS' }} {{ row.deductions }}</td>
+                    <td style="padding:18px 16px;font-size:14px;font-family:'Manrope',sans-serif;white-space:nowrap" :style="`color:${bonusColor(row)}`">+{{ row.currency || 'GHS' }} {{ row.bonus }}</td>
+                    <td style="padding:18px 16px;font-size:14px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ row.currency || 'GHS' }} {{ row.totalEarnings }}</td>
+                    <td style="padding:18px 16px">
+                      <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;color:${earningStatusBadge(row.status).color};background:${earningStatusBadge(row.status).bg};border:1px solid ${earningStatusBadge(row.status).border}`">
+                        {{ row.status }}
+                      </span>
+                    </td>
+                  </tr>
+                </template>
               </tbody>
             </table>
           </div>
@@ -758,6 +931,7 @@ function stopBadge(status: string) {
 
   <EditDriverModal
     v-if="showEditModal"
+    ref="editDriverModalRef"
     :driver="driver"
     @close="showEditModal = false"
     @submit="handleEditDriver"
@@ -772,6 +946,85 @@ function stopBadge(status: string) {
     @confirm="handleDeleteDriver"
     @cancel="showDeleteConfirm = false"
   />
+
+  <!-- Manual bonus / deduction modal -->
+  <div
+    v-if="showAdjustmentModal"
+    style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:50;display:flex;align-items:center;justify-content:center;padding:24px"
+    @click.self="showAdjustmentModal = false"
+  >
+    <div style="background:white;border:1px solid #e5e7eb;border-radius:16px;width:420px;box-shadow:0 10px 15px rgba(0,0,0,0.1),0 4px 6px rgba(0,0,0,0.1);position:relative;display:flex;flex-direction:column">
+      <!-- Close -->
+      <button
+        style="position:absolute;top:16px;right:16px;width:28px;height:28px;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px;opacity:0.7"
+        @click="showAdjustmentModal = false"
+      >
+        <UIcon name="i-lucide-x" style="width:16px;height:16px;color:#111" />
+      </button>
+
+      <!-- Header -->
+      <div style="padding:24px 24px 0">
+        <p style="font-size:20px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ adjustmentType === 'bonus' ? 'Add Manual Bonus' : 'Add Manual Deduction' }}</p>
+        <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:4px">{{ adjustmentType === 'bonus' ? 'Add a one-off bonus to this driver\u2019s current pay period.' : 'Apply a one-off deduction to this driver\u2019s current pay period.' }}</p>
+      </div>
+
+      <!-- Body -->
+      <div style="padding:16px 24px;display:flex;flex-direction:column;gap:16px">
+        <div v-if="adjustmentError" style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;font-size:13px;color:#ef4444;font-family:'Manrope',sans-serif">{{ adjustmentError }}</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Amount (GHS)</label>
+          <input
+            v-model="adjustmentAmount"
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="0.00"
+            style="width:100%;height:39px;padding:0 12px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box"
+            @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+            @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
+          />
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Period Month</label>
+          <input
+            v-model="adjustmentMonth"
+            type="month"
+            style="width:100%;height:39px;padding:0 12px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box"
+            @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+            @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
+          />
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Description</label>
+          <textarea
+            v-model="adjustmentReason"
+            rows="3"
+            :placeholder="adjustmentType === 'bonus' ? 'e.g. Outstanding performance this period' : 'e.g. Damaged equipment'"
+            style="width:100%;padding:8px 12px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;resize:none;box-sizing:border-box;line-height:1.5"
+            @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+            @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
+          />
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div style="padding:17px 24px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:8px">
+        <button
+          style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
+          :disabled="submittingAdjustment"
+          @click="showAdjustmentModal = false"
+        >Cancel</button>
+        <button
+          :style="`height:40px;padding:0 20px;background:${adjustmentType === 'bonus' ? '#22c55e' : '#ef4444'};border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px;opacity:${submittingAdjustment ? '0.8' : '1'}`"
+          :disabled="submittingAdjustment"
+          @click="submitAdjustment"
+        >
+          <UIcon v-if="submittingAdjustment" name="i-lucide-loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
+          {{ submittingAdjustment ? 'Saving...' : (adjustmentType === 'bonus' ? 'Add Bonus' : 'Add Deduction') }}
+        </button>
+      </div>
+    </div>
+  </div>
 
   </div>
 </template>

@@ -49,11 +49,18 @@ function validate() {
   return true
 }
 
+// Allow the parent to stop the loading state when the API call fails
+function stopSubmitting() {
+  submitting.value = false
+}
+
+defineExpose({ stopSubmitting })
+
 async function handleSubmit() {
   if (!validate()) return
   submitting.value = true
   emit('submit', { ...form })
-  // Note: submitting will be reset by parent after API call completes
+  // Note: submitting is reset by the parent via stopSubmitting() if the request fails
 }
 </script>
 

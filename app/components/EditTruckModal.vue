@@ -82,6 +82,13 @@ function validate(): boolean {
   return isValid
 }
 
+// Allow the parent to stop the loading state when the API call fails
+function stopSubmitting() {
+  submitting.value = false
+}
+
+defineExpose({ stopSubmitting })
+
 function submit() {
   if (!validate()) {
     console.log('[EditTruckModal] Validation failed')
@@ -183,7 +190,7 @@ function onBlur(e: Event)  { (e.target as HTMLElement).style.borderColor = '#e5e
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
             <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Capacity <span style="color:#ef4444">*</span></label>
-            <input v-model="form.capacity" type="text" :style="inputStyle" @focus="onFocus" @blur="onBlur" />
+            <input v-model="form.capacity" type="text" placeholder="e.g., 10 bins" :style="inputStyle" @focus="onFocus" @blur="onBlur" />
             <p v-if="errors.capacity" style="font-size:12px;color:#ef4444;margin:0">{{ errors.capacity }}</p>
           </div>
         </div>

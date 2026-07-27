@@ -6,6 +6,7 @@ definePageMeta({ layout: 'dashboard' })
 const { format } = useCurrency()
 
 const showAddDriverModal = ref(false)
+const addDriverModalRef = ref<{ stopSubmitting: () => void } | null>(null)
 const drivers = ref<Driver[]>([])
 const loading = ref(false)
 const toast = useAppToast()
@@ -29,6 +30,9 @@ async function handleAddDriver(payload: CreateDriverPayload) {
     showAddDriverModal.value = false
     toast.success('Driver added successfully')
     await fetchDrivers()
+  } else {
+    // Request failed — stop the button spinner so the user can retry
+    addDriverModalRef.value?.stopSubmitting()
   }
 }
 
@@ -142,6 +146,7 @@ function statusStyle(s: string) {
 
   <AddDriverModal
     v-if="showAddDriverModal"
+    ref="addDriverModalRef"
     @close="showAddDriverModal = false"
     @submit="handleAddDriver"
   />

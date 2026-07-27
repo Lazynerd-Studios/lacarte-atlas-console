@@ -82,6 +82,7 @@ onMounted(async () => {
 
 // Add Disposable Type Modal
 const showAddDisposableModal = ref(false)
+const addDisposableModalRef = ref<{ stopSubmitting: () => void } | null>(null)
 
 async function handleAddDisposable(data: { name: string; description: string; icon: string; isActive: boolean; displayOrder: number }) {
   const result = await api.post('/disposable/item-types', data, 'Failed to create disposable type')
@@ -89,12 +90,15 @@ async function handleAddDisposable(data: { name: string; description: string; ic
     showAddDisposableModal.value = false
     await fetchDisposableTypes()
     toast.success('Disposable type created successfully')
+  } else {
+    addDisposableModalRef.value?.stopSubmitting()
   }
 }
 
 // Edit Disposable Type Modal
 const showEditDisposableModal = ref(false)
 const editDisposableTarget = ref<DisposableType | null>(null)
+const editDisposableModalRef = ref<{ stopSubmitting: () => void } | null>(null)
 
 function openEditDisposable(item: DisposableType) {
   editDisposableTarget.value = item
@@ -109,6 +113,8 @@ async function handleEditDisposable(data: { name: string; description: string; i
     editDisposableTarget.value = null
     await fetchDisposableTypes()
     toast.success('Disposable type updated successfully')
+  } else {
+    editDisposableModalRef.value?.stopSubmitting()
   }
 }
 
@@ -134,6 +140,7 @@ async function handleDeleteDisposable() {
 
 // Add Estimated Quantity Modal
 const showAddQuantityModal = ref(false)
+const addQuantityModalRef = ref<{ stopSubmitting: () => void } | null>(null)
 
 async function handleAddQuantity(data: { label: string; description: string; displayOrder: number; isActive: boolean }) {
   const result = await api.post('/disposable/quantities', data, 'Failed to create estimated quantity')
@@ -141,12 +148,15 @@ async function handleAddQuantity(data: { label: string; description: string; dis
     showAddQuantityModal.value = false
     await fetchEstimatedQuantities()
     toast.success('Estimated quantity created successfully')
+  } else {
+    addQuantityModalRef.value?.stopSubmitting()
   }
 }
 
 // Edit Estimated Quantity Modal
 const showEditQuantityModal = ref(false)
 const editQuantityTarget = ref<EstimatedQuantity | null>(null)
+const editQuantityModalRef = ref<{ stopSubmitting: () => void } | null>(null)
 
 function openEditQuantity(item: EstimatedQuantity) {
   editQuantityTarget.value = item
@@ -161,6 +171,8 @@ async function handleEditQuantity(data: { label: string; description: string; di
     editQuantityTarget.value = null
     await fetchEstimatedQuantities()
     toast.success('Estimated quantity updated successfully')
+  } else {
+    editQuantityModalRef.value?.stopSubmitting()
   }
 }
 
@@ -381,8 +393,8 @@ async function handleDeleteQuantity() {
     </div>
 
     <!-- Modals for Disposable Types -->
-    <AddDisposableTypeModal v-if="showAddDisposableModal" @close="showAddDisposableModal = false" @submit="handleAddDisposable" />
-    <EditDisposableTypeModal v-if="showEditDisposableModal && editDisposableTarget" :item="editDisposableTarget" @close="showEditDisposableModal = false" @submit="handleEditDisposable" />
+    <AddDisposableTypeModal v-if="showAddDisposableModal" ref="addDisposableModalRef" @close="showAddDisposableModal = false" @submit="handleAddDisposable" />
+    <EditDisposableTypeModal v-if="showEditDisposableModal && editDisposableTarget" ref="editDisposableModalRef" :item="editDisposableTarget" @close="showEditDisposableModal = false" @submit="handleEditDisposable" />
     <DeleteConfirmModal 
       v-if="showDeleteDisposableModal && deleteDisposableTarget"
       :title="`Delete ${deleteDisposableTarget.name}?`"
@@ -392,8 +404,8 @@ async function handleDeleteQuantity() {
     />
 
     <!-- Modals for Estimated Quantities -->
-    <AddEstimatedQuantityModal v-if="showAddQuantityModal" @close="showAddQuantityModal = false" @submit="handleAddQuantity" />
-    <EditEstimatedQuantityModal v-if="showEditQuantityModal && editQuantityTarget" :item="editQuantityTarget" @close="showEditQuantityModal = false" @submit="handleEditQuantity" />
+    <AddEstimatedQuantityModal v-if="showAddQuantityModal" ref="addQuantityModalRef" @close="showAddQuantityModal = false" @submit="handleAddQuantity" />
+    <EditEstimatedQuantityModal v-if="showEditQuantityModal && editQuantityTarget" ref="editQuantityModalRef" :item="editQuantityTarget" @close="showEditQuantityModal = false" @submit="handleEditQuantity" />
     <DeleteConfirmModal 
       v-if="showDeleteQuantityModal && deleteQuantityTarget"
       :title="`Delete ${deleteQuantityTarget.label}?`"

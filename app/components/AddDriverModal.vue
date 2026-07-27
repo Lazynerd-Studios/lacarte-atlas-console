@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import type { CreateDriverPayload } from '~/types/driver'
+
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'submit', data: Record<string, unknown>): void
+  (e: 'submit', data: CreateDriverPayload): void
 }>()
 
 const form = reactive({
@@ -16,7 +18,7 @@ const form = reactive({
   perTripRate: '',
   expectedTripsPerMonth: '',
   minimumFillRate: '',
-  paymentFrequency: 'weekly',
+  paymentFrequency: 'weekly' as 'weekly' | 'bi_weekly' | 'monthly',
 })
 
 const zones = ref<{ id: string; name: string; color: string }[]>([])
@@ -43,6 +45,13 @@ function validate() {
   if (form.minimumFillRate === '' || Number(form.minimumFillRate) < 0 || Number(form.minimumFillRate) > 100) errors.minimumFillRate = 'Must be 0-100'
   return Object.keys(errors).length === 0
 }
+
+// Allow the parent to stop the loading state when the API call fails
+function stopSubmitting() {
+  submitting.value = false
+}
+
+defineExpose({ stopSubmitting })
 
 function submit() {
   if (!validate()) return

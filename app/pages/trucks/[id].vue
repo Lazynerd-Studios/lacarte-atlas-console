@@ -27,10 +27,12 @@ onMounted(async () => {
 })
 
 const showEditModal = ref(false)
+const editTruckModalRef = ref<{ stopSubmitting: () => void } | null>(null)
 const showMaintenanceModal = ref(false)
 const showAssignDriverModal = ref(false)
 const showDeleteConfirm = ref(false)
 const showEditMaintenanceModal = ref(false)
+const editMaintenanceModalRef = ref<{ stopSubmitting: () => void } | null>(null)
 const selectedMaintenance = ref<any>(null)
 const deleting = ref(false)
 const maintenanceHistory = ref<any[]>([])
@@ -149,6 +151,9 @@ async function handleEdit(data: { plate: string; vin: string; make: string; mode
     showEditModal.value = false
     toast.success('Truck updated successfully')
     console.log('[truck-detail] Truck updated successfully')
+  } else {
+    // Request failed — stop the button spinner so the user can retry
+    editTruckModalRef.value?.stopSubmitting()
   }
 }
 
@@ -200,6 +205,9 @@ async function handleUpdateMaintenance(maintenanceId: string, data: Record<strin
     }
     
     console.log('[truck-detail] Maintenance updated successfully')
+  } else {
+    // Request failed — stop the button spinner so the user can retry
+    editMaintenanceModalRef.value?.stopSubmitting()
   }
 }
 
@@ -532,6 +540,7 @@ const routeHistory = [
 
   <EditTruckModal
     v-if="showEditModal && truck"
+    ref="editTruckModalRef"
     :truck="{ id: truck.truckId, plate: truck.plateNumber, vin: truck.vinNumber, make: truck.make, model: truck.model, year: truck.year, capacity: truck.capacity, status: truck.status, gpsDeviceId: truck.gpsDeviceId, registrationExpiry: truck.registrationExpiry, notes: truck.notes }"
     @close="showEditModal = false"
     @submit="handleEdit"
@@ -554,6 +563,7 @@ const routeHistory = [
 
   <EditMaintenanceModal
     v-if="showEditMaintenanceModal && selectedMaintenance"
+    ref="editMaintenanceModalRef"
     :truck-id="truck.truckId"
     :maintenance="selectedMaintenance"
     @close="showEditMaintenanceModal = false"
