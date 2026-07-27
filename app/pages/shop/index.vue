@@ -29,14 +29,14 @@ const stats = computed(() => {
 
     return [
       { icon: 'i-lucide-shopping-bag', iconBg: '#fff9e6', label: 'Total Orders', value: String(totalOrders?.count ?? 0), sub: `${totalOrders?.percentageChange ?? 0}% from yesterday`, subColor: (totalOrders?.percentageChange ?? 0) >= 0 ? '#22c55e' : '#ef4444' },
-      { icon: 'i-lucide-dollar-sign', iconBg: '#fff9e6', label: 'Revenue Today', value: `${revenueToday?.currency ?? 'GHS'} ${(revenueToday?.amount ?? 0).toLocaleString()}`, sub: `${revenueToday?.percentageChange ?? 0}% from yesterday`, subColor: (revenueToday?.percentageChange ?? 0) >= 0 ? '#22c55e' : '#ef4444' },
+      { icon: 'i-lucide-banknote', iconBg: '#fff9e6', label: 'Revenue Today', value: `${revenueToday?.currency ?? 'GHS'} ${(revenueToday?.amount ?? 0).toLocaleString()}`, sub: `${revenueToday?.percentageChange ?? 0}% from yesterday`, subColor: (revenueToday?.percentageChange ?? 0) >= 0 ? '#22c55e' : '#ef4444' },
       { icon: 'i-lucide-package', iconBg: '#fff9e6', label: 'Top Product', value: topProduct?.productName ?? 'N/A', sub: `${topProduct?.unitsSold ?? 0} units sold today`, subColor: '#6b7280' },
       { icon: 'i-lucide-alert-circle', iconBg: '#fef2f2', label: 'Low Stock Alerts', value: String(lowStock?.count ?? 0), sub: 'Items need restocking', subColor: '#6b7280', valueColor: (lowStock?.count ?? 0) > 0 ? '#ef4444' : '#1a1a1a' },
     ]
   }
   return [
     { icon: 'i-lucide-shopping-bag', iconBg: '#fff9e6', label: 'Total Orders', value: '0', sub: '0% from yesterday', subColor: '#6b7280' },
-    { icon: 'i-lucide-dollar-sign', iconBg: '#fff9e6', label: 'Revenue Today', value: 'GHS 0', sub: '0% from yesterday', subColor: '#6b7280' },
+    { icon: 'i-lucide-banknote', iconBg: '#fff9e6', label: 'Revenue Today', value: 'GHS 0', sub: '0% from yesterday', subColor: '#6b7280' },
     { icon: 'i-lucide-package', iconBg: '#fff9e6', label: 'Top Product', value: 'N/A', sub: '0 units sold today', subColor: '#6b7280' },
     { icon: 'i-lucide-alert-circle', iconBg: '#fef2f2', label: 'Low Stock Alerts', value: '0', sub: 'Items need restocking', subColor: '#6b7280' },
   ]

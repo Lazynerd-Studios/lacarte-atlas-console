@@ -16,7 +16,7 @@ const statCards = [
   },
   {
     title: 'Revenue',
-    icon: 'i-lucide-dollar-sign',
+    icon: 'i-lucide-banknote',
     iconBg: '#f0fdf4',
     iconColor: '#22c55e',
     rows: [

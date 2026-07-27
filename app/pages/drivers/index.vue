@@ -124,11 +124,10 @@ function statusStyle(s: string) {
 
         <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:4px">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-            <UIcon name="i-lucide-dollar-sign" style="width:16px;height:16px;color:#15803d;flex-shrink:0" />
             <span style="font-size:14px;font-weight:500;color:#15803d;font-family:'Manrope',sans-serif">Period Earnings</span>
           </div>
-          <p style="font-size:20px;font-weight:700;color:#15803d;font-family:'Manrope',sans-serif;margin:0">{{ format(d.earnings ?? 0) }}</p>
-          <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">{{ d.completed ?? 0 }}/{{ d.total ?? 0 }} tasks completed</p>
+          <p style="font-size:20px;font-weight:700;color:#15803d;font-family:'Manrope',sans-serif;margin:0">{{ format(d.currentEarnings ?? 0) }}</p>
+          <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">{{ d.binsCompleted ?? 0 }}/{{ d.binsAssigned ?? 0 }} bins completed</p>
         </div>
 
         <div style="display:flex;gap:8px">

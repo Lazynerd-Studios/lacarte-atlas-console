@@ -545,7 +545,6 @@ function stopBadge(status: string) {
       </div>
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:10px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-          <UIcon name="i-lucide-dollar-sign" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
           <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Period Earnings</p>
         </div>
         <p style="font-size:20px;font-weight:700;color:#22c55e;font-family:'Manrope',sans-serif">{{ driver?.stats?.periodEarnings?.currentEarnings != null ? `GHS ${driver.stats.periodEarnings.currentEarnings}` : 'N/A' }}</p>

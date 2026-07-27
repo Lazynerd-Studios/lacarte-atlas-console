@@ -16,6 +16,16 @@ export interface AssignedTruck {
   plateNumber: string
 }
 
+export interface DriverPeriodEarnings {
+  periodMonth?: string
+  binsAssigned?: number
+  binsCompleted?: number
+  currentEarnings?: number
+  projectedSalary?: number
+  pendingBonuses?: number
+  pendingDeductions?: number
+}
+
 export interface Driver {
   id: string
   name?: string
@@ -30,11 +40,18 @@ export interface Driver {
   assignedTruck?: AssignedTruck | null
   assignedPickups?: number
   totalTrips?: number
+  binsPickedUp?: number
+  binsAssigned?: number
+  binsCompleted?: number
+  currentEarnings?: number
   earnings?: number
   incomplete?: number
   deductionAmt?: number
   completed?: number
   total?: number
+  stats?: {
+    periodEarnings?: DriverPeriodEarnings
+  }
 }
 
 export interface CreateDriverPayload {

@@ -107,7 +107,7 @@ const quickStats = computed(() => {
   const stockColor = qs.stockStatus.status === 'ok' ? '#22c55e' : qs.stockStatus.status === 'low' ? '#d49a00' : '#ef4444'
   const stockLabel = qs.stockStatus.status === 'ok' ? 'In Stock' : qs.stockStatus.status === 'low' ? 'Low Stock' : 'Critical'
   return [
-    { icon: 'i-lucide-dollar-sign', label: qs.totalRevenue.label, value: `${qs.totalRevenue.currency} ${qs.totalRevenue.amount.toLocaleString()}`, valueColor: '#1a1a1a' },
+    { icon: 'i-lucide-banknote', label: qs.totalRevenue.label, value: `${qs.totalRevenue.currency} ${qs.totalRevenue.amount.toLocaleString()}`, valueColor: '#1a1a1a' },
     { icon: 'i-lucide-trending-up', label: qs.avgMonthlySales.label, value: `${qs.avgMonthlySales.units} units`, valueColor: '#1a1a1a' },
     { icon: 'i-lucide-package', label: qs.stockStatus.label, value: stockLabel, valueColor: stockColor },
     { icon: 'i-lucide-refresh-cw', label: qs.stockTurnover.label, value: `${qs.stockTurnover.rate}${qs.stockTurnover.unit}`, valueColor: '#1a1a1a' },

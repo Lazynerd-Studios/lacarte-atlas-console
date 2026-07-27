@@ -306,7 +306,7 @@ const donutSlices = computed(() => {
         v-for="stat in [
           { icon: 'i-lucide-alert-circle',  label: 'Total Outstanding',    value: format(kpis.totalOutstanding) },
           { icon: 'i-lucide-repeat',        label: 'Subscription Revenue', value: format(kpis.subscriptionRevenue) },
-          { icon: 'i-lucide-dollar-sign',   label: 'PAYG Revenue',         value: format(kpis.paygRevenue) },
+          { icon: 'i-lucide-banknote',   label: 'PAYG Revenue',         value: format(kpis.paygRevenue) },
           { icon: 'i-lucide-clock',         label: 'Avg Collection Time',  value: `${kpis.avgCollectionTimeDays} days` },
         ]"
         :key="stat.label"
