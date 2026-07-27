@@ -128,7 +128,6 @@ function statusStyle(s: string) {
             <span style="font-size:14px;font-weight:500;color:#15803d;font-family:'Manrope',sans-serif">Period Earnings</span>
           </div>
           <p style="font-size:20px;font-weight:700;color:#15803d;font-family:'Manrope',sans-serif;margin:0">{{ format(d.earnings ?? 0) }}</p>
-          <p style="font-size:12px;color:#dc2626;font-family:'Manrope',sans-serif;margin:0">-{{ d.incomplete ?? 0 }} incomplete ({{ d.incomplete ?? 0 }} × GHS 15 = -{{ format(d.deductionAmt ?? 0) }})</p>
           <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">{{ d.completed ?? 0 }}/{{ d.total ?? 0 }} tasks completed</p>
         </div>
 

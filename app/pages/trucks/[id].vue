@@ -17,8 +17,8 @@ onMounted(async () => {
     truck.value = data
     console.log('[truck-detail] Loaded truck:', truck.value.truckId)
     
-    // Fetch maintenance history after truck data is loaded
-    await fetchMaintenanceHistory()
+    // Fetch maintenance and route history after truck data is loaded
+    await Promise.all([fetchMaintenanceHistory(), fetchRouteHistory()])
   } else {
     console.log('[truck-detail] Truck not found')
     notFound.value = true
@@ -244,13 +244,44 @@ watch(showMaintenanceModal, (isOpen) => {
   if (isOpen) console.log('[truck-detail] Opening maintenance modal')
 })
 
-const routeHistory = [
-  { date: '2026-03-07', driver: 'John Smith', stops: 28, distance: '42 mi', duration: '6h 20m', zone: 'Downtown' },
-  { date: '2026-03-06', driver: 'John Smith', stops: 32, distance: '48 mi', duration: '7h 10m', zone: 'Downtown' },
-  { date: '2026-03-05', driver: 'John Smith', stops: 27, distance: '39 mi', duration: '6h 05m', zone: 'Downtown' },
-  { date: '2026-03-04', driver: 'John Smith', stops: 30, distance: '44 mi', duration: '6h 45m', zone: 'Downtown' },
-  { date: '2026-03-03', driver: 'John Smith', stops: 25, distance: '37 mi', duration: '5h 50m', zone: 'Downtown' },
-]
+// Route history from API
+interface RouteHistoryRow {
+  date: string
+  driver: { id: string; name: string } | null
+  totalStops: number
+  assignedStops: number
+  distanceKm: number
+  durationMinutes: number
+  zone: { id: string; name: string } | null
+}
+
+const routeHistory = ref<RouteHistoryRow[]>([])
+const loadingRoutes = ref(false)
+
+async function fetchRouteHistory() {
+  loadingRoutes.value = true
+  try {
+    const api = useApi()
+    const data = await api.get<{ success: boolean; data: { rows: RouteHistoryRow[] } }>(
+      `/trucks/admin/${route.params.id}/route-history`,
+      'Failed to load route history'
+    )
+    if (data?.data?.rows) {
+      routeHistory.value = data.data.rows
+    }
+    console.log('[truck-detail] Loaded route history:', routeHistory.value.length)
+  } catch (err) {
+    console.error('[truck-detail] Error fetching route history:', err)
+  }
+  loadingRoutes.value = false
+}
+
+function formatRouteDuration(minutes: number) {
+  if (!minutes) return '—'
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return h > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m`
+}
 </script>
 
 <template>
@@ -512,20 +543,28 @@ const routeHistory = [
                   </tr>
                 </thead>
                 <tbody>
-                  <tr
-                    v-for="(row, i) in routeHistory"
-                    :key="i"
-                    style="border-bottom:1px solid #e5e7eb"
-                    @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
-                    @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
-                  >
-                    <td style="padding:17px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.date }}</td>
-                    <td style="padding:17px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.driver }}</td>
-                    <td style="padding:17px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.stops }}</td>
-                    <td style="padding:17px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.distance }}</td>
-                    <td style="padding:17px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.duration }}</td>
-                    <td style="padding:17px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.zone }}</td>
+                  <tr v-if="loadingRoutes">
+                    <td colspan="6" style="padding:32px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Loading route history...</td>
                   </tr>
+                  <tr v-else-if="routeHistory.length === 0">
+                    <td colspan="6" style="padding:32px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No route history yet</td>
+                  </tr>
+                  <template v-else>
+                    <tr
+                      v-for="(row, i) in routeHistory"
+                      :key="i"
+                      style="border-bottom:1px solid #e5e7eb"
+                      @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
+                      @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
+                    >
+                      <td style="padding:17px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.date }}</td>
+                      <td style="padding:17px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.driver?.name || '—' }}</td>
+                      <td style="padding:17px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.totalStops }}</td>
+                      <td style="padding:17px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.distanceKm }} km</td>
+                      <td style="padding:17px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ formatRouteDuration(row.durationMinutes) }}</td>
+                      <td style="padding:17px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ row.zone?.name || '—' }}</td>
+                    </tr>
+                  </template>
                 </tbody>
               </table>
             </div>

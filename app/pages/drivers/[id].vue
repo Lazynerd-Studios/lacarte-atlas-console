@@ -274,7 +274,7 @@ const currentPeriod = computed(() => {
   const deductionsTotal = (p.performanceDeduction || 0) + (p.manualDeductions || 0)
   return {
     label: `Current Pay Period (${monthLabel})`,
-    total: `${cur} ${p.totalPayout}`,
+    total: `${cur} ${p.currentEarnings ?? p.totalPayout}`,
     status: p.status,
     basePay: `${cur} ${p.monthlySalary}`,
     tasks: `${p.binsCompleted}/${p.binsAssigned}`,
@@ -548,7 +548,7 @@ function stopBadge(status: string) {
           <UIcon name="i-lucide-dollar-sign" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />
           <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Period Earnings</p>
         </div>
-        <p style="font-size:20px;font-weight:700;color:#22c55e;font-family:'Manrope',sans-serif">{{ driver?.stats?.periodEarnings?.projectedSalary != null ? `GHS ${driver.stats.periodEarnings.projectedSalary}` : 'N/A' }}</p>
+        <p style="font-size:20px;font-weight:700;color:#22c55e;font-family:'Manrope',sans-serif">{{ driver?.stats?.periodEarnings?.currentEarnings != null ? `GHS ${driver.stats.periodEarnings.currentEarnings}` : 'N/A' }}</p>
       </div>
     </div>
 
