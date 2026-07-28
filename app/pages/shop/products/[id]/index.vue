@@ -28,6 +28,16 @@ interface Product {
 const product = ref<Product | null>(null)
 const loading = ref(true)
 
+// Product image display — first image by default, thumbnails switch it
+const selectedImageIndex = ref(0)
+const imageFailed = ref(false)
+const displayImage = computed(() => product.value?.images?.[selectedImageIndex.value] ?? null)
+
+function selectImage(i: number) {
+  selectedImageIndex.value = i
+  imageFailed.value = false
+}
+
 async function fetchProduct() {
   loading.value = true
   try {
@@ -186,9 +196,29 @@ onMounted(() => {
       <!-- Product info card -->
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:20px 25px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
         <div style="display:flex;gap:24px;align-items:flex-start">
-          <!-- Icon placeholder -->
-          <div style="width:128px;height:128px;background:#f8f9fa;border-radius:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <UIcon name="i-lucide-package" style="width:64px;height:64px;color:#6b7280" />
+          <!-- Product image (falls back to icon when missing or failing to load) -->
+          <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">
+            <div style="width:128px;height:128px;background:#f8f9fa;border-radius:16px;display:flex;align-items:center;justify-content:center;overflow:hidden">
+              <img
+                v-if="displayImage && !imageFailed"
+                :src="displayImage"
+                :alt="product?.name || 'Product image'"
+                style="width:100%;height:100%;object-fit:cover"
+                @error="imageFailed = true"
+              />
+              <UIcon v-else name="i-lucide-package" style="width:64px;height:64px;color:#6b7280" />
+            </div>
+            <!-- Thumbnails when there are multiple images -->
+            <div v-if="(product?.images?.length ?? 0) > 1" style="display:flex;gap:6px;flex-wrap:wrap;max-width:128px">
+              <button
+                v-for="(img, i) in product!.images"
+                :key="i"
+                :style="`width:28px;height:28px;padding:0;border-radius:8px;overflow:hidden;cursor:pointer;background:#f8f9fa;border:2px solid ${selectedImageIndex === i ? '#ffb400' : 'transparent'}`"
+                @click="selectImage(i)"
+              >
+                <img :src="img" alt="" style="width:100%;height:100%;object-fit:cover;display:block" />
+              </button>
+            </div>
           </div>
           <!-- Info -->
           <div style="flex:1;display:flex;flex-direction:column;gap:16px">
