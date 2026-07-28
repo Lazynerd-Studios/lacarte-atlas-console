@@ -103,6 +103,13 @@ async function fetchCustomers() {
 watch([search, statusFilter, planFilter], () => { page.value = 1; fetchCustomers() })
 watch(page, fetchCustomers)
 
+// Last pickup: prefer lastPickupDate, fall back to locationUpdatedAt
+function lastPickupDisplay(c: any) {
+  const date = c.lastPickupDate ?? c.locationUpdatedAt
+  if (!date) return '—'
+  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 onMounted(async () => {
   initialLoading.value = true
   await fetchCustomers()
@@ -141,7 +148,7 @@ async function downloadExcel() {
       Phone: c.phoneNumber ?? '—',
       Address: c.address ?? '—',
       Plan: formatPlanLabel(c.customerType?.name),
-      'Last Pickup': c.lastPickup ?? '—',
+      'Last Pickup': lastPickupDisplay(c),
       Balance: c.balance ?? 0,
       Status: c.status ?? '—',
     }))
@@ -276,7 +283,7 @@ function statusBadge(status: string) {
                 {{ planBadge(c.customerType?.name).label }}
               </span>
             </td>
-            <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ c.lastPickup }}</td>
+            <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ lastPickupDisplay(c) }}</td>
             <td style="padding:16px;font-size:14px;font-family:'Manrope',sans-serif;white-space:nowrap" :style="c.balance > 0 ? 'color:#ef4444;font-weight:500' : 'color:#1a1a1a'">
               GHS {{ c.balance ?? 0 }}
             </td>
