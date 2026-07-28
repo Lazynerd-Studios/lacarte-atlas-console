@@ -40,6 +40,7 @@ interface PickupRequestDetail {
     id: string
     label: string
     description: string
+    binCount?: number | null
   }
   assignment: {
     id: string
@@ -186,6 +187,10 @@ const pickup = computed(() => {
     notes: data.additionalNotes || '—',
     disposableType: data.disposableItemType.name,
     estimatedQuantity: data.estimatedQuantity.label,
+    // Bins snapshot taken at request time; falls back to the customer's bin count when absent
+    bins: data.estimatedQuantity.binCount != null
+      ? `${data.estimatedQuantity.binCount}`
+      : (data.customer.noBins != null ? `${data.customer.noBins} (customer default)` : '—'),
     createdAt: formatDateTime(data.createdAt),
     assignedAt: assignment ? formatDateTime(assignment.scheduledDate) : '',
     startedAt: '',
@@ -615,6 +620,7 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
                 { label: 'Time Slot',   value: pickup.timeSlot },
                 { label: 'Disposable Type', value: pickup.disposableType },
                 { label: 'Estimated Quantity', value: pickup.estimatedQuantity },
+                { label: 'Bins', value: pickup.bins },
                 { label: 'Notes',       value: pickup.notes || '—' },
               ]" :key="item.label" style="display:flex;flex-direction:column;gap:2px">
                 <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">{{ item.label }}</p>

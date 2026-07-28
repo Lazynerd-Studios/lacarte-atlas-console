@@ -15,6 +15,7 @@ interface PickupRequest {
     name: string
     phoneNumber: string
     address: string
+    noBins?: number
     customerType: {
       id: string
       name: string
@@ -27,6 +28,7 @@ interface PickupRequest {
   estimatedQuantity: {
     id: string
     label: string
+    binCount?: number | null
   }
 }
 
@@ -311,6 +313,9 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
             <th style="padding:14px 16px;text-align:left">
               <div class="skeleton" style="height:14px;width:90px" />
             </th>
+            <th style="padding:14px 12px;text-align:left">
+              <div class="skeleton" style="height:14px;width:40px" />
+            </th>
             <th style="padding:14px 16px;text-align:left">
               <div class="skeleton" style="height:14px;width:100px" />
             </th>
@@ -347,6 +352,10 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
             <td style="padding:20px 16px">
               <div class="skeleton" style="height:14px;width:100px;margin-bottom:4px" />
               <div class="skeleton" style="height:12px;width:120px" />
+            </td>
+            <!-- Bins -->
+            <td style="padding:20px 12px">
+              <div class="skeleton" style="height:14px;width:40px" />
             </td>
             <!-- Payment Type -->
             <td style="padding:20px 16px">
@@ -463,6 +472,7 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap;cursor:pointer;user-select:none" @click="toggleSort('preferredPickupDate')">
               <span style="display:inline-flex;align-items:center;gap:4px">Pickup Date <UIcon :name="sortIcon('preferredPickupDate')" :style="`width:14px;height:14px;color:${sortBy === 'preferredPickupDate' ? '#ffb400' : '#9ca3af'}`" /></span>
             </th>
+            <th style="padding:14px 12px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Bins</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Payment Type</th>
             <th style="padding:14px 12px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Payment Status</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Status</th>
@@ -496,6 +506,16 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
             <td style="padding:20px 16px">
               <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ formatDate(req.preferredPickupDate) }}</p>
               <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:2px">{{ req.disposableItemType.name }} - {{ req.estimatedQuantity.label }}</p>
+            </td>
+
+            <!-- Bins (snapshot from the request; falls back to the customer's bin count) -->
+            <td style="padding:20px 12px;white-space:nowrap">
+              <p v-if="req.estimatedQuantity.binCount != null" style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ req.estimatedQuantity.binCount }}</p>
+              <template v-else-if="req.customer.noBins != null">
+                <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ req.customer.noBins }}</p>
+                <p style="font-size:11px;color:#9ca3af;font-family:'Manrope',sans-serif;margin-top:2px">customer default</p>
+              </template>
+              <p v-else style="font-size:14px;color:#9ca3af;font-family:'Manrope',sans-serif">—</p>
             </td>
 
             <!-- Payment Type -->

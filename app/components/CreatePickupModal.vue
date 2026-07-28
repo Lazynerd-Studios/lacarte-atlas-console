@@ -12,6 +12,8 @@ interface CustomerOption {
   name: string
   phoneNumber: string | null
   placeName: string | null
+  customerTypeId?: string | null
+  customerType?: { id: string } | null
   user?: { name?: string; email?: string } | null
 }
 interface DisposableItem {
@@ -22,12 +24,14 @@ interface DisposableItem {
 interface EstimatedQuantity {
   id: string
   label: string
+  binCount: number | null
 }
 
 const customers = ref<CustomerOption[]>([])
 const disposableItems = ref<DisposableItem[]>([])
 const estimatedQuantities = ref<EstimatedQuantity[]>([])
 const loadingOptions = ref(true)
+const loadingQuantities = ref(false)
 const submitting = ref(false)
 
 const form = reactive({
@@ -70,6 +74,31 @@ function selectCustomer(c: CustomerOption) {
   form.customerId = c.id
   customerDropdownOpen.value = false
   if (errors.customerId) delete errors.customerId
+  // Availability is checked against the customer's type — reload the quantity options scoped to it
+  fetchQuantities(c.customerTypeId ?? c.customerType?.id ?? null)
+}
+
+// Load active quantities, scoped to a customer type when one is selected
+async function fetchQuantities(customerTypeId: string | null) {
+  loadingQuantities.value = true
+  const endpoint = customerTypeId
+    ? `/disposable/quantities/active?customerTypeId=${customerTypeId}`
+    : '/disposable/quantities/active'
+  console.log('[CreatePickupModal] Fetching quantities:', endpoint)
+  const res = await api.get<any>(endpoint, 'Failed to load estimated quantities')
+  if (res) {
+    const items = Array.isArray(res) ? res : (res.data ?? res.quantities ?? [])
+    estimatedQuantities.value = items.map((q: any) => ({
+      id: q.id,
+      label: q.label,
+      binCount: q.binCount != null ? Number(q.binCount) : null,
+    }))
+    // Clear a stale selection that isn't available for this customer type
+    if (form.estimatedQuantityId && !estimatedQuantities.value.some(q => q.id === form.estimatedQuantityId)) {
+      form.estimatedQuantityId = ''
+    }
+  }
+  loadingQuantities.value = false
 }
 
 async function fetchAllCustomers(): Promise<CustomerOption[]> {
@@ -99,21 +128,15 @@ async function fetchAllCustomers(): Promise<CustomerOption[]> {
 
 onMounted(async () => {
   loadingOptions.value = true
-  const [cust, dispRes, qtyRes] = await Promise.all([
+  const [cust, dispRes] = await Promise.all([
     fetchAllCustomers(),
     api.get<any>('/disposable/item-types', 'Failed to load disposable types'),
-    api.get<any>('/disposable/quantities', 'Failed to load estimated quantities'),
+    fetchQuantities(null),
   ])
   customers.value = cust
   if (dispRes) {
     const items = Array.isArray(dispRes) ? dispRes : (dispRes.data ?? dispRes.disposableTypes ?? [])
     disposableItems.value = items.map((i: any) => ({ id: i.id, name: i.name, icon: i.icon ?? null }))
-  }
-  if (qtyRes) {
-    const items = Array.isArray(qtyRes) ? qtyRes : (qtyRes.data ?? qtyRes.quantities ?? [])
-    estimatedQuantities.value = items
-      .filter((q: any) => q.isActive !== false && q.isActive !== 0)
-      .map((q: any) => ({ id: q.id, label: q.label }))
   }
   loadingOptions.value = false
 })
@@ -239,12 +262,14 @@ function inputStyle(field: string) {
             <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Estimated Quantity</label>
             <select
               v-model="form.estimatedQuantityId"
-              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid ${errors.estimatedQuantityId ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:${form.estimatedQuantityId ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+              :disabled="loadingQuantities"
+              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid ${errors.estimatedQuantityId ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:${form.estimatedQuantityId ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:${loadingQuantities ? 'wait' : 'pointer'};appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box;opacity:${loadingQuantities ? 0.6 : 1}`"
             >
-              <option value="" disabled>Select quantity</option>
-              <option v-for="q in estimatedQuantities" :key="q.id" :value="q.id">{{ q.label }}</option>
+              <option value="" disabled>{{ loadingQuantities ? 'Loading quantities...' : 'Select quantity' }}</option>
+              <option v-for="q in estimatedQuantities" :key="q.id" :value="q.id">{{ q.label }}{{ q.binCount != null ? ` (${q.binCount} bins)` : '' }}</option>
             </select>
             <span v-if="errors.estimatedQuantityId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.estimatedQuantityId }}</span>
+            <span v-else-if="selectedCustomer && estimatedQuantities.length === 0 && !loadingQuantities" style="font-size:12px;color:#f59e0b;font-family:'Manrope',sans-serif">No quantities available for this customer's type</span>
           </div>
 
           <!-- Preferred pickup date -->
