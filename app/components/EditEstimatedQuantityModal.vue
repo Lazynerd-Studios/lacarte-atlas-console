@@ -4,6 +4,7 @@ const props = defineProps<{
     id: string
     label: string
     description: string
+    binCount?: number | null
     displayOrder: number
     isActive: boolean
   }
@@ -11,7 +12,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
-  submit: [data: { label: string; description: string; displayOrder: number; isActive: boolean }]
+  submit: [data: { label: string; description: string; binCount: number | null; displayOrder: number; isActive: boolean }]
 }>()
 
 const submitting = ref(false)
@@ -19,6 +20,7 @@ const submitting = ref(false)
 const form = reactive({
   label: props.item.label,
   description: props.item.description,
+  binCount: (props.item.binCount ?? '') as string | number,
   displayOrder: props.item.displayOrder,
   isActive: props.item.isActive
 })
@@ -26,12 +28,14 @@ const form = reactive({
 const errors = reactive({
   label: '',
   description: '',
+  binCount: '',
   displayOrder: ''
 })
 
 function validate() {
   errors.label = ''
   errors.description = ''
+  errors.binCount = ''
   errors.displayOrder = ''
   
   if (!form.label.trim()) {
@@ -40,6 +44,10 @@ function validate() {
   }
   if (!form.description.trim()) {
     errors.description = 'Description is required'
+    return false
+  }
+  if (form.binCount !== '' && (!Number.isInteger(Number(form.binCount)) || Number(form.binCount) < 1)) {
+    errors.binCount = 'Bin equivalent must be a whole number of 1 or greater'
     return false
   }
   if (form.displayOrder < 0) {
@@ -59,7 +67,14 @@ defineExpose({ stopSubmitting })
 async function handleSubmit() {
   if (!validate()) return
   submitting.value = true
-  emit('submit', { ...form })
+  // binCount: null clears the value on the API
+  emit('submit', {
+    label: form.label,
+    description: form.description,
+    binCount: form.binCount === '' ? null : Number(form.binCount),
+    displayOrder: form.displayOrder,
+    isActive: form.isActive
+  })
   // Note: submitting is reset by the parent via stopSubmitting() if the request fails
 }
 </script>
@@ -91,6 +106,14 @@ async function handleSubmit() {
           <label style="display:block;font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:8px">Description *</label>
           <textarea v-model="form.description" placeholder="Describe this quantity range..." rows="3" style="width:100%;padding:12px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;resize:vertical"></textarea>
           <p v-if="errors.description" style="font-size:12px;color:#ef4444;margin:6px 0 0">{{ errors.description }}</p>
+        </div>
+
+        <!-- Bin Equivalent -->
+        <div>
+          <label style="display:block;font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:8px">Bin Equivalent (optional)</label>
+          <input v-model="form.binCount" type="number" min="1" step="1" placeholder="e.g., 400" style="width:100%;height:42px;padding:0 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box" />
+          <p v-if="errors.binCount" style="font-size:12px;color:#ef4444;margin:6px 0 0">{{ errors.binCount }}</p>
+          <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">Clearing this makes it descriptive-only. Changes don't affect existing customers or past pickup requests</p>
         </div>
 
         <!-- Display Order -->

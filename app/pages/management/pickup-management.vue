@@ -15,6 +15,7 @@ interface EstimatedQuantity {
   id: string
   label: string
   description: string
+  binCount: number | null
   displayOrder: number
   isActive: boolean
   createdAt: string
@@ -56,9 +57,10 @@ async function fetchEstimatedQuantities() {
   const data = await api.get<any>('/disposable/quantities')
   if (data) {
     const items = Array.isArray(data) ? data : (data.data ?? data.quantities ?? [])
-    // Convert numeric isActive (0/1) to boolean for UI
+    // Convert numeric isActive (0/1) to boolean for UI; binCount may arrive as a string
     estimatedQuantities.value = items.map((item: any) => ({
       ...item,
+      binCount: item.binCount != null ? Number(item.binCount) : null,
       isActive: !!item.isActive
     }))
   }
@@ -142,7 +144,7 @@ async function handleDeleteDisposable() {
 const showAddQuantityModal = ref(false)
 const addQuantityModalRef = ref<{ stopSubmitting: () => void } | null>(null)
 
-async function handleAddQuantity(data: { label: string; description: string; displayOrder: number; isActive: boolean }) {
+async function handleAddQuantity(data: { label: string; description: string; binCount: number | null; displayOrder: number; isActive: boolean }) {
   const result = await api.post('/disposable/quantities', data, 'Failed to create estimated quantity')
   if (result !== null) {
     showAddQuantityModal.value = false
@@ -163,7 +165,7 @@ function openEditQuantity(item: EstimatedQuantity) {
   showEditQuantityModal.value = true
 }
 
-async function handleEditQuantity(data: { label: string; description: string; displayOrder: number; isActive: boolean }) {
+async function handleEditQuantity(data: { label: string; description: string; binCount: number | null; displayOrder: number; isActive: boolean }) {
   if (!editQuantityTarget.value) return
   const result = await api.patch(`/disposable/quantities/${editQuantityTarget.value.id}`, data, 'Failed to update estimated quantity')
   if (result !== null) {
@@ -352,6 +354,7 @@ async function handleDeleteQuantity() {
             <tr style="background:#f9fafb;border-bottom:1px solid #f0f0f0">
               <th style="text-align:left;padding:16px 24px;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Label</th>
               <th style="text-align:left;padding:16px 24px;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Description</th>
+              <th style="text-align:center;padding:16px 24px;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Bin Equivalent</th>
               <th style="text-align:center;padding:16px 24px;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Order</th>
               <th style="text-align:center;padding:16px 24px;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Status</th>
               <th style="text-align:right;padding:16px 24px;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Actions</th>
@@ -361,6 +364,7 @@ async function handleDeleteQuantity() {
             <tr v-for="item in filteredQuantity" :key="item.id" style="border-bottom:1px solid #f0f0f0">
               <td style="padding:16px 24px;font-size:14px;font-weight:600;color:#1a1a1a">{{ item.label }}</td>
               <td style="padding:16px 24px;font-size:13px;color:#6b7280">{{ item.description }}</td>
+              <td style="padding:16px 24px;text-align:center;font-size:13px;font-weight:600;color:#1a1a1a">{{ item.binCount != null ? `${item.binCount} bins` : '—' }}</td>
               <td style="padding:16px 24px;text-align:center;font-size:13px;font-weight:600;color:#1a1a1a">{{ item.displayOrder }}</td>
               <td style="padding:16px 24px;text-align:center">
                 <span :style="`font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px;${item.isActive ? 'background:#dcfce7;color:#16a34a' : 'background:#f3f4f6;color:#9ca3af'}`">

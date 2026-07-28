@@ -1,18 +1,27 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'dashboard' })
 
+interface EstimatedQuantityOption {
+  id: string
+  label: string
+  description: string
+  binCount: number | null
+}
+
 interface CustomerType {
   id: string  // UUID from API
   name: string
   description: string  // Client-side only
   color: string  // Client-side only
   customerCount: number  // Client-side only
+  estimatedQuantities: EstimatedQuantityOption[]
 }
 
 interface ApiCustomerType {
   id: string
   name: string
   customerCount?: number
+  estimatedQuantities?: EstimatedQuantityOption[]
   createdAt: string
   updatedAt: string
 }
@@ -42,6 +51,7 @@ async function fetchCustomerTypes() {
       description: '',  // Not in API
       color: getColorForIndex(index),  // Assign colors cyclically
       customerCount: ct.customerCount ?? 0,  // Use API value if available
+      estimatedQuantities: ct.estimatedQuantities ?? [],
     }))
   }
   
@@ -54,13 +64,39 @@ function getColorForIndex(index: number): string {
   return colors[index % colors.length]!
 }
 
+// Estimated quantity options for the multi-select
+const quantityOptions = ref<EstimatedQuantityOption[]>([])
+const loadingQuantities = ref(false)
+
+async function fetchQuantityOptions() {
+  loadingQuantities.value = true
+  const api = useApi()
+  const data = await api.get<any>('/disposable/quantities', 'Failed to load estimated quantities')
+  if (data) {
+    const items = Array.isArray(data) ? data : (data.data ?? data.quantities ?? [])
+    quantityOptions.value = items.map((q: any) => ({
+      id: q.id,
+      label: q.label,
+      description: q.description,
+      binCount: q.binCount != null ? Number(q.binCount) : null,
+    }))
+  }
+  loadingQuantities.value = false
+}
+
+function toggleQuantity(ids: string[], id: string): string[] {
+  return ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]
+}
+
 // Add modal
 const showAddModal = ref(false)
 const addForm = ref({ name: '', description: '', color: '#ffb400' })
+const addSelectedQuantityIds = ref<string[]>([])
 const addError = ref('')
 
 function openAdd() {
   addForm.value = { name: '', description: '', color: '#ffb400' }
+  addSelectedQuantityIds.value = []
   addError.value = ''
   showAddModal.value = true
 }
@@ -78,11 +114,17 @@ async function handleAdd() {
     const api = useApi()
     const toast = useAppToast()
     
-    console.log('[CustomerTypes] Creating customer type:', addForm.value.name)
+    console.log('[CustomerTypes] Creating customer type:', addForm.value.name, 'quantities:', addSelectedQuantityIds.value)
+    
+    // Omit estimatedQuantityIds when nothing selected — type falls back to all active quantities
+    const payload: Record<string, unknown> = { name: addForm.value.name.trim() }
+    if (addSelectedQuantityIds.value.length > 0) {
+      payload.estimatedQuantityIds = addSelectedQuantityIds.value
+    }
     
     const response = await api.post<ApiCustomerType>(
       '/customer/admin/types',
-      { name: addForm.value.name.trim() },
+      payload,
       'Failed to create customer type'
     )
     
@@ -108,11 +150,13 @@ async function handleAdd() {
 }
 
 const showEditModal = ref(false)
-const editForm = ref<CustomerType>({ id: '', name: '', description: '', color: '#ffb400', customerCount: 0 })
+const editForm = ref<CustomerType>({ id: '', name: '', description: '', color: '#ffb400', customerCount: 0, estimatedQuantities: [] })
+const editSelectedQuantityIds = ref<string[]>([])
 const editError = ref('')
 
 function openEdit(ct: CustomerType) {
   editForm.value = { ...ct }
+  editSelectedQuantityIds.value = ct.estimatedQuantities.map(q => q.id)
   editError.value = ''
   showEditModal.value = true
 }
@@ -130,11 +174,12 @@ async function handleEdit() {
     const api = useApi()
     const toast = useAppToast()
     
-    console.log('[CustomerTypes] Updating customer type:', editForm.value.id)
+    console.log('[CustomerTypes] Updating customer type:', editForm.value.id, 'quantities:', editSelectedQuantityIds.value)
     
+    // Always send the full set on PATCH — it replaces the associations; [] detaches all (falls back to all active)
     const response = await api.patch<ApiCustomerType>(
       `/customer/admin/types/${editForm.value.id}`,
-      { name: editForm.value.name.trim() },
+      { name: editForm.value.name.trim(), estimatedQuantityIds: editSelectedQuantityIds.value },
       'Failed to update customer type'
     )
     
@@ -203,7 +248,10 @@ const largestType = computed(() => {
 })
 
 // Fetch data on mount
-onMounted(fetchCustomerTypes)
+onMounted(() => {
+  fetchCustomerTypes()
+  fetchQuantityOptions()
+})
 </script>
 
 <style scoped>
@@ -306,6 +354,7 @@ onMounted(fetchCustomerTypes)
           <tr style="border-bottom:1px solid #f0f0f0">
             <th style="padding:14px 24px;text-align:left;font-size:13px;font-weight:600;color:#6b7280">Type</th>
             <th style="padding:14px 16px;text-align:left;font-size:13px;font-weight:600;color:#6b7280">Customers</th>
+            <th style="padding:14px 16px;text-align:left;font-size:13px;font-weight:600;color:#6b7280">Quantities</th>
             <th style="padding:14px 24px;text-align:right;font-size:13px;font-weight:600;color:#6b7280">Actions</th>
           </tr>
         </thead>
@@ -324,6 +373,12 @@ onMounted(fetchCustomerTypes)
             </td>
             <td style="padding:14px 16px">
               <span :style="`background:${ct.color}22;color:${ct.color};font-size:12px;font-weight:600;padding:3px 12px;border-radius:20px;white-space:nowrap`">{{ ct.customerCount }} customers</span>
+            </td>
+            <td style="padding:14px 16px">
+              <div v-if="ct.estimatedQuantities.length > 0" style="display:flex;gap:6px;flex-wrap:wrap">
+                <span v-for="q in ct.estimatedQuantities" :key="q.id" style="background:#f5f5f5;color:#374151;font-size:12px;font-weight:500;padding:3px 10px;border-radius:20px;white-space:nowrap">{{ q.label }}</span>
+              </div>
+              <span v-else style="font-size:12px;color:#9ca3af">All active</span>
             </td>
             <td style="padding:14px 24px">
               <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end">
@@ -379,6 +434,20 @@ onMounted(fetchCustomerTypes)
               </button>
             </div>
           </div>
+          <div>
+            <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Estimated Quantities</label>
+            <div v-if="loadingQuantities" style="font-size:13px;color:#9ca3af;padding:10px 0">Loading quantities...</div>
+            <div v-else-if="quantityOptions.length === 0" style="font-size:13px;color:#9ca3af;padding:10px 0">No estimated quantities available</div>
+            <div v-else style="border:1.5px solid #e5e7eb;border-radius:10px;max-height:180px;overflow-y:auto">
+              <label v-for="(q, qi) in quantityOptions" :key="q.id"
+                :style="`display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;${qi < quantityOptions.length - 1 ? 'border-bottom:1px solid #f5f5f5' : ''}`">
+                <input type="checkbox" :checked="addSelectedQuantityIds.includes(q.id)" @change="addSelectedQuantityIds = toggleQuantity(addSelectedQuantityIds, q.id)" style="width:16px;height:16px;accent-color:#ffb400;cursor:pointer;flex-shrink:0" />
+                <span style="font-size:13px;font-weight:600;color:#1a1a1a">{{ q.label }}</span>
+                <span style="font-size:12px;color:#9ca3af;margin-left:auto;white-space:nowrap">{{ q.binCount != null ? `${q.binCount} bins` : 'descriptive' }}</span>
+              </label>
+            </div>
+            <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">Leave empty to allow all active quantities for this type</p>
+          </div>
         </div>
         <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px">
           <button @click="showAddModal=false" :disabled="submitting" 
@@ -418,6 +487,20 @@ onMounted(fetchCustomerTypes)
                 :style="`width:28px;height:28px;border-radius:50%;background:${c};border:${editForm.color===c ? '3px solid #1a1a1a' : '2px solid transparent'};cursor:pointer;outline:none`">
               </button>
             </div>
+          </div>
+          <div>
+            <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Estimated Quantities</label>
+            <div v-if="loadingQuantities" style="font-size:13px;color:#9ca3af;padding:10px 0">Loading quantities...</div>
+            <div v-else-if="quantityOptions.length === 0" style="font-size:13px;color:#9ca3af;padding:10px 0">No estimated quantities available</div>
+            <div v-else style="border:1.5px solid #e5e7eb;border-radius:10px;max-height:180px;overflow-y:auto">
+              <label v-for="(q, qi) in quantityOptions" :key="q.id"
+                :style="`display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;${qi < quantityOptions.length - 1 ? 'border-bottom:1px solid #f5f5f5' : ''}`">
+                <input type="checkbox" :checked="editSelectedQuantityIds.includes(q.id)" @change="editSelectedQuantityIds = toggleQuantity(editSelectedQuantityIds, q.id)" style="width:16px;height:16px;accent-color:#ffb400;cursor:pointer;flex-shrink:0" />
+                <span style="font-size:13px;font-weight:600;color:#1a1a1a">{{ q.label }}</span>
+                <span style="font-size:12px;color:#9ca3af;margin-left:auto;white-space:nowrap">{{ q.binCount != null ? `${q.binCount} bins` : 'descriptive' }}</span>
+              </label>
+            </div>
+            <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">Saving replaces the entire set. Deselect all to fall back to all active quantities</p>
           </div>
         </div>
         <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px">
