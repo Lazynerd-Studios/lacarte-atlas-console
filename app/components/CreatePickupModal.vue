@@ -40,6 +40,7 @@ const form = reactive({
   estimatedQuantityId: '',
   preferredPickupDate: '',
   additionalNotes: '',
+  isEmergency: false,
 })
 const errors = reactive<Record<string, string>>({})
 
@@ -141,12 +142,21 @@ onMounted(async () => {
   loadingOptions.value = false
 })
 
+const todayForDateInput = computed(() => {
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+})
+
 function validate() {
   Object.keys(errors).forEach(k => delete errors[k])
   if (!form.customerId)                  errors.customerId = 'Select a customer'
   if (!form.disposableItemTypeId)        errors.disposableItemTypeId = 'Required'
   if (!form.estimatedQuantityId)         errors.estimatedQuantityId = 'Required'
   if (!form.preferredPickupDate)         errors.preferredPickupDate = 'Required'
+  if (!form.isEmergency && form.preferredPickupDate && form.preferredPickupDate < todayForDateInput.value) {
+    errors.preferredPickupDate = 'Pickup date cannot be in the past'
+  }
   if (form.additionalNotes.length > 500)  errors.additionalNotes = 'Max 500 characters'
   return Object.keys(errors).length === 0
 }
@@ -163,13 +173,14 @@ async function submit() {
       estimatedQuantityId: form.estimatedQuantityId,
       preferredPickupDate: form.preferredPickupDate,
       paymentType: 'subscription',
+      isEmergency: form.isEmergency,
       additionalNotes: form.additionalNotes.trim(),
     },
     'Failed to create pickup request'
   )
   submitting.value = false
   if (result) {
-    toast.success('Pickup request created')
+    toast.success(form.isEmergency ? 'Emergency pickup request created' : 'Pickup request created')
     emit('created')
   }
 }
@@ -274,13 +285,34 @@ function inputStyle(field: string) {
 
           <!-- Preferred pickup date -->
           <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Preferred Pickup Date</label>
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">
+              Preferred Pickup Date {{ form.isEmergency ? '(today only for emergencies)' : '' }}
+            </label>
             <input
               v-model="form.preferredPickupDate"
               type="date"
+              :min="todayForDateInput"
               :style="inputStyle('preferredPickupDate')"
             />
             <span v-if="errors.preferredPickupDate" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.preferredPickupDate }}</span>
+            <span v-else-if="form.isEmergency" style="font-size:12px;color:#f59e0b;font-family:'Manrope',sans-serif">Emergency pickups are scheduled for today</span>
+          </div>
+
+          <!-- Emergency toggle -->
+          <div
+            style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;border:1px solid #e5e7eb;cursor:pointer;background:#fff"
+            @click="form.isEmergency = !form.isEmergency"
+          >
+            <input
+              v-model="form.isEmergency"
+              type="checkbox"
+              style="width:18px;height:18px;accent-color:#ef4444;cursor:pointer;flex-shrink:0"
+              @click.stop
+            />
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <span style="font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Emergency Pickup</span>
+              <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Same-day urgent collection. Extra emergency fee may apply.</span>
+            </div>
           </div>
 
           <!-- Additional notes -->

@@ -211,6 +211,7 @@ const avgResponseHours = computed(() => {
 // ── Modal ──
 const showTicketModal = ref(false)
 const selectedTicket = ref<SupportTicket | null>(null)
+const showCreateTicketModal = ref(false)
 
 function openTicket(t: SupportTicket) {
   selectedTicket.value = t
@@ -223,15 +224,31 @@ function handleTicketUpdate(id: string, status: string) {
     t.status = status as SupportTicketStatus
   }
 }
+
+async function handleTicketCreated() {
+  showCreateTicketModal.value = false
+  await Promise.all([fetchTicketStats(), fetchTickets()])
+}
 </script>
 
 <template>
   <div style="display:flex;flex-direction:column;gap:21px">
 
     <!-- Header -->
-    <div style="display:flex;flex-direction:column;gap:6px">
-      <h1 style="font-size:32px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;margin:0">Customer Support</h1>
-      <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">Manage customer inquiries and support tickets</p>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <h1 style="font-size:32px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;margin:0">Customer Support</h1>
+        <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">Manage customer inquiries and support tickets</p>
+      </div>
+      <button
+        style="height:40px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px;flex-shrink:0"
+        @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
+        @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
+        @click="showCreateTicketModal = true"
+      >
+        <UIcon name="i-lucide-plus" style="width:16px;height:16px;color:#0a0d12" />
+        Create Ticket
+      </button>
     </div>
 
     <!-- Stat cards -->
@@ -416,6 +433,12 @@ function handleTicketUpdate(id: string, status: string) {
     :ticket="selectedTicket"
     @close="showTicketModal = false"
     @update="handleTicketUpdate"
+  />
+
+  <CreateSupportTicketModal
+    v-if="showCreateTicketModal"
+    @close="showCreateTicketModal = false"
+    @created="handleTicketCreated"
   />
 
 </template>
