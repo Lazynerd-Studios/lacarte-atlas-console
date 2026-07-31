@@ -27,7 +27,7 @@ defineExpose({ submitting })
 
 watch(() => props.config, (config) => {
   if (config) {
-    feeGhs.value = Number(config.fee) / 100
+    feeGhs.value = Number(config.fee)
     isActive.value = config.isActive
   } else {
     feeGhs.value = 0
@@ -36,7 +36,8 @@ watch(() => props.config, (config) => {
   error.value = ''
 }, { immediate: true })
 
-const formattedPreview = computed(() => format(feeGhs.value))
+const feeInPesewas = computed(() => Math.round(feeGhs.value * 100))
+const formattedPreview = computed(() => `${feeInPesewas.value} pesewas`)
 
 function submit() {
   error.value = ''
@@ -47,8 +48,7 @@ function submit() {
   }
 
   submitting.value = true
-  const feePesewas = Math.round(Number(feeGhs.value) * 100)
-  emit('submit', { fee: feePesewas, isActive: isActive.value })
+  emit('submit', { fee: Number(feeGhs.value), isActive: isActive.value })
 }
 </script>
 
@@ -78,7 +78,7 @@ function submit() {
               style="width:100%;padding:10px 14px 10px 52px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box"
             />
           </div>
-          <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">Fee is stored in pesewas (minor units). Preview: {{ formattedPreview }}</p>
+          <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">Preview: {{ formattedPreview }}</p>
         </div>
 
         <div style="display:flex;align-items:center;justify-content:space-between;background:#f9fafb;border-radius:10px;padding:14px 16px">

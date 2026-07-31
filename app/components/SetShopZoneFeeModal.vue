@@ -31,7 +31,7 @@ defineExpose({ submitting, deleting })
 
 watch(() => props.zone, (zone) => {
   if (zone) {
-    feeGhs.value = Number(zone.fee) / 100
+    feeGhs.value = Number(zone.fee)
     freeDeliveryMinQuantity.value = Number(zone.freeDeliveryMinQuantity) || 1
     isActive.value = zone.isActive
   } else {
@@ -42,7 +42,8 @@ watch(() => props.zone, (zone) => {
   error.value = ''
 }, { immediate: true })
 
-const formattedPreview = computed(() => format(feeGhs.value))
+const feeInPesewas = computed(() => Math.round(feeGhs.value * 100))
+const formattedPreview = computed(() => `${feeInPesewas.value} pesewas`)
 
 function submit() {
   error.value = ''
@@ -63,11 +64,10 @@ function submit() {
   }
 
   submitting.value = true
-  const feePesewas = Math.round(Number(feeGhs.value) * 100)
   emit('submit', {
     zoneId: props.zone.zoneId,
     configId: props.zone.configId,
-    fee: feePesewas,
+    fee: Number(feeGhs.value),
     freeDeliveryMinQuantity: Math.round(Number(freeDeliveryMinQuantity.value)),
     isActive: isActive.value,
   })
@@ -106,7 +106,7 @@ function handleDelete() {
               style="width:100%;padding:10px 14px 10px 52px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box"
             />
           </div>
-          <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">Fee is stored in pesewas (minor units). Preview: {{ formattedPreview }}</p>
+          <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">Preview: {{ formattedPreview }}</p>
         </div>
 
         <div>

@@ -18,12 +18,9 @@ const emit = defineEmits<{
 
 const { format } = useCurrency()
 
-const feeInGhs = computed(() => {
-  if (!props.config) return 0
-  return Number(props.config.fee) / 100
-})
-
-const formattedFee = computed(() => format(feeInGhs.value))
+const feeInGhs = computed(() => props.config ? Number(props.config.fee) : 0)
+const feeInPesewas = computed(() => Math.round(feeInGhs.value * 100))
+const formattedGhs = computed(() => format(feeInGhs.value))
 const statusColor = computed(() => props.config?.isActive ? '#22c55e' : '#9ca3af')
 </script>
 
@@ -49,7 +46,10 @@ const statusColor = computed(() => props.config?.isActive ? '#22c55e' : '#9ca3af
     <div style="margin-top:24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px">
       <div>
         <p style="font-size:12px;color:#6b7280;margin:0 0 6px;font-weight:500">Current Fee</p>
-        <p v-if="!loading" style="font-size:28px;font-weight:700;color:#1a1a1a;margin:0">{{ formattedFee }}</p>
+        <div v-if="!loading">
+          <p style="font-size:28px;font-weight:700;color:#1a1a1a;margin:0">{{ formattedGhs }}</p>
+          <p style="font-size:12px;color:#6b7280;margin:4px 0 0">{{ feeInPesewas }} pesewas</p>
+        </div>
         <div v-else class="skeleton" style="height:28px;width:100px" />
       </div>
       <div>
