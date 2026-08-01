@@ -17,6 +17,13 @@
 - [requirements.md](file://.kiro/specs/team-management/requirements.md)
 </cite>
 
+## Update Summary
+**Changes Made**
+- Enhanced Team Member Deletion Flow section with parallel refresh implementation using Promise.all()
+- Updated Performance Considerations to highlight Promise.all() optimization
+- Added comprehensive error handling details for delete operations
+- Updated API Endpoints section to include 204 No Content response handling
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Project Structure](#project-structure)
@@ -312,7 +319,9 @@ end
 - [requirements.md:60-80](file://.kiro/specs/team-management/requirements.md#L60-L80)
 
 ### Team Member Lifecycle: Delete Member Flow
-Deletion requires explicit authorization and confirmation. Upon successful deletion, the list refreshes automatically.
+Deletion requires explicit authorization and confirmation. Upon successful deletion, the list refreshes automatically using parallel execution for optimal performance.
+
+**Updated** Enhanced with Promise.all() for parallel refresh of both member list and stats dashboard, handling 204 No Content responses and comprehensive error handling.
 
 ```mermaid
 sequenceDiagram
@@ -327,8 +336,12 @@ ListPage-->>Admin : Error toast
 else Authorized
 Admin->>ListPage : Confirm delete
 ListPage->>API : DELETE /team/{id}
-API-->>ListPage : Success
-ListPage-->>Admin : Success toast + refresh list
+API-->>ListPage : 204 No Content
+ListPage->>API : GET /team/ (parallel)
+ListPage->>API : GET /team/stats (parallel)
+API-->>ListPage : Members data
+API-->>ListPage : Stats data
+ListPage-->>Admin : Success toast + updated UI
 end
 ```
 
@@ -471,6 +484,8 @@ Transform["utils/teamTransform.ts"] --> Pages
 - Debounce heavy operations like filtering large member lists.
 - Use skeleton loaders to improve perceived performance during initial loads.
 - Avoid excessive reactivity churn by keeping derived computations minimal.
+- **Enhanced**: Team member deletion now uses Promise.all() for parallel refresh of member list and stats dashboard, significantly improving performance by eliminating sequential API calls.
+- **Enhanced**: Delete operations handle 204 No Content responses efficiently without unnecessary data processing.
 
 [No sources needed since this section provides general guidance]
 
@@ -480,6 +495,8 @@ Common issues and resolutions:
 - Duplicate email on add member: Handle 400 responses indicating duplicate email and display a specific error message.
 - Invalid email or phone formats: Use validation utilities to catch and present clear field-level errors.
 - Session expiration: The store periodically checks session validity and redirects to login when expired.
+- **Enhanced**: Delete operation failures: Comprehensive error handling now catches network errors, permission issues, and invalid member IDs with appropriate user feedback.
+- **Enhanced**: Parallel refresh issues: Promise.all() properly handles partial failures - if one refresh fails, the other continues and displays appropriate error states.
 
 **Section sources**
 - [permissions.global.ts:1-59](file://app/middleware/permissions.global.ts#L1-L59)
@@ -488,7 +505,7 @@ Common issues and resolutions:
 - [auth.ts (store):1-230](file://app/stores/auth.ts#L1-L230)
 
 ## Conclusion
-The team administration system implements a robust RBAC model with layered access controls: route-level middleware, component-level guards, and store-managed session and profile enrichment. Admins enjoy implicit full permissions, while regular users require explicit permissions. Robust client-side validation and transformation ensure reliable submissions, and the UI communicates invitation and security policies clearly.
+The team administration system implements a robust RBAC model with layered access controls: route-level middleware, component-level guards, and store-managed session and profile enrichment. Admins enjoy implicit full permissions, while regular users require explicit permissions. Robust client-side validation and transformation ensure reliable submissions, and the UI communicates invitation and security policies clearly. The recent enhancements to the deletion workflow demonstrate improved performance through parallel API calls and comprehensive error handling, providing a more responsive and reliable user experience.
 
 [No sources needed since this section summarizes without analyzing specific files]
 
@@ -498,9 +515,11 @@ The team administration system implements a robust RBAC model with layered acces
 - GET /team/: Retrieve team members list.
 - GET /team/stats: Retrieve team statistics.
 - POST /team/: Create a new team member.
-- DELETE /team/{id}: Delete a team member.
+- DELETE /team/{id}: Delete a team member (returns 204 No Content on success).
 - GET /team/roles: Retrieve available roles.
 - POST /team/roles: Create a new role.
 - GET /team/permissions: Retrieve available permissions.
+
+**Updated**: Delete endpoint now returns 204 No Content status code for successful deletions, enabling efficient parallel refresh operations.
 
 [No sources needed since this section aggregates endpoints referenced in code paths]

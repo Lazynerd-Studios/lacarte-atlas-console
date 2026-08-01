@@ -1,1 +1,0 @@
-`bun dev` / `nuxt dev` starts the dev server; `bun test` runs Vitest against the `app/` tree using the same path aliases as the app.

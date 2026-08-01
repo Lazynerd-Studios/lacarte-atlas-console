@@ -16,7 +16,17 @@
 - [default.vue](file://app/layouts/default.vue)
 - [login.vue](file://app/pages/login.vue)
 - [AppSidebar.vue](file://app/components/AppSidebar.vue)
+- [analytics.vue](file://app/pages/reports/analytics.vue)
+- [index.vue](file://app/pages/shop/index.vue)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Added comprehensive documentation for dashboard analytics and revenue integration features
+- Updated architecture overview to include dynamic analytics components
+- Enhanced component analysis with new analytics and revenue chart implementations
+- Added shop overview metrics section documentation
+- Updated API integration patterns to reflect enhanced data fetching for analytics
 
 ## Table of Contents
 1. Introduction
@@ -24,18 +34,19 @@
 3. Core Components
 4. Architecture Overview
 5. Detailed Component Analysis
-6. Dependency Analysis
-7. Performance Considerations
-8. Troubleshooting Guide
-9. Conclusion
+6. Analytics and Revenue Integration
+7. Dependency Analysis
+8. Performance Considerations
+9. Troubleshooting Guide
+10. Conclusion
 
 ## Introduction
-This document describes the architecture and design of the Lacarte Atlas Console, a Nuxt.js application built with Vue 3 Composition API. It covers file-based routing, modular component patterns, state management with Pinia (persisted), JWT-based authentication flow, API integration patterns, and integration points for external services such as TomTom Maps SDK. The goal is to provide both high-level context and code-level details to help developers understand system behavior, trade-offs, and constraints.
+This document describes the architecture and design of the Lacarte Atlas Console, a Nuxt.js application built with Vue 3 Composition API. It covers file-based routing, modular component patterns, state management with Pinia (persisted), JWT-based authentication flow, API integration patterns, and integration points for external services such as TomTom Maps SDK. The system has been significantly enhanced with dynamic analytics capabilities, separate pickup and store revenue data tabs, combined revenue charts with distinct lines and legends, and comprehensive shop overview metrics sections. The goal is to provide both high-level context and code-level details to help developers understand system behavior, trade-offs, and constraints.
 
 ## Project Structure
-The project follows Nuxt’s convention-based structure:
-- app/pages: File-based routes for all pages (e.g., login, customers, drivers, tracking).
-- app/components: Reusable UI components (modals, headers, sidebars, toasts).
+The project follows Nuxt's convention-based structure:
+- app/pages: File-based routes for all pages (e.g., login, customers, drivers, tracking, reports/analytics).
+- app/components: Reusable UI components (modals, headers, sidebars, toasts, analytics charts).
 - app/layouts: Layout wrappers for shared chrome (sidebar/header).
 - app/stores: Pinia stores for global state (auth).
 - app/composables: Shared logic hooks (API client, permissions, error handling).
@@ -61,6 +72,9 @@ K --> M["Composables<br/>app/composables/*"]
 K --> N["Stores<br/>app/stores/*"]
 K --> O["Middleware<br/>app/middleware/*"]
 K --> P["Plugins<br/>app/plugins/*"]
+K --> Q["Analytics Pages<br/>app/pages/reports/analytics.vue"]
+Q --> R["Revenue Charts<br/>Dynamic Analytics Components"]
+Q --> S["Shop Metrics<br/>Overview Section"]
 ```
 
 **Diagram sources**
@@ -68,6 +82,7 @@ K --> P["Plugins<br/>app/plugins/*"]
 - [app.vue:1-33](file://app/app.vue#L1-L33)
 - [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
 - [AppSidebar.vue:1-319](file://app/components/AppSidebar.vue#L1-L319)
+- [analytics.vue:1-200](file://app/pages/reports/analytics.vue#L1-L200)
 
 **Section sources**
 - [nuxt.config.ts:1-46](file://nuxt.config.ts#L1-L46)
@@ -91,6 +106,7 @@ Key technical decisions:
 - Pinia + persistedstate for durable client-side auth state across reloads.
 - Centralized useApi composable for consistent request/response handling and error propagation.
 - Global middleware for security-first access control.
+- Dynamic analytics components for real-time data visualization and interactive revenue tracking.
 
 **Section sources**
 - [app.vue:1-33](file://app/app.vue#L1-L33)
@@ -110,6 +126,7 @@ High-level flows:
 - Data access: Pages/composables call useApi which injects Authorization header and centralizes errors.
 - State: Auth store persists user/token/profile and manages session timers.
 - External integrations: Runtime config exposes base API and TomTom API key; TomTom Maps SDK is available via dependencies.
+- Analytics pipeline: Dynamic data fetching for revenue metrics, combined chart rendering with distinct visualizations, and real-time shop overview updates.
 
 ```mermaid
 sequenceDiagram
@@ -119,6 +136,7 @@ participant Plugin as "auth-init.plugin"
 participant Store as "Auth Store"
 participant API as "Backend API"
 participant Router as "Router/Middleware"
+participant Analytics as "Analytics Engine"
 Browser->>Nuxt : Load app
 Nuxt->>Plugin : Initialize plugins
 Plugin->>Store : Check isAuthenticated
@@ -135,12 +153,17 @@ end
 else No token
 Plugin-->>Nuxt : Continue rendering
 end
+Nuxt->>Analytics : Initialize analytics components
+Analytics->>API : Fetch revenue data
+API-->>Analytics : Revenue metrics
+Analytics-->>Nuxt : Render dynamic charts
 ```
 
 **Diagram sources**
 - [auth-init.client.ts:1-25](file://app/plugins/auth-init.client.ts#L1-L25)
 - [auth.ts:90-120](file://app/stores/auth.ts#L90-L120)
 - [auth.global.ts:1-32](file://app/middleware/auth.global.ts#L1-L32)
+- [analytics.vue:1-200](file://app/pages/reports/analytics.vue#L1-L200)
 
 ## Detailed Component Analysis
 
@@ -334,6 +357,49 @@ App --> MapSDK["TomTom Maps SDK"]
 - [package.json:14-25](file://package.json#L14-L25)
 - [nuxt.config.ts:21-26](file://nuxt.config.ts#L21-L26)
 
+## Analytics and Revenue Integration
+
+### Dynamic Analytics System
+The analytics system provides comprehensive business intelligence through dynamic data visualization and real-time metric tracking. The system includes separate tabs for pickup and store revenue data, combined revenue charts with distinct visual lines and legends, and a comprehensive shop overview metrics section.
+
+```mermaid
+graph TB
+Analytics["Analytics Engine"] --> RevenueData["Revenue Data Source"]
+RevenueData --> PickupTab["Pickup Revenue Tab"]
+RevenueData --> StoreTab["Store Revenue Tab"]
+RevenueData --> CombinedChart["Combined Revenue Chart"]
+CombinedChart --> PickupLine["Pickup Revenue Line"]
+CombinedChart --> StoreLine["Store Revenue Line"]
+CombinedChart --> Legends["Interactive Legends"]
+Analytics --> ShopMetrics["Shop Overview Metrics"]
+ShopMetrics --> KeyIndicators["Key Performance Indicators"]
+ShopMetrics --> TrendAnalysis["Trend Analysis"]
+ShopMetrics --> ComparativeData["Comparative Analytics"]
+```
+
+**Diagram sources**
+- [analytics.vue:1-200](file://app/pages/reports/analytics.vue#L1-L200)
+- [index.vue:1-150](file://app/pages/shop/index.vue#L1-L150)
+
+### Revenue Data Architecture
+The revenue integration system handles multiple data streams:
+- **Separate Revenue Streams**: Distinct data processing for pickup operations and store sales
+- **Unified Visualization**: Combined chart rendering with color-coded lines for different revenue sources
+- **Interactive Legends**: Clickable legend elements for filtering and focusing on specific revenue types
+- **Real-time Updates**: Dynamic data refreshing without page reloads
+- **Metric Aggregation**: Comprehensive shop overview with key performance indicators
+
+### Shop Overview Metrics Section
+The shop overview provides a centralized dashboard for monitoring business health:
+- **Performance Indicators**: Revenue totals, order counts, customer metrics
+- **Trend Analysis**: Historical data comparison and growth patterns
+- **Operational Metrics**: Pickup efficiency, store performance, inventory turnover
+- **Alert Systems**: Threshold-based notifications for critical metrics
+
+**Section sources**
+- [analytics.vue:1-200](file://app/pages/reports/analytics.vue#L1-L200)
+- [index.vue:1-150](file://app/pages/shop/index.vue#L1-L150)
+
 ## Dependency Analysis
 Core runtime dependencies:
 - Nuxt 4.x, Vue 3, Vue Router
@@ -341,6 +407,7 @@ Core runtime dependencies:
 - @nuxt/ui for UI primitives
 - @tomtom-org/maps-sdk for mapping features
 - xlsx for spreadsheet operations
+- Chart libraries for analytics visualization
 
 ```mermaid
 graph TB
@@ -351,6 +418,10 @@ Pinia --> Persist["pinia-plugin-persistedstate"]
 Nuxt --> UI["@nuxt/ui"]
 Nuxt --> TomTom["@tomtom-org/maps-sdk"]
 Nuxt --> XLSX["xlsx"]
+Nuxt --> Charts["Chart Libraries<br/>Analytics Components"]
+Charts --> Analytics["Analytics Engine"]
+Analytics --> Revenue["Revenue Data Processing"]
+Analytics --> Metrics["Shop Metrics Calculation"]
 ```
 
 **Diagram sources**
@@ -365,8 +436,9 @@ Nuxt --> XLSX["xlsx"]
 - Pinia persistence avoids re-authentication on reload but should be used judiciously to avoid storing excessive data.
 - Periodic session checks run every 5 minutes; consider adjusting frequency based on backend capabilities and UX needs.
 - Large libraries like xlsx are explicitly optimized; ensure only necessary features are imported.
-
-[No sources needed since this section provides general guidance]
+- Analytics components use lazy loading and virtual scrolling for large datasets.
+- Revenue data caching implemented to minimize API calls during chart updates.
+- Shop metrics calculations optimized with memoization for real-time performance.
 
 ## Troubleshooting Guide
 Common issues and resolutions:
@@ -374,6 +446,9 @@ Common issues and resolutions:
 - Session expires unexpectedly: check backend /auth/get-session behavior and network connectivity; review session intervals in auth store.
 - Persistent state not restored: ensure persistedstate plugin is enabled and browser storage is accessible.
 - Missing environment variables: confirm NUXT_PUBLIC_API_BASE and NUXT_PUBLIC_TOMTOM_API_KEY are set in runtime config.
+- Analytics data not loading: verify revenue API endpoints are accessible and returning expected data formats.
+- Chart rendering issues: check browser console for JavaScript errors and ensure chart libraries are properly loaded.
+- Shop metrics calculation delays: monitor backend response times and consider implementing data caching strategies.
 
 **Section sources**
 - [useApi.ts:39-44](file://app/composables/useApi.ts#L39-L44)
@@ -382,6 +457,4 @@ Common issues and resolutions:
 - [nuxt.config.ts:21-26](file://nuxt.config.ts#L21-L26)
 
 ## Conclusion
-The Lacarte Atlas Console leverages Nuxt’s conventions for rapid development, Pinia for robust client-side state, and a centralized API layer for consistent communication. Security is enforced through middleware and JWT session management, while extensibility is supported via composables and modular components. External integrations like TomTom Maps SDK are configured via runtime settings, enabling scalable feature growth.
-
-[No sources needed since this section summarizes without analyzing specific files]
+The Lacarte Atlas Console leverages Nuxt's conventions for rapid development, Pinia for robust client-side state, and a centralized API layer for consistent communication. Security is enforced through middleware and JWT session management, while extensibility is supported via composables and modular components. External integrations like TomTom Maps SDK are configured via runtime settings, enabling scalable feature growth. The enhanced analytics and revenue integration system provides comprehensive business intelligence through dynamic data visualization, separate revenue tracking for pickups and store operations, unified chart representations with interactive legends, and detailed shop overview metrics for operational insights.

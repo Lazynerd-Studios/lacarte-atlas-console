@@ -24,14 +24,18 @@
 - [team/index.vue](file://app/pages/team/index.vue)
 - [support/index.vue](file://app/pages/support/index.vue)
 - [settings/index.vue](file://app/pages/settings/index.vue)
+- [shop/products/index.vue](file://app/pages/shop/products/index.vue)
+- [shop/products/add.vue](file://app/pages/shop/products/add.vue)
+- [shop/products/[id]/index.vue](file://app/pages/shop/products/[id]/index.vue)
+- [shop/products/[id]/edit.vue](file://app/pages/shop/products/[id]/edit.vue)
 </cite>
 
 ## Update Summary
 **Changes Made**
-- Enhanced Security tab with password visibility toggles, improved client-side validation, real-time error feedback, and proper API integration
-- Added comprehensive Activity Logs tab with debounced search (500ms), advanced filtering by action type/module/entity type, pagination support, contextual icons, and detailed log information including timestamps and IP addresses
-- Updated password change workflow with loading states, token management, and success notifications
-- Enhanced settings interface architecture with modular tab-based design
+- Added comprehensive Shop module documentation covering product management with image gallery functionality
+- Documented new product image upload system with immediate upload, animated loading indicators, and limit enforcement
+- Added product detail pages with image galleries, thumbnail selection, and error fallbacks
+- Updated project structure to include shop operations alongside existing business modules
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -46,20 +50,21 @@
 10. [Appendices](#appendices)
 
 ## Introduction
-This document provides comprehensive documentation for the business modules in the Lacarte Atlas Console, covering customer management, fleet management (drivers and trucks), pickup operations, billing and subscriptions, team administration, support systems, and system settings. It explains user stories, feature descriptions, data models, CRUD operations, workflows, and integration patterns between modules. The console is a Nuxt 3 application that communicates with a backend API via a centralized HTTP client and uses role-based permissions to control access.
+This document provides comprehensive documentation for the business modules in the Lacarte Atlas Console, covering customer management, fleet management (drivers and trucks), pickup operations, billing and subscriptions, team administration, support systems, shop operations, and system settings. It explains user stories, feature descriptions, data models, CRUD operations, workflows, and integration patterns between modules. The console is a Nuxt 3 application that communicates with a backend API via a centralized HTTP client and uses role-based permissions to control access.
 
 ## Project Structure
-The application follows a page-driven structure under app/pages, with shared composables, types, components, and middleware. Key configuration includes runtime API base URL and module setup.
+The application follows a page-driven structure under app/pages, with shared composables, types, components, and middleware. Key configuration includes runtime API base URL and module setup. The shop module has been integrated alongside existing business modules.
 
 ```mermaid
 graph TB
 A["Nuxt App<br/>app.vue"] --> B["Layouts<br/>dashboard.vue / default.vue"]
-A --> C["Pages<br/>customers, drivers, trucks, pickups,<br/>billing, management, team, support, settings"]
+A --> C["Pages<br/>customers, drivers, trucks, pickups,<br/>billing, management, team, support, settings, shop"]
 C --> D["Composables<br/>useApi, usePermissions, useCurrency"]
 C --> E["Types<br/>customer.ts, driver.ts, support.ts, team.ts"]
 C --> F["Components<br/>modals, tables, pagination"]
 G["Config<br/>nuxt.config.ts"] --> A
 H["Dependencies<br/>package.json"] --> A
+I["Shop Module<br/>Products & Orders"] --> C
 ```
 
 **Diagram sources**
@@ -444,6 +449,76 @@ Update --> End(["Done"])
 - [support/index.vue:1-422](file://app/pages/support/index.vue#L1-L422)
 - [support.ts:1-81](file://app/types/support.ts#L1-L81)
 
+### Shop Operations
+Purpose:
+- Admin users can manage products with advanced image gallery functionality, including upload, preview, and organization capabilities.
+
+User stories:
+- As an admin, I want to add new products with multiple images and detailed descriptions.
+- As an admin, I want to upload product images with immediate feedback and validation.
+- As an admin, I want to view product details with interactive image galleries and thumbnail selection.
+- As an admin, I want to edit existing products and manage their image collections.
+
+CRUD and workflows:
+- **Product Management**:
+  - Create products via POST /products/admin/ with image upload support
+  - List products via GET /products/admin/ with filtering and search
+  - View product details via GET /products/admin/{id}
+  - Update products via PATCH /products/admin/{id}
+  - Delete products via DELETE /products/admin/{id}
+- **Image Gallery System**:
+  - Immediate image upload with progress indicators
+  - Animated loading states during upload operations
+  - Image limit enforcement with validation feedback
+  - Thumbnail selection and primary image designation
+  - Error fallbacks for failed uploads
+  - Image preview and management interface
+
+Data model highlights:
+- Product includes name, description, price, category, stock, status, and image collection
+- Image entity supports multiple uploads with metadata and validation
+- Upload workflow includes progress tracking and error handling
+
+Integration points:
+- Uses useApi for product and image operations
+- Integrates with file storage services for image hosting
+- Provides visual feedback through toast notifications and loading indicators
+
+```mermaid
+sequenceDiagram
+participant Admin as "Admin"
+participant ProductsPage as "Products Page"
+participant API as "useApi"
+participant Backend as "Backend API"
+participant Storage as "File Storage"
+Admin->>ProductsPage : Click "Add Product"
+ProductsPage->>ProductsPage : Open Product Form
+Admin->>ProductsPage : Select Images
+ProductsPage->>API : Upload Images (Immediate)
+API->>Storage : Store Images
+Storage-->>API : Upload Progress
+API-->>ProductsPage : Loading Indicators
+Storage-->>API : Success/Failure
+API-->>ProductsPage : Image Preview + Validation
+Admin->>ProductsPage : Submit Product
+ProductsPage->>API : POST /products/admin/
+API->>Backend : Create Product with Images
+Backend-->>API : Success
+API-->>ProductsPage : Refresh List + Toast
+```
+
+**Diagram sources**
+- [shop/products/index.vue:1-200](file://app/pages/shop/products/index.vue#L1-L200)
+- [shop/products/add.vue:1-150](file://app/pages/shop/products/add.vue#L1-L150)
+- [shop/products/[id]/index.vue:1-180](file://app/pages/shop/products/[id]/index.vue#L1-L180)
+- [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
+
+**Section sources**
+- [shop/products/index.vue:1-200](file://app/pages/shop/products/index.vue#L1-L200)
+- [shop/products/add.vue:1-150](file://app/pages/shop/products/add.vue#L1-L150)
+- [shop/products/[id]/index.vue:1-180](file://app/pages/shop/products/[id]/index.vue#L1-L180)
+- [shop/products/[id]/edit.vue:1-120](file://app/pages/shop/products/[id]/edit.vue#L1-L120)
+
 ### System Settings
 Purpose:
 - Admin users can manage system preferences, security settings, and monitor activity logs. The settings interface has been significantly enhanced with a modular tab-based architecture focused on security and activity monitoring.
@@ -528,6 +603,7 @@ Module interactions:
 - Fleet management (drivers/trucks) supports pickup assignment and tracking.
 - Settings module provides system-wide configuration and monitoring capabilities that impact all other modules.
 - **Enhanced Integration**: Activity logs provide cross-module audit trails, while security features ensure consistent authentication across all modules.
+- **Shop Integration**: Product management integrates with customer orders and billing systems, providing e-commerce capabilities alongside operational management.
 
 ```mermaid
 graph TB
@@ -542,6 +618,9 @@ Support["Support Tickets"] --> Customers
 Settings["System Settings"] --> All
 ActivityLogs["Activity Logs"] --> All
 Security["Security Features"] --> All
+Shop["Shop & Products"] --> Customers
+Shop --> Billing
+Products["Product Images"] --> Shop
 ```
 
 [No sources needed since this diagram shows conceptual relationships]
@@ -557,6 +636,11 @@ Security["Security Features"] --> All
   - Server-side pagination handles large datasets efficiently
   - Contextual icons and color coding provide instant visual feedback without additional network requests
   - Password validation occurs client-side to minimize unnecessary API calls
+- **Shop Optimization**:
+  - Image uploads use progressive loading with immediate feedback
+  - Thumbnail generation optimized for fast preview rendering
+  - Image compression and caching strategies for improved load times
+  - Batch operations for multiple image uploads to reduce API calls
 
 [No sources needed since this section provides general guidance]
 
@@ -572,12 +656,18 @@ Common issues and resolutions:
   - Tab navigation: Ensure activeTab state is properly managed and tab content conditionals are correct
   - Password change failures: Verify current password validation and check for proper token refresh
   - Pagination issues: Confirm server-side pagination parameters are correctly formatted
+- **Shop Issues**:
+  - Image upload failures: Check file size limits, supported formats, and storage service availability
+  - Gallery not displaying: Verify image URLs are accessible and CORS policies are configured correctly
+  - Thumbnail loading issues: Ensure proper image optimization and caching headers
+  - Product save failures: Validate required fields and check image upload completion before submission
 
 Operational tips:
 - Inspect console logs from useApi for request/response details.
 - Verify runtime config values (NUXT_PUBLIC_API_BASE) in nuxt.config.ts.
 - For permission-related blocks, confirm the user has required roles/permissions.
 - **Settings Debugging**: Monitor activity log API calls and verify pagination parameters are correctly formatted. Check browser console for validation errors and API response structures.
+- **Shop Debugging**: Monitor image upload progress events and check file validation results. Verify storage service connectivity and image processing pipelines.
 
 **Section sources**
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
@@ -585,7 +675,7 @@ Operational tips:
 - [settings/index.vue:104-130](file://app/pages/settings/index.vue#L104-L130)
 
 ## Conclusion
-The Lacarte Atlas Console provides robust administrative capabilities across customers, fleet, pickups, billing, subscriptions, team, support, and system settings. Each module implements clear CRUD flows, consistent error handling, and permission checks. Integration points between modules enable end-to-end operational workflows from customer onboarding to service delivery and billing. The recent settings interface enhancements significantly improve security posture and operational visibility through comprehensive activity logging and enhanced password management capabilities.
+The Lacarte Atlas Console provides robust administrative capabilities across customers, fleet, pickups, billing, subscriptions, team, support, shop operations, and system settings. Each module implements clear CRUD flows, consistent error handling, and permission checks. Integration points between modules enable end-to-end operational workflows from customer onboarding to service delivery and billing. The recent settings interface enhancements significantly improve security posture and operational visibility through comprehensive activity logging and enhanced password management capabilities. The addition of shop operations with advanced image gallery functionality provides comprehensive e-commerce management capabilities alongside traditional operational tools.
 
 [No sources needed since this section summarizes without analyzing specific files]
 
@@ -629,6 +719,13 @@ The Lacarte Atlas Console provides robust administrative capabilities across cus
 - Support
   - GET /support/admin/tickets
   - GET /support/admin/tickets/stats
+- **Shop Operations**
+  - GET /products/admin/
+  - POST /products/admin/
+  - GET /products/admin/{id}
+  - PATCH /products/admin/{id}
+  - DELETE /products/admin/{id}
+  - POST /products/admin/{id}/images (for image uploads)
 - **Settings**
   - POST /auth/change-password (with token refresh)
   - GET /activity-logs/me (with pagination and filters)
@@ -668,3 +765,30 @@ L --> V["Action Type Filters"]
 - [settings/index.vue:214-237](file://app/pages/settings/index.vue#L214-L237)
 - [settings/index.vue:176-190](file://app/pages/settings/index.vue#L176-L190)
 - [AppPagination.vue:1-48](file://app/components/AppPagination.vue#L1-48)
+
+### Shop Module Architecture
+The shop module provides comprehensive product management with advanced image gallery functionality:
+
+```mermaid
+graph LR
+A["Shop Module"] --> B["Product Management"]
+A --> C["Image Gallery System"]
+B --> D["Product CRUD Operations"]
+B --> E["Product Listing & Search"]
+B --> F["Product Detail Views"]
+C --> G["Image Upload Pipeline"]
+C --> H["Thumbnail Generation"]
+C --> I["Gallery Display"]
+G --> J["Progress Tracking"]
+G --> K["Validation & Limits"]
+G --> L["Error Handling"]
+I --> M["Thumbnail Selection"]
+I --> N["Primary Image Designation"]
+I --> O["Error Fallbacks"]
+```
+
+**Diagram sources**
+- [shop/products/index.vue:1-200](file://app/pages/shop/products/index.vue#L1-L200)
+- [shop/products/add.vue:1-150](file://app/pages/shop/products/add.vue#L1-L150)
+- [shop/products/[id]/index.vue:1-180](file://app/pages/shop/products/[id]/index.vue#L1-L180)
+- [shop/products/[id]/edit.vue:1-120](file://app/pages/shop/products/[id]/edit.vue#L1-L120)

@@ -17,6 +17,14 @@
 - [tracking/drivers.vue](file://app/pages/tracking/drivers.vue)
 </cite>
 
+## Update Summary
+**Changes Made**
+- Added comprehensive driver compensation field support including perTripRate, expectedTripsPerMonth, minimumFillRate, and paymentFrequency fields
+- Enhanced driver detail page with manual bonus/deduction adjustments functionality
+- Updated driver data models to include compensation-related properties
+- Added validation and UI inputs for compensation fields in driver creation and editing workflows
+- Integrated dynamic earnings fetching capabilities for real-time compensation tracking
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Project Structure](#project-structure)
@@ -29,7 +37,7 @@
 9. [Conclusion](#conclusion)
 
 ## Introduction
-This document provides comprehensive documentation for the Fleet Management feature, covering driver and truck administration, assignment workflows, availability tracking, operational status management, and real-time status updates. It explains how drivers and trucks are modeled, how assignments are created and updated, and how the system integrates with backend APIs to reflect live operational states.
+This document provides comprehensive documentation for the Fleet Management feature, covering driver and truck administration, assignment workflows, availability tracking, operational status management, and real-time status updates. It explains how drivers and trucks are modeled, how assignments are created and updated, and how the system integrates with backend APIs to reflect live operational states. The system now includes advanced driver compensation management with per-trip rates, monthly trip expectations, fill rate requirements, and flexible payment frequency options.
 
 ## Project Structure
 Fleet Management is implemented across pages, components, types, and composables:
@@ -106,11 +114,12 @@ Track --> Api
 - [tracking/drivers.vue:1-556](file://app/pages/tracking/drivers.vue#L1-L556)
 
 ## Core Components
-- Driver lifecycle: Create, edit, delete, view details, route history, performance metrics, earnings summary.
+- Driver lifecycle: Create, edit, delete, view details, route history, performance metrics, earnings summary, and compensation management.
 - Truck lifecycle: Create, edit, delete, view details, maintenance scheduling/history, assign/unassign driver.
-- Assignment workflow: Assign a driver to a truck via modal; update truck’s assigned driver and refresh state.
+- Assignment workflow: Assign a driver to a truck via modal; update truck's assigned driver and refresh state.
 - Availability and status: Drivers have statuses such as active, inactive, on_leave, on-route, online; Trucks have active, maintenance, inactive.
 - Real-time tracking: SSE-based driver location stream rendered on a map.
+- Compensation management: Per-trip rate configuration, monthly trip expectations, minimum fill rate tracking, and flexible payment frequency settings.
 
 Key responsibilities by file:
 - Data models: [driver.ts:1-106](file://app/types/driver.ts#L1-L106)
@@ -139,7 +148,7 @@ Key responsibilities by file:
 - [tracking/drivers.vue:1-556](file://app/pages/tracking/drivers.vue#L1-L556)
 
 ## Architecture Overview
-The Fleet Management UI follows a page-driven architecture with reusable modals and typed data models. All server interactions go through a centralized API composable that handles authentication, error handling, and response normalization.
+The Fleet Management UI follows a page-driven architecture with reusable modals and typed data models. All server interactions go through a centralized API composable that handles authentication, error handling, and response normalization. The system now supports comprehensive driver compensation management with real-time earnings calculation and adjustment capabilities.
 
 ```mermaid
 sequenceDiagram
@@ -175,8 +184,8 @@ API-->>Page : Updated truck with assignedDriver
 ## Detailed Component Analysis
 
 ### Data Models and Relationships
-The shared type definitions define the core entities and their relationships:
-- Driver: identity, contact info, license, zone, status, assigned truck, stats
+The shared type definitions define the core entities and their relationships, now enhanced with comprehensive compensation fields:
+- Driver: identity, contact info, license, zone, status, assigned truck, stats, and compensation details
 - Truck: identity, plate, VIN, make/model/year/capacity, status, assigned driver, GPS info
 - DriverTracking: real-time telemetry fields
 - Payloads: create/update structures for drivers and trucks
@@ -215,6 +224,10 @@ class Driver {
 +number deductionAmt
 +number completed
 +number total
++number perTripRate
++number expectedTripsPerMonth
++number minimumFillRate
++string paymentFrequency
 }
 class TruckDriver {
 +string id
@@ -252,6 +265,8 @@ Driver --> AssignedTruck : "assigned"
 Truck --> TruckDriver : "assigned"
 ```
 
+**Updated** Added compensation fields to the Driver class including perTripRate, expectedTripsPerMonth, minimumFillRate, and paymentFrequency for comprehensive driver compensation management.
+
 **Diagram sources**
 - [driver.ts:1-106](file://app/types/driver.ts#L1-L106)
 
@@ -263,15 +278,18 @@ Truck --> TruckDriver : "assigned"
   - UI: [AddDriverModal.vue:1-190](file://app/components/AddDriverModal.vue#L1-L190)
   - Submission: [drivers/index.vue:23-33](file://app/pages/drivers/index.vue#L23-L33)
   - API: POST /drivers/admin/
+  - **Updated** Now includes compensation field validation and input handling
 - Edit Driver:
   - UI: [EditDriverModal.vue:1-195](file://app/components/EditDriverModal.vue#L1-L195)
   - Submission: [drivers/[id].vue](file://app/pages/drivers/[id].vue#L271-L282)
   - API: PATCH /drivers/admin/:id
+  - **Updated** Enhanced with compensation field editing capabilities
 - Delete Driver:
   - Confirmation and deletion: [drivers/[id].vue](file://app/pages/drivers/[id].vue#L284-L300)
   - API: DELETE /drivers/admin/:id
 - View Details:
   - Profile, current route, history, performance, earnings: [drivers/[id].vue](file://app/pages/drivers/[id].vue#L108-L119)
+  - **Updated** Enhanced with manual bonus/deduction adjustments and dynamic earnings fetching
   - API calls:
     - GET /drivers/admin/:id
     - GET /drivers/admin/:id/route
@@ -284,13 +302,18 @@ Start([Open Driver Detail]) --> FetchProfile["GET /drivers/admin/:id"]
 FetchProfile --> FetchRoute["GET /drivers/admin/:id/route"]
 FetchProfile --> FetchHistory["GET /drivers/admin/:id/pickups/history"]
 FetchProfile --> FetchPerf["GET /drivers/admin/:id/performance?months=N"]
+FetchProfile --> FetchEarnings["GET /drivers/admin/:id/earnings"]
 FetchRoute --> RenderRoute["Render Current Route"]
 FetchHistory --> RenderHistory["Render History Table"]
 FetchPerf --> RenderPerf["Render Charts & Stats"]
+FetchEarnings --> RenderEarnings["Render Earnings Summary"]
 RenderRoute --> End([Ready])
 RenderHistory --> End
 RenderPerf --> End
+RenderEarnings --> End
 ```
+
+**Updated** Added dynamic earnings fetching endpoint and enhanced earnings display with manual adjustment capabilities.
 
 **Diagram sources**
 - [drivers/[id].vue](file://app/pages/drivers/[id].vue#L36-L119)
@@ -426,6 +449,50 @@ OnLeave --> Active : "return"
 - [trucks/index.vue:1-205](file://app/pages/trucks/index.vue#L1-L205)
 - [trucks/[id].vue](file://app/pages/trucks/[id].vue#L1-L573)
 
+### Driver Compensation Management
+**New Section** The system now provides comprehensive driver compensation management with the following features:
+
+- **Per-Trip Rate Configuration**: Set individual per-trip compensation rates for each driver
+- **Monthly Trip Expectations**: Define expected trips per month for performance tracking
+- **Minimum Fill Rate**: Configure minimum fill rate requirements for optimal utilization
+- **Payment Frequency Settings**: Support for various payment frequencies (weekly, bi-weekly, monthly)
+- **Manual Adjustments**: Ability to add bonuses and deductions directly from driver detail page
+- **Dynamic Earnings Calculation**: Real-time earnings calculation based on actual trips and rates
+
+Compensation fields integration:
+- **Data Model**: Enhanced Driver type with compensation properties
+- **UI Inputs**: Validation and input handling in Add/Edit Driver modals
+- **Detail Page**: Manual bonus/deduction adjustment interface
+- **API Integration**: Backend endpoints for compensation data synchronization
+
+```mermaid
+flowchart TD
+CompSetup["Compensation Setup"] --> PerTripRate["Set Per-Trip Rate"]
+CompSetup --> ExpectedTrips["Define Expected Trips/Month"]
+CompSetup --> MinFillRate["Configure Minimum Fill Rate"]
+CompSetup --> PaymentFreq["Set Payment Frequency"]
+ActualTrips["Actual Trip Tracking"] --> EarningsCalc["Calculate Earnings"]
+EarningsCalc --> BonusAdj["Apply Bonuses"]
+EarningsCalc --> DeductionAdj["Apply Deductions"]
+BonusAdj --> FinalEarnings["Final Earnings"]
+DeductionAdj --> FinalEarnings
+MinFillRate --> PerformanceCheck["Performance Check"]
+ExpectedTrips --> PerformanceCheck
+PerformanceCheck --> FinalEarnings
+```
+
+**Diagram sources**
+- [driver.ts:1-106](file://app/types/driver.ts#L1-L106)
+- [AddDriverModal.vue:1-190](file://app/components/AddDriverModal.vue#L1-L190)
+- [EditDriverModal.vue:1-195](file://app/components/EditDriverModal.vue#L1-L195)
+- [drivers/[id].vue](file://app/pages/drivers/[id].vue#L1-L800)
+
+**Section sources**
+- [driver.ts:1-106](file://app/types/driver.ts#L1-L106)
+- [AddDriverModal.vue:1-190](file://app/components/AddDriverModal.vue#L1-L190)
+- [EditDriverModal.vue:1-195](file://app/components/EditDriverModal.vue#L1-L195)
+- [drivers/[id].vue](file://app/pages/drivers/[id].vue#L1-L800)
+
 ### Real-Time Status Updates (Driver Tracking)
 - Live map rendering using TomTom SDK
 - SSE connection to /tracking/sse/drivers
@@ -500,8 +567,7 @@ Types --> TrackingDrivers
   - For large lists, consider pagination or virtualization if needed.
 - Error resilience:
   - Centralized error handling in [useApi.ts:46-67](file://app/composables/useApi.ts#L46-L67) ensures consistent UX and avoids repeated failed requests.
-
-[No sources needed since this section provides general guidance]
+- **Updated** Compensation calculations should be cached where possible to minimize API calls during earnings display.
 
 ## Troubleshooting Guide
 - Authentication failures:
@@ -512,6 +578,9 @@ Types --> TrackingDrivers
   - Connection errors set a non-blocking banner with a retry button ([tracking/drivers.vue:285-353](file://app/pages/tracking/drivers.vue#L285-L353)).
 - Validation errors in forms:
   - Driver and Truck modals validate required fields and display inline errors ([AddDriverModal.vue:29-38](file://app/components/AddDriverModal.vue#L29-L38), [AddTruckModal.vue:37-85](file://app/components/AddTruckModal.vue#L37-L85)).
+- **Updated** Compensation field validation:
+  - Ensure numeric values are properly formatted and within acceptable ranges for per-trip rates and fill rates.
+  - Validate payment frequency against supported values.
 
 **Section sources**
 - [useApi.ts:39-67](file://app/composables/useApi.ts#L39-L67)
@@ -521,4 +590,4 @@ Types --> TrackingDrivers
 - [AddTruckModal.vue:37-85](file://app/components/AddTruckModal.vue#L37-L85)
 
 ## Conclusion
-Fleet Management provides a robust admin experience for managing drivers and trucks, including assignment workflows, maintenance scheduling, and real-time tracking. The modular structure separates concerns between pages, modals, types, and API utilities, enabling clear maintenance and extensibility. Status management and assignment constraints are enforced at both UI and API layers, ensuring consistency across the application.
+Fleet Management provides a robust admin experience for managing drivers and trucks, including assignment workflows, maintenance scheduling, real-time tracking, and comprehensive compensation management. The modular structure separates concerns between pages, modals, types, and API utilities, enabling clear maintenance and extensibility. Status management and assignment constraints are enforced at both UI and API layers, ensuring consistency across the application. The new compensation management features provide flexible driver payment configurations with real-time earnings calculation and manual adjustment capabilities, enhancing the overall driver administration experience.
