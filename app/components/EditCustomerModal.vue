@@ -13,6 +13,7 @@ const emit = defineEmits<{
     zoneId: string
     phoneNumber: string
     noBins: number
+    capacityRateId: string | null
     address: string
     city: string
     region: string
@@ -22,19 +23,28 @@ const emit = defineEmits<{
   }): void
 }>()
 
-const customerTypes = ref<{ id: string; name: string }[]>([])
+const customerTypes = ref<{ id: string; name: string; pricingMode?: 'per_bin' | 'full_truck' }[]>([])
 const zones = ref<{ id: string; name: string; color: string }[]>([])
+const capacityTiers = ref<{ id: string; capacityLiters: number; prepayRate: number }[]>([])
 const loadingOptions = ref(true)
 
 onMounted(async () => {
   const api = useApi()
-  const [typesRes, zonesRes] = await Promise.all([
-    api.get<{ id: string; name: string; customerCount?: string }[]>('/customer/admin/types/', 'Failed to load customer types'),
+  const [typesRes, zonesRes, capacityRes] = await Promise.all([
+    api.get<{ id: string; name: string; customerCount?: string; pricingMode?: 'per_bin' | 'full_truck' }[]>('/customer/admin/types/', 'Failed to load customer types'),
     api.get<{ id: string; name: string; color: string }[]>('/zone/public/list', 'Failed to load zones'),
+    api.get<{ tiers: { id: string; capacityLiters: number; prepayRate: number }[] }>('/rates/admin/capacity', 'Failed to load bin capacities'),
   ])
   if (typesRes) customerTypes.value = typesRes
   if (zonesRes) zones.value = zonesRes
+  if (capacityRes) capacityTiers.value = capacityRes.tiers || []
   loadingOptions.value = false
+})
+
+// Whether the selected customer type is priced per bin
+const isPerBinType = computed(() => {
+  const ct = customerTypes.value.find(t => t.id === form.customerTypeId)
+  return (ct?.pricingMode ?? 'per_bin') === 'per_bin'
 })
 
 const form = reactive({
@@ -42,6 +52,7 @@ const form = reactive({
   zoneId: props.customer.zoneId ?? '',
   phoneNumber: props.customer.phoneNumber ?? '',
   noBins: props.customer.noBins ?? 1,
+  capacityRateId: props.customer.capacityRateId ?? '',
   address: props.customer.address ?? '',
   city: props.customer.city ?? '',
   region: props.customer.region ?? '',
@@ -60,6 +71,7 @@ function validate() {
   if (!form.customerTypeId)      errors.customerTypeId = 'Required'
   if (!form.zoneId)              errors.zoneId = 'Required'
   if (form.noBins < 0)           errors.noBins = 'Cannot be negative'
+  if (isPerBinType.value && !form.capacityRateId) errors.capacityRateId = 'Required'
   return Object.keys(errors).length === 0
 }
 
@@ -71,6 +83,7 @@ function submit() {
     zoneId: form.zoneId,
     phoneNumber: form.phoneNumber.trim(),
     noBins: Number(form.noBins),
+    capacityRateId: isPerBinType.value ? (form.capacityRateId || null) : null,
     address: form.address.trim(),
     city: form.city.trim(),
     region: form.region?.trim() ?? '',
@@ -144,6 +157,19 @@ const selectStyle = (hasValue: boolean) =>
             <option v-for="t in customerTypes" :key="t.id" :value="t.id">{{ t.name }}</option>
           </select>
           <span v-if="errors.customerTypeId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.customerTypeId }}</span>
+        </div>
+
+        <!-- Bin Capacity (per_bin pricing mode only) -->
+        <div v-if="isPerBinType" style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Bin Capacity</label>
+          <select
+            v-model="form.capacityRateId"
+            :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid ${errors.capacityRateId ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:${form.capacityRateId ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+          >
+            <option value="" disabled>Select bin capacity</option>
+            <option v-for="tier in capacityTiers" :key="tier.id" :value="tier.id">{{ tier.capacityLiters }}L — GHS {{ tier.prepayRate }}/pickup</option>
+          </select>
+          <span v-if="errors.capacityRateId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.capacityRateId }}</span>
         </div>
 
         <!-- Zone -->

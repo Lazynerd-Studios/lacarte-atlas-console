@@ -102,6 +102,7 @@ async function handleEditCustomer(payload: {
   zoneId: string
   phoneNumber: string
   noBins: number
+  capacityRateId: string | null
   address: string
   city: string
   region: string

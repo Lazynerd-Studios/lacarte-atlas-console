@@ -18,6 +18,7 @@ export interface CustomerUser {
 export interface CustomerType {
   id: string
   name: string
+  pricingMode?: 'per_bin' | 'full_truck'
   createdAt: string
   updatedAt: string
 }
@@ -38,6 +39,7 @@ export interface Customer {
   zoneId: string
   phoneNumber: string
   noBins: number
+  capacityRateId?: string | null
   status: string
   address: string | null
   city: string | null

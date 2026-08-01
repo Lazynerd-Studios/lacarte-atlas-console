@@ -8,6 +8,8 @@ interface EstimatedQuantityOption {
   binCount: number | null
 }
 
+type PricingMode = 'per_bin' | 'full_truck'
+
 interface CustomerType {
   id: string  // UUID from API
   name: string
@@ -15,6 +17,7 @@ interface CustomerType {
   color: string  // Client-side only
   customerCount: number  // Client-side only
   estimatedQuantities: EstimatedQuantityOption[]
+  pricingMode: PricingMode
 }
 
 interface ApiCustomerType {
@@ -22,6 +25,7 @@ interface ApiCustomerType {
   name: string
   customerCount?: number
   estimatedQuantities?: EstimatedQuantityOption[]
+  pricingMode?: PricingMode
   createdAt: string
   updatedAt: string
 }
@@ -52,6 +56,7 @@ async function fetchCustomerTypes() {
       color: getColorForIndex(index),  // Assign colors cyclically
       customerCount: ct.customerCount ?? 0,  // Use API value if available
       estimatedQuantities: ct.estimatedQuantities ?? [],
+      pricingMode: ct.pricingMode ?? 'per_bin',
     }))
   }
   
@@ -90,16 +95,21 @@ function toggleQuantity(ids: string[], id: string): string[] {
 
 // Add modal
 const showAddModal = ref(false)
-const addForm = ref({ name: '', description: '', color: '#ffb400' })
+const addForm = ref({ name: '', description: '', color: '#ffb400', pricingMode: 'per_bin' as PricingMode })
 const addSelectedQuantityIds = ref<string[]>([])
 const addError = ref('')
 
 function openAdd() {
-  addForm.value = { name: '', description: '', color: '#ffb400' }
+  addForm.value = { name: '', description: '', color: '#ffb400', pricingMode: 'per_bin' }
   addSelectedQuantityIds.value = []
   addError.value = ''
   showAddModal.value = true
 }
+
+const pricingModeHelper = (mode: PricingMode) =>
+  mode === 'per_bin'
+    ? 'Customers priced by bin size × number of bins'
+    : 'Customers priced by truck load tier (flat per trip)'
 
 async function handleAdd() {
   if (!addForm.value.name.trim()) { 
@@ -117,7 +127,10 @@ async function handleAdd() {
     console.log('[CustomerTypes] Creating customer type:', addForm.value.name, 'quantities:', addSelectedQuantityIds.value)
     
     // Omit estimatedQuantityIds when nothing selected — type falls back to all active quantities
-    const payload: Record<string, unknown> = { name: addForm.value.name.trim() }
+    const payload: Record<string, unknown> = {
+      name: addForm.value.name.trim(),
+      pricingMode: addForm.value.pricingMode,
+    }
     if (addSelectedQuantityIds.value.length > 0) {
       payload.estimatedQuantityIds = addSelectedQuantityIds.value
     }
@@ -150,7 +163,7 @@ async function handleAdd() {
 }
 
 const showEditModal = ref(false)
-const editForm = ref<CustomerType>({ id: '', name: '', description: '', color: '#ffb400', customerCount: 0, estimatedQuantities: [] })
+const editForm = ref<CustomerType>({ id: '', name: '', description: '', color: '#ffb400', customerCount: 0, estimatedQuantities: [], pricingMode: 'per_bin' })
 const editSelectedQuantityIds = ref<string[]>([])
 const editError = ref('')
 
@@ -179,7 +192,7 @@ async function handleEdit() {
     // Always send the full set on PATCH — it replaces the associations; [] detaches all (falls back to all active)
     const response = await api.patch<ApiCustomerType>(
       `/customer/admin/types/${editForm.value.id}`,
-      { name: editForm.value.name.trim(), estimatedQuantityIds: editSelectedQuantityIds.value },
+      { name: editForm.value.name.trim(), estimatedQuantityIds: editSelectedQuantityIds.value, pricingMode: editForm.value.pricingMode },
       'Failed to update customer type'
     )
     
@@ -354,6 +367,7 @@ onMounted(() => {
           <tr style="border-bottom:1px solid #f0f0f0">
             <th style="padding:14px 24px;text-align:left;font-size:13px;font-weight:600;color:#6b7280">Type</th>
             <th style="padding:14px 16px;text-align:left;font-size:13px;font-weight:600;color:#6b7280">Customers</th>
+            <th style="padding:14px 16px;text-align:left;font-size:13px;font-weight:600;color:#6b7280">Pricing Mode</th>
             <th style="padding:14px 16px;text-align:left;font-size:13px;font-weight:600;color:#6b7280">Quantities</th>
             <th style="padding:14px 24px;text-align:right;font-size:13px;font-weight:600;color:#6b7280">Actions</th>
           </tr>
@@ -373,6 +387,11 @@ onMounted(() => {
             </td>
             <td style="padding:14px 16px">
               <span :style="`background:${ct.color}22;color:${ct.color};font-size:12px;font-weight:600;padding:3px 12px;border-radius:20px;white-space:nowrap`">{{ ct.customerCount }} customers</span>
+            </td>
+            <td style="padding:14px 16px">
+              <span :style="`font-size:12px;font-weight:600;padding:3px 12px;border-radius:20px;white-space:nowrap;background:${ct.pricingMode === 'per_bin' ? '#f0f9ff' : '#fdf4ff'};color:${ct.pricingMode === 'per_bin' ? '#0369a1' : '#a21caf'}`">
+                {{ ct.pricingMode === 'per_bin' ? 'Per Bin' : 'Full Truck' }}
+              </span>
             </td>
             <td style="padding:14px 16px">
               <div v-if="ct.estimatedQuantities.length > 0" style="display:flex;gap:6px;flex-wrap:wrap">
@@ -421,6 +440,16 @@ onMounted(() => {
           <div>
             <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Name <span style="color:#ef4444">*</span></label>
             <input v-model="addForm.name" placeholder="e.g. Commercial" style="width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box" />
+          </div>
+          <div>
+            <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:8px">Pricing Mode</label>
+            <div style="display:flex;gap:10px">
+              <button v-for="mode in (['per_bin', 'full_truck'] as const)" :key="mode" type="button" @click="addForm.pricingMode = mode"
+                :style="`flex:1;padding:10px 14px;border:1.5px solid ${addForm.pricingMode === mode ? '#ffb400' : '#e5e7eb'};border-radius:10px;background:${addForm.pricingMode === mode ? '#fff9e6' : '#fff'};cursor:pointer;text-align:left`">
+                <span style="display:block;font-size:13px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ mode === 'per_bin' ? 'Per Bin' : 'Full Truck' }}</span>
+              </button>
+            </div>
+            <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">{{ pricingModeHelper(addForm.pricingMode) }}</p>
           </div>
           <div>
             <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Description</label>
@@ -475,6 +504,16 @@ onMounted(() => {
           <div>
             <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Name <span style="color:#ef4444">*</span></label>
             <input v-model="editForm.name" style="width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box" />
+          </div>
+          <div>
+            <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:8px">Pricing Mode</label>
+            <div style="display:flex;gap:10px">
+              <button v-for="mode in (['per_bin', 'full_truck'] as const)" :key="mode" type="button" @click="editForm.pricingMode = mode"
+                :style="`flex:1;padding:10px 14px;border:1.5px solid ${editForm.pricingMode === mode ? '#ffb400' : '#e5e7eb'};border-radius:10px;background:${editForm.pricingMode === mode ? '#fff9e6' : '#fff'};cursor:pointer;text-align:left`">
+                <span style="display:block;font-size:13px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ mode === 'per_bin' ? 'Per Bin' : 'Full Truck' }}</span>
+              </button>
+            </div>
+            <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">{{ pricingModeHelper(editForm.pricingMode) }}</p>
           </div>
           <div>
             <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Description</label>

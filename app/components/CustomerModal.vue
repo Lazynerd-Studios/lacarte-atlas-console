@@ -11,8 +11,9 @@ const api = useApi()
 const toast = useAppToast()
 const config = useRuntimeConfig()
 
-interface CustomerType { id: string; name: string }
+interface CustomerType { id: string; name: string; pricingMode?: 'per_bin' | 'full_truck' }
 interface Zone { id: string; name: string }
+interface CapacityTierOption { id: string; capacityLiters: number; prepayRate: number }
 
 type TomTomPlace = Feature<Point, {
   address?: {
@@ -36,6 +37,7 @@ const form = reactive({
   customerTypeId: '',
   zoneId: '',
   binCount: 1,
+  capacityRateId: '',
   address: '',
   city: '',
   region: '',
@@ -52,7 +54,14 @@ const GHANA_RADIUS_METERS = 300000
 
 const customerTypes = ref<CustomerType[]>([])
 const zones = ref<Zone[]>([])
+const capacityTiers = ref<CapacityTierOption[]>([])
 const loading = ref(false)
+
+// Whether the selected customer type is priced per bin
+const isPerBinType = computed(() => {
+  const ct = customerTypes.value.find(t => t.id === form.customerTypeId)
+  return (ct?.pricingMode ?? 'per_bin') === 'per_bin'
+})
 
 const addressSuggestions = ref<TomTomPlace[]>([])
 const showSuggestions = ref(false)
@@ -134,9 +143,17 @@ async function fetchZones() {
   }
 }
 
+async function fetchCapacityTiers() {
+  const data = await api.get<{ tiers: CapacityTierOption[] }>('/rates/admin/capacity', 'Failed to load bin capacities')
+  if (data) {
+    capacityTiers.value = (data.tiers || []).filter(t => t.capacityLiters != null)
+  }
+}
+
 onMounted(() => {
   fetchCustomerTypes()
   fetchZones()
+  fetchCapacityTiers()
 })
 
 const errors = reactive<Record<string, string>>({})
@@ -150,13 +167,14 @@ function validate() {
   if (!form.phone.trim())      errors.phone = 'Required'
   if (!form.customerTypeId)    errors.customerTypeId = 'Required'
   if (!form.zoneId)            errors.zoneId = 'Required'
+  if (isPerBinType.value && !form.capacityRateId) errors.capacityRateId = 'Required'
   return Object.keys(errors).length === 0
 }
 
 async function submit() {
   if (!validate()) return
   loading.value = true
-  const payload = {
+  const payload: Record<string, unknown> = {
     email: form.email.trim(),
     name: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
     phoneNumber: form.phone.trim(),
@@ -173,6 +191,10 @@ async function submit() {
       latitude: Number(form.latitude) || 0,
       longitude: Number(form.longitude) || 0,
     },
+  }
+  // Only per_bin customers get a capacity rate assigned at profile level
+  if (isPerBinType.value && form.capacityRateId) {
+    payload.capacityRateId = form.capacityRateId
   }
   const result = await api.post('/customer/admin/', payload, 'Failed to create customer')
   loading.value = false
@@ -266,6 +288,21 @@ function onBlur(e: Event, field: string) {
             <option v-for="t in customerTypes" :key="t.id" :value="t.id">{{ t.name }}</option>
           </select>
           <span v-if="errors.customerTypeId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.customerTypeId }}</span>
+        </div>
+
+        <!-- Bin Capacity (per_bin pricing mode only) -->
+        <div v-if="isPerBinType" style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Bin Capacity</label>
+          <select
+            v-model="form.capacityRateId"
+            :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid ${errors.capacityRateId ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:${form.capacityRateId ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+            @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+            @blur="($event.target as HTMLElement).style.borderColor=errors.capacityRateId ? '#ef4444' : '#e5e7eb'"
+          >
+            <option value="" disabled>Select bin capacity</option>
+            <option v-for="tier in capacityTiers" :key="tier.id" :value="tier.id">{{ tier.capacityLiters }}L — GHS {{ tier.prepayRate }}/pickup</option>
+          </select>
+          <span v-if="errors.capacityRateId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.capacityRateId }}</span>
         </div>
 
         <!-- Address -->
