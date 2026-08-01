@@ -239,12 +239,43 @@ async function fetchStats() {
 
 const cycleLabel = (c: BillingCycle) => ({ monthly: 'Monthly', quarterly: 'Quarterly', yearly: 'Yearly' }[c])
 
+// ── Active Subscription Tiers ──
+// Subscriptions are listed via the plans endpoint: each active plan is a
+// subscription tier carrying its current subscriberCount. This consolidated
+// view shows active tiers across both billing types (the plan cards above are
+// filtered by the active tab and include inactive plans for management).
+const activeTiers = ref<Plan[]>([])
+
+/**
+ * Fetch all active subscription tiers (plans) across both billing types.
+ *
+ * Uses the raw request helper so a failure degrades gracefully to an empty
+ * list instead of surfacing an error toast.
+ */
+async function fetchActiveTiers() {
+  const api = useApi()
+  try {
+    const response = await api.request<{ plans?: ApiPlan[]; data?: ApiPlan[] } | ApiPlan[]>(
+      '/subscription/admin/plans?status=active',
+      {}
+    )
+    const list = Array.isArray(response)
+      ? response
+      : (response?.plans || response?.data || [])
+    activeTiers.value = list.map(apiToPlan)
+    console.log('[fetchActiveTiers] Loaded', activeTiers.value.length, 'active tiers')
+  } catch (err) {
+    console.log('[fetchActiveTiers] Not available, showing empty list:', err)
+    activeTiers.value = []
+  }
+}
+
 // ── Lifecycle Hooks ──
 
 // Fetch data on mount
 onMounted(async () => {
   console.log('[onMounted] Initializing subscription page')
-  await Promise.all([fetchPlans(), fetchStats()])
+  await Promise.all([fetchPlans(), fetchStats(), fetchActiveTiers()])
 })
 
 // Watch for tab changes and refresh data
@@ -682,7 +713,7 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
           <div style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
             <p style="font-size:12px;color:#6b7280;margin:0 0 6px;font-weight:500">Est. Revenue</p>
             <p style="font-size:28px;font-weight:700;color:#1a1a1a;margin:0">{{ format(totalRevenue) }}</p>
-            <p style="font-size:11px;color:#9ca3af;margin:4px 0 0">monthly</p>
+            <p style="font-size:11px;color:#9ca3af;margin:4px 0 0">monthly · plan-based only</p>
           </div>
         </template>
       </div>
@@ -756,6 +787,68 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
       <p style="font-size:15px;font-weight:600;color:#1a1a1a;margin:0 0 6px">No {{ activeTab }} plans yet</p>
       <p style="font-size:13px;color:#6b7280;margin:0 0 20px">Create your first {{ activeTab }} plan to get started.</p>
       <button @click="openAdd" style="background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Add Plan</button>
+    </div>
+
+    <!-- ── ACTIVE SUBSCRIPTIONS (all active tiers, both billing types) ── -->
+    <div style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;overflow:hidden">
+      <div style="padding:20px 24px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div>
+          <p style="font-size:16px;font-weight:700;color:#1a1a1a;margin:0">Active Subscriptions</p>
+          <p style="font-size:13px;color:#6b7280;margin:4px 0 0">All active subscription tiers across prepaid and postpaid, with current subscriber counts</p>
+        </div>
+        <span style="font-size:13px;color:#9ca3af">{{ activeTiers.length }} tier{{ activeTiers.length !== 1 ? 's' : '' }}</span>
+      </div>
+
+      <table v-if="activeTiers.length > 0" style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
+            <th style="padding:12px 24px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Plan</th>
+            <th style="padding:12px 16px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Billing</th>
+            <th style="padding:12px 16px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Pickups</th>
+            <th style="padding:12px 16px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Cycle</th>
+            <th style="padding:12px 16px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Price</th>
+            <th style="padding:12px 24px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Subscribers</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="tier in activeTiers" :key="tier.id" style="border-bottom:1px solid #f0f0f0"
+            @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
+            @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'">
+            <!-- Plan name + color -->
+            <td style="padding:14px 24px">
+              <div style="display:flex;align-items:center;gap:10px">
+                <span :style="`width:10px;height:10px;border-radius:50%;background:${tier.color};display:inline-block;flex-shrink:0`"></span>
+                <span style="font-size:14px;font-weight:600;color:#1a1a1a">{{ tier.name }}</span>
+              </div>
+            </td>
+            <!-- Billing type badge -->
+            <td style="padding:14px 16px">
+              <span :style="`font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;text-transform:capitalize;${tier.billingType === 'prepaid' ? 'background:#eff6ff;color:#1d4ed8' : 'background:#fdf4ff;color:#a21caf'}`">{{ tier.billingType }}</span>
+            </td>
+            <!-- Pickups -->
+            <td style="padding:14px 16px;font-size:13px;color:#374151">{{ tier.pickupCount }}</td>
+            <!-- Billing cycle -->
+            <td style="padding:14px 16px;font-size:13px;color:#374151">{{ cycleLabel(tier.billingCycle) }}</td>
+            <!-- Price -->
+            <td style="padding:14px 16px">
+              <span style="font-size:14px;font-weight:700;color:#1a1a1a">{{ format(tier.price) }}</span>
+            </td>
+            <!-- Subscriber count -->
+            <td style="padding:14px 24px">
+              <span style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#1a1a1a">
+                <Icon name="lucide:users" style="width:14px;height:14px;color:#6b7280" />
+                {{ tier.subscriberCount }}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div v-else style="padding:40px 24px;text-align:center">
+        <Icon name="lucide:repeat" style="width:32px;height:32px;color:#d1d5db;margin-bottom:10px" />
+        <p style="font-size:14px;font-weight:600;color:#1a1a1a;margin:0 0 4px">No active subscriptions</p>
+        <p style="font-size:13px;color:#6b7280;margin:0">Active subscription tiers will appear here.</p>
+      </div>
     </div>
 
     <!-- ── ADD MODAL ── -->
