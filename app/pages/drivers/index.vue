@@ -46,7 +46,8 @@ function statusStyle(s: string) {
 </script>
 
 <template>
-  <div style="display:flex;flex-direction:column;gap:32px">
+  <PageSkeleton v-if="loading && drivers.length === 0" type="card-grid" />
+  <div v-else style="display:flex;flex-direction:column;gap:32px">
     <div style="display:flex;align-items:flex-start;justify-content:space-between">
       <div>
         <h1 style="font-size:32px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;line-height:1.3">Drivers &amp; Trucks</h1>

@@ -299,9 +299,11 @@ onMounted(() => {
           <tr v-if="filtered.length === 0 && !inventoryLoading">
             <td colspan="8" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No items match your filters</td>
           </tr>
-          <tr v-if="inventoryLoading">
-            <td colspan="8" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Loading inventory...</td>
-          </tr>
+          <template v-if="inventoryLoading">
+            <tr v-for="i in 5" :key="`sk-${i}`" style="border-bottom:1px solid #e5e7eb">
+              <td v-for="j in 8" :key="j" style="padding:20px 16px"><div class="skeleton" style="height:14px;width:100%" /></td>
+            </tr>
+          </template>
         </tbody>
       </table>
     </div>

@@ -278,7 +278,37 @@ onMounted(async () => {
 
 <template>
   <div v-if="loading" style="display:flex;flex-direction:column;gap:28px">
-    <PageSkeleton type="dashboard" />
+    <!-- Back link skeleton -->
+    <div class="skeleton" style="height:16px;width:120px;border-radius:8px" />
+
+    <!-- Header skeleton -->
+    <div>
+      <div class="skeleton" style="height:32px;width:240px;margin-bottom:8px" />
+      <div class="skeleton" style="height:14px;width:340px" />
+    </div>
+
+    <!-- Two-column form skeleton -->
+    <div style="display:grid;grid-template-columns:1fr 344px;gap:24px;align-items:start">
+      <!-- Left: form fields -->
+      <div style="display:flex;flex-direction:column;gap:24px">
+        <div v-for="i in 2" :key="i" style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+          <div class="skeleton" style="height:20px;width:180px;margin-bottom:24px" />
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <div v-for="j in 3" :key="j" style="display:flex;flex-direction:column;gap:8px">
+              <div class="skeleton" style="height:14px;width:100px" />
+              <div class="skeleton" style="height:40px;width:100%;border-radius:12px" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Right: role/permissions -->
+      <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+        <div class="skeleton" style="height:20px;width:140px;margin-bottom:24px" />
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div v-for="i in 5" :key="i" class="skeleton" style="height:36px;width:100%;border-radius:10px" />
+        </div>
+      </div>
+    </div>
   </div>
   
   <div v-else style="display:flex;flex-direction:column;gap:28px">

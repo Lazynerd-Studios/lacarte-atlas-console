@@ -66,7 +66,8 @@ function statusBadge(s: string) {
 </script>
 
 <template>
-  <div style="display:flex;flex-direction:column;gap:32px">
+  <PageSkeleton v-if="loading && trucks.length === 0" type="table" :rows="5" :cards="0" />
+  <div v-else style="display:flex;flex-direction:column;gap:32px">
 
     <!-- Header -->
     <div style="display:flex;align-items:flex-start;justify-content:space-between">
@@ -92,8 +93,8 @@ function statusBadge(s: string) {
     <!-- Table card -->
     <div style="background:white;border:1px solid #ececec;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
       
-      <!-- Loading skeleton -->
-      <div v-if="loading" style="padding:48px 24px;text-align:center">
+      <!-- Loading skeleton (subsequent loads) -->
+      <div v-if="loading && trucks.length > 0" style="padding:48px 24px;text-align:center">
         <div style="display:inline-block;width:40px;height:40px;border:3px solid #f3f4f6;border-top-color:#ffb400;border-radius:50%;animation:spin 1s linear infinite"></div>
         <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:16px">Loading trucks...</p>
       </div>

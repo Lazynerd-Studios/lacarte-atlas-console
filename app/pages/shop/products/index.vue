@@ -321,9 +321,11 @@ async function handleDelete(id: string) {
           <tr v-if="filtered.length === 0 && !productsLoading">
             <td colspan="7" style="padding:32px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No products found.</td>
           </tr>
-          <tr v-if="productsLoading">
-            <td colspan="7" style="padding:32px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Loading products...</td>
-          </tr>
+          <template v-if="productsLoading">
+            <tr v-for="i in 5" :key="`sk-${i}`" style="border-bottom:1px solid #e5e7eb">
+              <td v-for="j in 7" :key="j" style="padding:20px 16px"><div class="skeleton" style="height:14px;width:100%" /></td>
+            </tr>
+          </template>
         </tbody>
       </table>
 

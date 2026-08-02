@@ -510,7 +510,7 @@ onUnmounted(() => {
     </div>
 
     <!-- Map + driver panel -->
-    <div style="display:flex;gap:24px;align-items:stretch">
+    <div class="grid-map" style="align-items:stretch">
     <div
       class="tracking-map"
       style="flex:1;min-width:0;background:white;border:1px solid #ececec;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);height:700px;position:relative"
@@ -576,7 +576,7 @@ onUnmounted(() => {
     </div>
 
     <!-- Driver panel -->
-    <div style="width:360px;flex-shrink:0;background:white;border:1px solid #ececec;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,0.1);height:700px;display:flex;flex-direction:column;overflow:hidden">
+    <div class="tracking-sidebar" style="background:white;border:1px solid #ececec;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,0.1);height:700px;display:flex;flex-direction:column;overflow:hidden">
       <div style="padding:20px 24px;border-bottom:1px solid #ececec;flex-shrink:0">
         <div style="display:flex;align-items:center;justify-content:space-between">
           <p style="font-size:16px;font-weight:700;color:#111;font-family:'Manrope',sans-serif">Drivers</p>

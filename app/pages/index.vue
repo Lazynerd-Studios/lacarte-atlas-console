@@ -229,13 +229,18 @@ async function fetchShopOverview() {
   }
 }
 
-onMounted(() => {
-  fetchAnalytics()
-  fetchRevenue()
-  fetchRevenueChart()
-  fetchPendingPickups()
-  fetchActiveTrucks()
-  fetchShopOverview()
+const initialLoading = ref(true)
+
+onMounted(async () => {
+  await Promise.allSettled([
+    fetchAnalytics(),
+    fetchRevenue(),
+    fetchRevenueChart(),
+    fetchPendingPickups(),
+    fetchActiveTrucks(),
+    fetchShopOverview(),
+  ])
+  initialLoading.value = false
 })
 
 // Chart helpers
@@ -301,7 +306,8 @@ function barH(v: number) { return (pickupMax.value ? v / pickupMax.value : 0) * 
 </script>
 
 <template>
-  <div style="display:flex;flex-direction:column;gap:24px">
+  <PageSkeleton v-if="initialLoading" type="dashboard" />
+  <div v-else style="display:flex;flex-direction:column;gap:24px">
     <!-- Page heading -->
     <div>
       <h1 style="font-size:32px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;line-height:1.3">Admin Dashboard</h1>

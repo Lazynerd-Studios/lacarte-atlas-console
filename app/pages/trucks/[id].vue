@@ -294,7 +294,7 @@ function formatRouteDuration(minutes: number) {
     </NuxtLink>
 
     <!-- Loading state -->
-    <div v-if="loading" style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Loading...</div>
+    <PageSkeleton v-if="loading" type="detail" />
 
     <!-- Not found state -->
     <div v-else-if="notFound" style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Truck not found</div>

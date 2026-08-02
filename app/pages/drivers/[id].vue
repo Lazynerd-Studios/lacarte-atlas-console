@@ -452,7 +452,7 @@ function stopBadge(status: string) {
   <div style="display:flex;flex-direction:column;gap:21px">
 
     <!-- Loading state -->
-    <div v-if="loading" style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Loading...</div>
+    <PageSkeleton v-if="loading" type="detail" />
 
     <!-- Not found state -->
     <div v-else-if="notFound" style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Driver not found</div>

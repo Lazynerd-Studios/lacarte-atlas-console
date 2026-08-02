@@ -166,9 +166,11 @@ onMounted(() => {
           <tr v-if="filtered.length === 0 && !ordersLoading">
             <td colspan="8" style="padding:32px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No orders found.</td>
           </tr>
-          <tr v-if="ordersLoading">
-            <td colspan="8" style="padding:32px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Loading orders...</td>
-          </tr>
+          <template v-if="ordersLoading">
+            <tr v-for="i in 5" :key="`sk-${i}`" style="border-bottom:1px solid #e5e7eb">
+              <td v-for="j in 8" :key="j" style="padding:20px 16px"><div class="skeleton" style="height:14px;width:100%" /></td>
+            </tr>
+          </template>
         </tbody>
       </table>
 

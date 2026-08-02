@@ -389,9 +389,7 @@ const billingHistory = ref<any[]>([])
     </NuxtLink>
 
     <!-- Loading state -->
-    <div v-if="loading" style="display:flex;align-items:center;justify-content:center;padding:80px 0">
-      <UIcon name="i-lucide-loader-2" style="width:28px;height:28px;color:#ffb400;animation:spin 1s linear infinite" />
-    </div>
+    <PageSkeleton v-if="loading" type="detail" />
 
     <!-- Not found state -->
     <div v-else-if="notFound || !customer" style="background:white;border:1px solid #ececec;border-radius:16px;padding:48px;text-align:center">
