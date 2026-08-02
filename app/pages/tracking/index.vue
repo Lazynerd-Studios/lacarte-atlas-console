@@ -11,13 +11,22 @@ const drivers = ref<Map<string, DriverTracking>>(new Map())
 const driverDetails = ref<Map<string, Driver>>(new Map())
 const loading = ref(true)
 const mapError = ref('')
+const mapFailed = ref(false)
+const streamError = ref('')
 const connected = ref(false)
 
 let map: any = null
 let abortController: AbortController | null = null
 let iconsLoaded = false
+let mapReady = false
+let hasFitOnce = false
 let PopupClass: any = null
 let hoverPopup: any = null
+let staleTimer: ReturnType<typeof setInterval> | null = null
+let detailsTimer: ReturnType<typeof setInterval> | null = null
+
+// A driver is considered offline if their last fix is older than this
+const STALE_AFTER_MS = 60_000
 
 function truckIconDataUrl(bodyColor: string, accentColor: string): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
@@ -100,12 +109,14 @@ const enrichedDrivers = computed(() =>
   })
 )
 
-// Panel list: online drivers first, then alphabetical
+// Panel list: only drivers with a valid fix (matches the map), online first
 const panelDrivers = computed(() =>
-  enrichedDrivers.value.slice().sort((a, b) => {
-    if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1
-    return a.name.localeCompare(b.name)
-  })
+  enrichedDrivers.value
+    .filter(d => d.lat && d.lng)
+    .sort((a, b) => {
+      if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1
+      return a.name.localeCompare(b.name)
+    })
 )
 
 function initials(name: string): string {
@@ -122,6 +133,7 @@ function timeAgo(iso: string): string {
 }
 
 function formatCoord(lat: number, lng: number): string {
+  if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) return '—'
   return `${lat.toFixed(5)}, ${lng.toFixed(5)}`
 }
 
@@ -140,6 +152,7 @@ async function initMap() {
   console.log('[Map] API Key:', apiKey ? 'present' : 'missing')
 
   if (!apiKey) {
+    mapFailed.value = true
     mapError.value = 'TomTom API key not configured. Set NUXT_PUBLIC_TOMTOM_API_KEY environment variable.'
     return
   }
@@ -150,6 +163,7 @@ async function initMap() {
   console.log('[Map] Container:', container ? 'found' : 'not found')
 
   if (!container) {
+    mapFailed.value = true
     mapError.value = 'Map container not found in DOM'
     return
   }
@@ -184,20 +198,23 @@ async function initMap() {
       try {
         await loadTruckIcons(map.mapLibreMap)
       } catch (err) {
-        console.error('[Map] Failed to load truck icons:', err)
-        mapError.value = 'Failed to load driver markers. Please refresh the page.'
+        // Non-fatal: updateMarkers falls back to colored circle markers
+        console.error('[Map] Failed to load truck icons, using circle fallback:', err)
       }
       setupMapInteractions(map.mapLibreMap)
+      mapReady = true
       loading.value = false
       updateMarkers()
     })
 
     map.mapLibreMap.on('error', (e: any) => {
       console.error('[Map] Map error:', e)
+      mapFailed.value = true
       mapError.value = 'Map failed to load. Check console for details.'
     })
   } catch (err) {
     console.error('[Map] Failed to initialize map:', err)
+    mapFailed.value = true
     mapError.value = 'Failed to load map. Please refresh the page.'
   }
 }
@@ -205,9 +222,6 @@ async function initMap() {
 function updateMarkers() {
   if (!map?.mapLibreMap) return
   const mapLibreMap = map.mapLibreMap
-
-  if (mapLibreMap.getLayer('drivers-truck')) mapLibreMap.removeLayer('drivers-truck')
-  if (mapLibreMap.getSource('drivers')) mapLibreMap.removeSource('drivers')
 
   const driversArray = driversList.value
   const geojson = {
@@ -231,49 +245,56 @@ function updateMarkers() {
       })),
   }
 
-  mapLibreMap.addSource('drivers', { type: 'geojson', data: geojson })
-
-  if (iconsLoaded) {
-    mapLibreMap.addLayer({
-      id: 'drivers-truck',
-      type: 'symbol',
-      source: 'drivers',
-      layout: {
-        'icon-image': ['case', ['get', 'isOnline'], 'truck-online', 'truck-offline'],
-        'icon-size': 1.2,
-        'icon-allow-overlap': true,
-        'icon-rotate': ['get', 'heading'],
-        'icon-rotation-alignment': 'map',
-      },
-    })
+  const existingSource = mapLibreMap.getSource('drivers')
+  if (existingSource) {
+    // Update in place — avoids tearing down/re-adding the layer on every tick
+    ;(existingSource as any).setData(geojson)
   } else {
-    // Fallback to colored circles if custom icons failed to load
-    mapLibreMap.addLayer({
-      id: 'drivers-truck',
-      type: 'circle',
-      source: 'drivers',
-      paint: {
-        'circle-radius': 8,
-        'circle-color': ['case', ['get', 'isOnline'], '#ffb400', '#111111'],
-        'circle-stroke-width': 2,
-        'circle-stroke-color': 'white',
-      },
-    })
+    mapLibreMap.addSource('drivers', { type: 'geojson', data: geojson })
+    if (iconsLoaded) {
+      mapLibreMap.addLayer({
+        id: 'drivers-truck',
+        type: 'symbol',
+        source: 'drivers',
+        layout: {
+          'icon-image': ['case', ['get', 'isOnline'], 'truck-online', 'truck-offline'],
+          'icon-size': 1.2,
+          'icon-allow-overlap': true,
+          'icon-rotate': ['get', 'heading'],
+          'icon-rotation-alignment': 'map',
+        },
+      })
+    } else {
+      // Fallback to colored circles if custom icons failed to load
+      mapLibreMap.addLayer({
+        id: 'drivers-truck',
+        type: 'circle',
+        source: 'drivers',
+        paint: {
+          'circle-radius': 8,
+          'circle-color': ['case', ['get', 'isOnline'], '#ffb400', '#111111'],
+          'circle-stroke-width': 2,
+          'circle-stroke-color': 'white',
+        },
+      })
+    }
   }
 
-  if (driversArray.length > 0) {
+  // Fit the camera once when we first have data; don't fight the user afterwards
+  if (!hasFitOnce) {
     const coords = driversArray
       .filter(d => d.lat && d.lng)
-      .map(d => [d.lng, d.lat])
+      .map(d => [d.lng, d.lat] as [number, number])
     if (coords.length > 0) {
-      const minLng = Math.min(...coords.map((c: number[]) => c[0] as number))
-      const maxLng = Math.max(...coords.map((c: number[]) => c[0] as number))
-      const minLat = Math.min(...coords.map((c: number[]) => c[1] as number))
-      const maxLat = Math.max(...coords.map((c: number[]) => c[1] as number))
+      const minLng = Math.min(...coords.map(c => c[0]))
+      const maxLng = Math.max(...coords.map(c => c[0]))
+      const minLat = Math.min(...coords.map(c => c[1]))
+      const maxLat = Math.max(...coords.map(c => c[1]))
       mapLibreMap.fitBounds(
         [[minLng, minLat], [maxLng, maxLat]],
         { padding: 80, maxZoom: 14 },
       )
+      hasFitOnce = true
     }
   }
 }

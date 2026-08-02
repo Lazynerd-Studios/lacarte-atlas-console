@@ -1,0 +1,1 @@
+Nuxt 3 file-based routing with `<script setup lang="ts">`, Tailwind-like inline CSS strings for styling, Lucide icons via the `UIcon` component, and the app's auto-imported composables (`useApi`, `useAuthStore`, `useAppToast`, `useRouter`).
