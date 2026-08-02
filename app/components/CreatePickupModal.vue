@@ -26,10 +26,22 @@ interface EstimatedQuantity {
   label: string
   binCount: number | null
 }
+interface TruckLoadTier {
+  id: string
+  label: string
+  prepayRate: number
+  postpayRate: number
+  binEquivalent: number
+}
+type PricingMode = 'per_bin' | 'full_truck'
 
 const customers = ref<CustomerOption[]>([])
 const disposableItems = ref<DisposableItem[]>([])
 const estimatedQuantities = ref<EstimatedQuantity[]>([])
+const truckTiers = ref<TruckLoadTier[]>([])
+// Map of customerTypeId -> pricingMode, used to decide whether the selected
+// customer is priced per_bin (automatic) or full_truck (needs a truck tier).
+const customerTypePricingModes = ref<Record<string, PricingMode>>({})
 const loadingOptions = ref(true)
 const loadingQuantities = ref(false)
 const submitting = ref(false)
@@ -38,6 +50,7 @@ const form = reactive({
   customerId: '',
   disposableItemTypeId: '',
   estimatedQuantityId: '',
+  truckLoadRateId: '',
   preferredPickupDate: '',
   additionalNotes: '',
   isEmergency: false,
@@ -73,10 +86,40 @@ function selectCustomer(c: CustomerOption) {
   selectedCustomer.value = c
   customerSearch.value = c.name
   form.customerId = c.id
+  // A truck tier chosen for a previous customer no longer applies
+  form.truckLoadRateId = ''
   customerDropdownOpen.value = false
   if (errors.customerId) delete errors.customerId
   // Availability is checked against the customer's type — reload the quantity options scoped to it
   fetchQuantities(c.customerTypeId ?? c.customerType?.id ?? null)
+}
+
+// Pricing mode of the currently selected customer's type. per_bin customers are
+// priced automatically; full_truck customers require a truck load tier.
+const selectedPricingMode = computed<PricingMode>(() => {
+  const typeId = selectedCustomer.value?.customerTypeId ?? selectedCustomer.value?.customerType?.id ?? null
+  if (!typeId) return 'per_bin'
+  return customerTypePricingModes.value[typeId] ?? 'per_bin'
+})
+const isFullTruck = computed(() => selectedPricingMode.value === 'full_truck')
+
+// Load customer types once to build the id -> pricingMode lookup
+async function fetchCustomerTypePricingModes() {
+  const res = await api.get<{ id: string; pricingMode?: PricingMode }[]>('/customer/admin/types/', 'Failed to load customer types')
+  if (res) {
+    const list = Array.isArray(res) ? res : ((res as any).data ?? [])
+    for (const ct of list) {
+      customerTypePricingModes.value[ct.id] = ct.pricingMode ?? 'per_bin'
+    }
+  }
+}
+
+// Truck load tiers for the full_truck dropdown (public endpoint)
+async function fetchTruckTiers() {
+  const res = await api.get<{ data?: TruckLoadTier[] } | TruckLoadTier[]>('/rates/truck-loads', 'Failed to load truck load tiers')
+  if (res) {
+    truckTiers.value = Array.isArray(res) ? res : (res.data ?? [])
+  }
 }
 
 // Load active quantities, scoped to a customer type when one is selected
@@ -131,8 +174,10 @@ onMounted(async () => {
   loadingOptions.value = true
   const [cust, dispRes] = await Promise.all([
     fetchAllCustomers(),
-    api.get<any>('/disposable/item-types', 'Failed to load disposable types'),
+    api.get<any>('/disposable/item-types/active', 'Failed to load disposable types'),
     fetchQuantities(null),
+    fetchCustomerTypePricingModes(),
+    fetchTruckTiers(),
   ])
   customers.value = cust
   if (dispRes) {
@@ -153,6 +198,7 @@ function validate() {
   if (!form.customerId)                  errors.customerId = 'Select a customer'
   if (!form.disposableItemTypeId)        errors.disposableItemTypeId = 'Required'
   if (!form.estimatedQuantityId)         errors.estimatedQuantityId = 'Required'
+  if (isFullTruck.value && !form.truckLoadRateId) errors.truckLoadRateId = 'Select a truck load tier'
   if (!form.preferredPickupDate)         errors.preferredPickupDate = 'Required'
   if (!form.isEmergency && form.preferredPickupDate && form.preferredPickupDate < todayForDateInput.value) {
     errors.preferredPickupDate = 'Pickup date cannot be in the past'
@@ -165,17 +211,23 @@ async function submit() {
   if (submitting.value) return
   if (!validate()) return
   submitting.value = true
+  // paymentType is intentionally omitted — the server auto-resolves it from the
+  // customer's subscription state. truckLoadRateId is only valid for full_truck
+  // customers (the server rejects it for per_bin).
+  const payload: Record<string, unknown> = {
+    customerId: form.customerId,
+    disposableItemTypeId: form.disposableItemTypeId,
+    estimatedQuantityId: form.estimatedQuantityId,
+    preferredPickupDate: form.preferredPickupDate,
+    isEmergency: form.isEmergency,
+    additionalNotes: form.additionalNotes.trim(),
+  }
+  if (isFullTruck.value) {
+    payload.truckLoadRateId = form.truckLoadRateId
+  }
   const result = await api.post<any>(
     '/pickup-requests/admin/',
-    {
-      customerId: form.customerId,
-      disposableItemTypeId: form.disposableItemTypeId,
-      estimatedQuantityId: form.estimatedQuantityId,
-      preferredPickupDate: form.preferredPickupDate,
-      paymentType: 'subscription',
-      isEmergency: form.isEmergency,
-      additionalNotes: form.additionalNotes.trim(),
-    },
+    payload,
     'Failed to create pickup request'
   )
   submitting.value = false
@@ -201,7 +253,7 @@ function inputStyle(field: string) {
       <!-- Header -->
       <div style="padding:24px 24px 16px;flex-shrink:0;border-bottom:1px solid #e5e7eb">
         <p style="font-size:20px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Create Pickup Request</p>
-        <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:4px">Payment type: Subscription</p>
+        <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:4px">Payment type: Auto-resolved by the system</p>
       </div>
 
       <!-- Close -->
@@ -281,6 +333,20 @@ function inputStyle(field: string) {
             </select>
             <span v-if="errors.estimatedQuantityId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.estimatedQuantityId }}</span>
             <span v-else-if="selectedCustomer && estimatedQuantities.length === 0 && !loadingQuantities" style="font-size:12px;color:#f59e0b;font-family:'Manrope',sans-serif">No quantities available for this customer's type</span>
+          </div>
+
+          <!-- Truck load tier (full_truck customers only) -->
+          <div v-if="isFullTruck" style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Truck Load Tier</label>
+            <select
+              v-model="form.truckLoadRateId"
+              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid ${errors.truckLoadRateId ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:${form.truckLoadRateId ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+            >
+              <option value="" disabled>Select truck load tier</option>
+              <option v-for="t in truckTiers" :key="t.id" :value="t.id">{{ t.label }}</option>
+            </select>
+            <span v-if="errors.truckLoadRateId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.truckLoadRateId }}</span>
+            <span v-else style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">This customer is priced by truck load — pick the load size for this trip.</span>
           </div>
 
           <!-- Preferred pickup date -->

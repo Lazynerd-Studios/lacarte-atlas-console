@@ -10,15 +10,16 @@
 - [useApi.ts](file://app/composables/useApi.ts)
 - [useCurrency.ts](file://app/composables/useCurrency.ts)
 - [rateValidation.ts](file://app/utils/rateValidation.ts)
+- [subscription.ts](file://app/types/subscription.ts)
 </cite>
 
 ## Update Summary
 **Changes Made**
-- Updated Invoice Detail section to reflect new PDF download functionality and send invoice feature implementation
-- Enhanced data model documentation with comprehensive TypeScript interfaces for Invoice, Customer, and Items structures
-- Added detailed error handling and loading state management throughout the billing system
-- Updated API integration patterns from mock data to live backend endpoints
-- Enhanced user experience with comprehensive loading states and error handling mechanisms
+- Added comprehensive active subscription tiers display with dual pricing model support (prepaid/postpaid)
+- Implemented enhanced subscriber count tracking with real-time API integration
+- Integrated new API endpoint `/subscription/admin/plans?status=active` for fetching active plans
+- Added color-coded billing type badges and interactive table interface
+- Enhanced subscription management with improved data visualization and user experience
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -35,12 +36,12 @@
 ## Introduction
 This document provides comprehensive documentation for the Billing and Subscription management system within the application. It covers payment processing workflows, subscription plan management, rate configuration, billing cycle handling, invoice generation, payment status tracking, subscription tier management, and revenue analytics integration. The system is implemented as a Nuxt 3 frontend with Vue 3 components that interact with backend APIs via a centralized API composable.
 
-**Updated** The billing system has undergone a major enhancement including complete transition from mock data to live API integration, comprehensive TypeScript interface definitions for all data models, enhanced invoice management with PDF download and send capabilities, robust error handling, and sophisticated loading state management throughout the entire billing workflow.
+**Updated** The billing system has undergone a major enhancement including complete transition from mock data to live API integration, comprehensive TypeScript interface definitions for all data models, enhanced invoice management with PDF download and send capabilities, robust error handling, sophisticated loading state management throughout the entire billing workflow, and the addition of comprehensive active subscription tiers display with dual pricing model support.
 
 ## Project Structure
 The billing and subscriptions features are organized by pages and utilities:
 - Billing overview and invoice detail views with real-time API integration and enhanced invoice management
-- Subscription plan management (prepaid/postpaid)
+- Subscription plan management (prepaid/postpaid) with active tiers display
 - Pay-as-you-go rate management
 - Customer-facing payment portal
 - Shared composables and utilities for API calls, currency formatting, and validation
@@ -52,7 +53,7 @@ BIndex["Billing Dashboard<br/>Real-time KPIs, Server-side Pagination, Dynamic Ch
 BDetail["Invoice Detail<br/>PDF Download, Send Invoice, Enhanced Actions"]
 end
 subgraph "Management"
-SubPlans["Subscription Plans<br/>CRUD, stats, toggle"]
+SubPlans["Subscription Plans<br/>CRUD, stats, toggle, Active Tiers Display"]
 Rates["Rate Management<br/>pay-as-you-go rates"]
 end
 subgraph "Payments"
@@ -62,7 +63,7 @@ subgraph "Shared"
 Api["useApi composable"]
 Currency["useCurrency composable"]
 Validation["rateValidation utils"]
-Types["TypeScript Interfaces<br/>Invoice, Customer, Items"]
+Types["TypeScript Interfaces<br/>Invoice, Customer, Items, Subscription"]
 end
 BIndex --> Api
 BDetail --> Api
@@ -76,12 +77,13 @@ Rates --> Currency
 Rates --> Validation
 BDetail --> Types
 BIndex --> Types
+SubPlans --> Types
 ```
 
 **Diagram sources**
 - [billing/index.vue:1-599](file://app/pages/billing/index.vue#L1-L599)
 - [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
-- [management/subscriptions.vue:1-962](file://app/pages/management/subscriptions.vue#L1-L962)
+- [management/subscriptions.vue:1-1055](file://app/pages/management/subscriptions.vue#L1-L1055)
 - [management/rates.vue:1-882](file://app/pages/management/rates.vue#L1-L882)
 - [pay/[id].vue](file://app/pages/pay/[id].vue#L1-L353)
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
@@ -91,7 +93,7 @@ BIndex --> Types
 **Section sources**
 - [billing/index.vue:1-599](file://app/pages/billing/index.vue#L1-L599)
 - [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
-- [management/subscriptions.vue:1-962](file://app/pages/management/subscriptions.vue#L1-L962)
+- [management/subscriptions.vue:1-1055](file://app/pages/management/subscriptions.vue#L1-L1055)
 - [management/rates.vue:1-882](file://app/pages/management/rates.vue#L1-L882)
 - [pay/[id].vue](file://app/pages/pay/[id].vue#L1-L353)
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
@@ -101,7 +103,7 @@ BIndex --> Types
 ## Core Components
 - **Billing Dashboard**: Real-time KPI display with skeleton loading, searchable paginated invoices with server-side filtering, dynamic revenue breakdown charts, and SVG-based payment aging visualization. Features comprehensive error handling and loading states.
 - **Enhanced Invoice Detail**: Shows invoice metadata, line items, totals, and comprehensive actions including PDF download functionality, send invoice feature, and enhanced error handling with loading states.
-- Subscription Plan Management: Full CRUD for prepaid/postpaid plans with billing cycles, pricing, feature counts, active toggling, and statistics.
+- **Enhanced Subscription Plan Management**: Full CRUD for prepaid/postpaid plans with billing cycles, pricing, feature counts, active toggling, statistics, and comprehensive active subscription tiers display with dual pricing model support.
 - Rate Management: Configures pay-as-you-go pickup rates per customer type and estimated quantity tiers with effective dates and notes.
 - Customer Payment Portal: Accepts cash or mobile money payments with validation, countdown, and success states.
 
@@ -109,14 +111,14 @@ Key shared utilities:
 - useApi: Centralized HTTP client with authentication headers, error handling, and typed helpers.
 - useCurrency: Formats amounts in GHS using Intl.NumberFormat.
 - rateValidation: Validates and transforms rate form data into API payloads.
-- **New** Comprehensive TypeScript interfaces for Invoice, Customer, and Items structures providing compile-time type safety.
+- **Updated** Comprehensive TypeScript interfaces for Invoice, Customer, Items, and Subscription structures providing compile-time type safety.
 
-**Updated** The billing system now includes comprehensive TypeScript interfaces for all data models, enhanced invoice management with PDF download and send capabilities, sophisticated loading state management, and robust error handling throughout the entire component lifecycle.
+**Updated** The billing system now includes comprehensive TypeScript interfaces for all data models, enhanced invoice management with PDF download and send capabilities, sophisticated loading state management, robust error handling throughout the entire component lifecycle, and the addition of comprehensive active subscription tiers display with enhanced subscriber count tracking and dual pricing model support.
 
 **Section sources**
 - [billing/index.vue:1-599](file://app/pages/billing/index.vue#L1-L599)
 - [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
-- [management/subscriptions.vue:1-962](file://app/pages/management/subscriptions.vue#L1-L962)
+- [management/subscriptions.vue:1-1055](file://app/pages/management/subscriptions.vue#L1-L1055)
 - [management/rates.vue:1-882](file://app/pages/management/rates.vue#L1-L882)
 - [pay/[id].vue](file://app/pages/pay/[id].vue#L1-L353)
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
@@ -124,13 +126,14 @@ Key shared utilities:
 - [rateValidation.ts:1-69](file://app/utils/rateValidation.ts#L1-L69)
 
 ## Architecture Overview
-The system follows a component-driven architecture where each page encapsulates its own state and API interactions. Data flows from backend endpoints through useApi into reactive UI state, which renders tables, charts, and forms. The billing dashboard implements a sophisticated multi-API data fetching pattern with proper loading states and error handling, while the invoice detail view provides comprehensive invoice management capabilities.
+The system follows a component-driven architecture where each page encapsulates its own state and API interactions. Data flows from backend endpoints through useApi into reactive UI state, which renders tables, charts, and forms. The billing dashboard implements a sophisticated multi-API data fetching pattern with proper loading states and error handling, while the invoice detail view provides comprehensive invoice management capabilities. The subscription management system now includes enhanced active tiers display with dual pricing model support.
 
 ```mermaid
 sequenceDiagram
 participant Admin as "Admin UI"
 participant BillingPage as "Billing Dashboard"
 participant InvoiceDetail as "Invoice Detail View"
+participant SubPlans as "Subscription Plans"
 participant API as "useApi Composable"
 participant Backend as "Backend APIs"
 Admin->>BillingPage : Open /billing
@@ -151,11 +154,21 @@ InvoiceDetail->>API : POST /invoices/ : id/send
 API->>Backend : HTTP POST to send invoice email
 Backend-->>API : { success : true, message : "Invoice sent" }
 API-->>InvoiceDetail : Success confirmation with toast notification
+Admin->>SubPlans : Open /management/subscriptions
+SubPlans->>API : GET /subscription/admin/plans?type={prepaid|postpaid}
+API->>Backend : HTTP GET with type filter
+Backend-->>API : { plans[], stats }
+API-->>SubPlans : Plans data with subscriber counts
+SubPlans->>API : GET /subscription/admin/plans?status=active
+API->>Backend : HTTP GET for active tiers
+Backend-->>API : { activeTiers[] }
+API-->>SubPlans : Active subscription tiers with dual pricing support
 ```
 
 **Diagram sources**
 - [billing/index.vue:21-38](file://app/pages/billing/index.vue#L21-L38)
 - [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
+- [management/subscriptions.vue:153-285](file://app/pages/management/subscriptions.vue#L153-L285)
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
 
 ## Detailed Component Analysis
@@ -247,60 +260,50 @@ API-->>InvoiceDetail : Success confirmation with toast notification
 **Section sources**
 - [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
 
-### Subscription Plan Management
-- Tabs: Prepaid vs Postpaid
-- Stats: Total plans, active plans, subscribers, estimated revenue
-- Plan cards: Name, description, subscriber count, active/inactive, pickups, bins, price, billing cycle, billing type
-- Actions: Add, Edit, Delete, Toggle Active
+### Enhanced Subscription Plan Management
+**Updated** The subscription plan management system has been significantly enhanced with comprehensive active subscription tiers display, dual pricing model support, and improved subscriber count tracking.
 
-API integration:
-- Fetch plans: GET /subscription/admin/plans?type=prepaid|postpaid
-- Fetch stats: GET /subscription/admin/stats?type=prepaid|postpaid
-- Create plan: POST /subscription/admin/plans
-- Update plan: PATCH /subscription/admin/plans/:id
-- Toggle plan: PATCH /subscription/admin/plans/:id/toggle
-- Delete plan: DELETE /subscription/admin/plans/:id
+#### Active Subscription Tiers Display
+- **Dual Pricing Model Support**: Comprehensive display of both prepaid and postpaid subscription tiers
+- **Real-time Subscriber Count**: Live subscriber count tracking with visual indicators
+- **Interactive Table Interface**: Enhanced table with hover effects, color-coded billing type badges, and responsive design
+- **API Integration**: New endpoint `/subscription/admin/plans?status=active` for fetching active plans
+- **Graceful Degradation**: Empty state handling when active tiers are not available
 
-Data transformation:
-- apiToPlan maps API fields to UI fields (type→billingType, pickups→pickupCount, bins→binCount, badgeColor→color)
-- formToApiPayload maps UI form fields to API payload (name, description, type, pickups, bins, billingCycle, price, badgeColor, isActive)
+#### Enhanced Data Transformation
+- **API to UI Mapping**: Comprehensive `apiToPlan` function mapping API fields to UI format
+- **Field Mapping**: `type→billingType`, `pickups→pickupCount`, `bins→binCount`, `badgeColor→color`
+- **Subscriber Count Integration**: Real-time subscriber count display with proper formatting
+- **Type Safety**: Complete TypeScript interfaces for both API and UI data structures
 
-Validation:
-- Client-side validation ensures required fields and numeric constraints before submission.
+#### Improved Statistics Tracking
+- **Enhanced Stats Interface**: `totalPlans`, `activePlans`, `totalSubscribers`, `estimatedRevenue`
+- **Tab-specific Filtering**: Statistics filtered by current billing type (prepaid/postpaid)
+- **Real-time Updates**: Automatic refresh when switching between tabs
+- **Loading States**: Dedicated loading indicators for statistics data
 
-Error handling:
-- 401 triggers logout and redirect via useApi
-- 400 validation errors displayed in modal
-- Other errors show toast notifications
+#### Interactive UI Enhancements
+- **Color-coded Billing Type Badges**: Visual distinction between prepaid (blue) and postpaid (purple) plans
+- **Hover Effects**: Interactive table rows with background color changes
+- **Responsive Design**: Mobile-friendly layout with adaptive spacing
+- **Empty State Handling**: User-friendly messaging when no active subscriptions exist
 
-Lifecycle:
-- onMounted fetches plans and stats
-- watch(activeTab) refreshes when switching tabs
+#### Advanced API Integration
+- **Multiple Response Format Support**: Handles `{ plans: [...] }`, `{ data: [...] }`, or direct arrays
+- **Error Handling Strategy**: Graceful degradation with console logging instead of error toasts
+- **Concurrent Data Fetching**: Parallel API calls for optimal performance
+- **Lifecycle Management**: Proper cleanup and state management
 
-```mermaid
-flowchart TD
-Start(["Open Subscription Plans"]) --> Load["Fetch plans + stats"]
-Load --> Render["Render plans + stats"]
-Render --> Action{"User action?"}
-Action --> |Add| ValidateAdd["Validate add form"]
-ValidateAdd --> |Valid| Create["POST /subscription/admin/plans"]
-Create --> Refresh["Refresh plans + stats"]
-Action --> |Edit| ValidateEdit["Validate edit form"]
-ValidateEdit --> |Valid| Update["PATCH /subscription/admin/plans/:id"]
-Update --> Refresh
-Action --> |Toggle| ToggleReq["PATCH /subscription/admin/plans/:id/toggle"]
-ToggleReq --> UpdateLocal["Update local isActive"]
-Action --> |Delete| ConfirmDel["Confirm delete"]
-ConfirmDel --> DelReq["DELETE /subscription/admin/plans/:id"]
-DelReq --> Refresh
-Refresh --> End(["Updated UI"])
-```
-
-**Diagram sources**
-- [management/subscriptions.vue:153-548](file://app/pages/management/subscriptions.vue#L153-L548)
+**New Features**:
+- **Active Tiers Section**: Dedicated section showing all active subscription tiers across both billing types
+- **Enhanced Subscriber Tracking**: Visual subscriber count with user icon and formatted numbers
+- **Improved Data Visualization**: Professional table layout with proper column organization
+- **Better User Experience**: Intuitive navigation and clear visual hierarchy
 
 **Section sources**
-- [management/subscriptions.vue:1-962](file://app/pages/management/subscriptions.vue#L1-L962)
+- [management/subscriptions.vue:242-271](file://app/pages/management/subscriptions.vue#L242-L271)
+- [management/subscriptions.vue:792-852](file://app/pages/management/subscriptions.vue#L792-L852)
+- [management/subscriptions.vue:153-285](file://app/pages/management/subscriptions.vue#L153-L285)
 
 ### Rate Management (Pay-as-you-go)
 - Filters: By customer type and status (active/upcoming/inactive)
@@ -352,6 +355,7 @@ Flow:
 - Subscription management uses internal transformations between API and UI models.
 - **Updated** Billing dashboard now implements multiple concurrent API calls with independent loading states and comprehensive error handling.
 - **New** Invoice detail view depends on comprehensive TypeScript interfaces for type-safe data handling.
+- **New** Subscription management integrates with enhanced API endpoints for active tiers display.
 
 ```mermaid
 graph LR
@@ -373,10 +377,13 @@ Billing -.-> Aging["Payment Aging API"]
 InvoiceDetail -.-> PDF["PDF Generation API"]
 InvoiceDetail -.-> Email["Email Service API"]
 InvoiceDetail -.-> Types["TypeScript Interfaces"]
+SubPlans -.-> ActiveTiers["Active Tiers API"]
+SubPlans -.-> PlanStats["Plan Statistics API"]
+SubPlans -.-> Types["Subscription Types"]
 ```
 
 **Diagram sources**
-- [management/subscriptions.vue:153-548](file://app/pages/management/subscriptions.vue#L153-L548)
+- [management/subscriptions.vue:153-285](file://app/pages/management/subscriptions.vue#L153-L285)
 - [management/rates.vue:57-124](file://app/pages/management/rates.vue#L57-L124)
 - [billing/index.vue:21-38](file://app/pages/billing/index.vue#L21-L38)
 - [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
@@ -400,6 +407,8 @@ InvoiceDetail -.-> Types["TypeScript Interfaces"]
 - **New** TypeScript interfaces provide compile-time type safety and better IDE support
 - **New** Efficient PDF download handling prevents memory leaks and improves file transfer performance
 - **New** Optimized error handling reduces unnecessary re-renders during error states
+- **New** Active tiers display uses graceful degradation to avoid blocking UI on API failures
+- **New** Enhanced subscriber count tracking minimizes re-renders through computed properties
 
 [No sources needed since this section provides general guidance]
 
@@ -414,15 +423,19 @@ Common issues and resolutions:
 - **New** PDF download issues: Verify backend PDF generation service is running and accessible. Check browser download permissions.
 - **New** Email sending failures: Confirm email service configuration and check spam filters for delivered invoices.
 - **New** Invoice data loading: Verify invoice ID format and ensure invoice exists in the database before attempting to load details.
+- **New** Active tiers display issues: Check console logs for API call failures and verify the `/subscription/admin/plans?status=active` endpoint is accessible.
+- **New** Subscriber count not updating: Ensure the subscription plan has valid subscriber data and check for API response format issues.
 
 Operational tips:
 - Inspect console logs emitted by useApi for request/response details.
-- Confirm correct query parameters for subscription endpoints (type=prepaid|postpaid).
+- Confirm correct query parameters for subscription endpoints (type=prepaid|postpaid, status=active).
 - Validate MoMo phone numbers against expected patterns.
 - **New** Monitor loading states in billing dashboard to identify slow API responses.
 - **New** Check browser network tab for detailed API request/response information when debugging billing data issues.
 - **New** Test PDF generation with sample invoices to ensure backend service is functioning properly.
 - **New** Verify email service credentials and SMTP configuration for invoice sending functionality.
+- **New** Verify active tiers endpoint returns proper data structure for dual pricing model support.
+- **New** Check subscriber count data integrity in subscription plan responses.
 
 **Section sources**
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
@@ -435,7 +448,7 @@ Operational tips:
 ## Conclusion
 The Billing & Subscriptions module provides a robust foundation for managing subscription plans, configuring pay-as-you-go rates, viewing invoices and payment statuses, and processing customer payments. The architecture leverages reusable composables for API access and currency formatting, while maintaining clear separation of concerns across pages. 
 
-**Updated** The billing system has been significantly enhanced with comprehensive TypeScript interfaces for all data models, enhanced invoice management with PDF download and send capabilities, sophisticated loading state management, robust error handling, and seamless transition from mock data to live API integration. The invoice detail view now provides complete invoice lifecycle management with professional-grade features including document generation and distribution capabilities. Future enhancements can include server-side pagination for other lists, richer analytics dashboards, deeper integrations with external payment gateways, and advanced reporting capabilities.
+**Updated** The billing system has been significantly enhanced with comprehensive TypeScript interfaces for all data models, enhanced invoice management with PDF download and send capabilities, sophisticated loading state management, robust error handling, seamless transition from mock data to live API integration, and the addition of comprehensive active subscription tiers display with dual pricing model support. The subscription management system now provides enhanced subscriber count tracking, color-coded billing type badges, and an interactive table interface for better data visualization. Future enhancements can include server-side pagination for other lists, richer analytics dashboards, deeper integrations with external payment gateways, and advanced reporting capabilities.
 
 [No sources needed since this section summarizes without analyzing specific files]
 
@@ -450,8 +463,9 @@ The Billing & Subscriptions module provides a robust foundation for managing sub
   - **New** GET /invoices/:id - Returns complete invoice data with customer and items
   - **New** POST /invoices/:id/download-pdf - Generates and returns PDF invoice document
   - **New** POST /invoices/:id/send - Sends invoice via email to customer
-- Subscription Plans
-  - GET /subscription/admin/plans?type={prepaid|postpaid}
+- **Updated** Subscription Plans
+  - GET /subscription/admin/plans?type={prepaid|postpaid} - Returns plans filtered by billing type
+  - **New** GET /subscription/admin/plans?status=active - Returns all active subscription tiers across both billing types
   - POST /subscription/admin/plans
   - PATCH /subscription/admin/plans/:id
   - PATCH /subscription/admin/plans/:id/toggle
@@ -469,10 +483,10 @@ The Billing & Subscriptions module provides a robust foundation for managing sub
 **Section sources**
 - [billing/index.vue:21-38](file://app/pages/billing/index.vue#L21-L38)
 - [billing/index.vue:135-158](file://app/pages/billing/index.vue#L135-L158)
-- [billing/index.vue:194-204](file://app/pages/billing/index.vue#L194-L204)
-- [billing/index.vue:232-242](file://app/pages/billing/index.vue#L232-L242)
+- [billing/index.vue:194-204](file://app/pages/billing/index.vue#L194-204)
+- [billing/index.vue:232-242](file://app/pages/billing/index.vue#L232-242)
 - [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
-- [management/subscriptions.vue:153-548](file://app/pages/management/subscriptions.vue#L153-L548)
+- [management/subscriptions.vue:153-285](file://app/pages/management/subscriptions.vue#L153-L285)
 - [management/rates.vue:57-124](file://app/pages/management/rates.vue#L57-L124)
 
 ### Enhanced Data Models Overview
@@ -486,10 +500,13 @@ The Billing & Subscriptions module provides a robust foundation for managing sub
   - Invoice: id, status, from, billTo, invoiceDate, dueDate, paymentMethod, items[], subtotal, tax, taxRate, total
   - Customer: name, address, email, phone, company
   - Items: description, quantity, unitPrice, total
-- Plan (UI): id, name, description, billingType, billingCycle, pickupCount, binCount, price, color, subscriberCount, isActive
-- Plan (API): id, name, description, type, pickups, bins, billingCycle, price, badgeColor, subscriberCount, isActive, createdAt, updatedAt
+- **Updated** Subscription Plan Interfaces
+  - Plan (UI): id, name, description, billingType, billingCycle, pickupCount, binCount, price, color, subscriberCount, isActive
+  - Plan (API): id, name, description, type, pickups, bins, billingCycle, price, badgeColor, subscriberCount, isActive, createdAt, updatedAt
+  - **New** Active Tier Display: Enhanced table structure with color-coded billing type badges and interactive hover effects
 - Rate (UI/API): id, customerTypeId, estimatedQuantityId, rate, effectiveDate, note, isActive, createdAt, updatedAt
 - Transfer (UI): id, customer, paymentType, amount, reference, submitted
+- **New** Subscription Types: Comprehensive TypeScript definitions for dual pricing model support (plan vs calculated)
 
 **Section sources**
 - [billing/index.vue:6-11](file://app/pages/billing/index.vue#L6-L11)
@@ -500,3 +517,4 @@ The Billing & Subscriptions module provides a robust foundation for managing sub
 - [management/subscriptions.vue:1-130](file://app/pages/management/subscriptions.vue#L1-L130)
 - [management/rates.vue:1-50](file://app/pages/management/rates.vue#L1-L50)
 - [billing/index.vue:34-79](file://app/pages/billing/index.vue#L34-L79)
+- [subscription.ts:1-66](file://app/types/subscription.ts#L1-L66)

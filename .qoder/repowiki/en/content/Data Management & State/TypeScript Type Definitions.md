@@ -5,6 +5,7 @@
 - [auth.ts](file://app/types/auth.ts)
 - [customer.ts](file://app/types/customer.ts)
 - [driver.ts](file://app/types/driver.ts)
+- [subscription.ts](file://app/types/subscription.ts)
 - [support.ts](file://app/types/support.ts)
 - [team.ts](file://app/types/team.ts)
 - [useApi.ts](file://app/composables/useApi.ts)
@@ -16,7 +17,16 @@
 - [SupportTicketModal.vue](file://app/components/SupportTicketModal.vue)
 - [customers/[id].vue](file://app/pages/customers/[id].vue)
 - [support/index.vue](file://app/pages/support/index.vue)
+- [subscriptions.vue](file://app/pages/management/subscriptions.vue)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Added new Subscription type definitions section documenting dual pricing models and subscription management types
+- Updated Project Structure to include subscription types module
+- Enhanced Core Components section with Subscription, SubscriptionPlan, and related types
+- Added new Architecture Overview diagram showing subscription data flow
+- Included comprehensive documentation of subscription pricing models, frequencies, and billing cycles
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -31,11 +41,11 @@
 10. [Appendices](#appendices)
 
 ## Introduction
-This document explains the TypeScript type definitions used across the application, focusing on core domain models and their relationships: AuthUser, AuthTeamMember, Customer, Driver, SupportTicket, and TeamMember. It covers how these types model API responses, how they are consumed by components and business logic, and how validation and transformation utilities maintain data integrity. The goal is to provide a clear reference for maintaining consistent data structures and leveraging type safety throughout the codebase.
+This document explains the TypeScript type definitions used across the application, focusing on core domain models and their relationships: AuthUser, AuthTeamMember, Customer, Driver, SupportTicket, TeamMember, and the newly added Subscription types. It covers how these types model API responses, how they are consumed by components and business logic, and how validation and transformation utilities maintain data integrity. The goal is to provide a clear reference for maintaining consistent data structures and leveraging type safety throughout the codebase.
 
 ## Project Structure
 The type system is organized into feature-oriented modules under app/types, with supporting utilities and composables that consume or transform these types. Key areas include:
-- Domain types: auth, customer, driver, support, team
+- Domain types: auth, customer, driver, support, team, subscription
 - Utilities: auth helpers, team validation and transformation
 - Composables: typed HTTP client wrapper
 - Stores: session and profile management using auth types
@@ -49,6 +59,7 @@ TCustomer["types/customer.ts"]
 TDriver["types/driver.ts"]
 TSupport["types/support.ts"]
 TTeam["types/team.ts"]
+TSubscription["types/subscription.ts"]
 end
 subgraph "Utilities"
 UAuth["utils/auth.ts"]
@@ -64,6 +75,7 @@ CompEditCust["components/EditCustomerModal.vue"]
 CompTicket["components/SupportTicketModal.vue"]
 PageCust["pages/customers/[id].vue"]
 PageSupport["pages/support/index.vue"]
+PageSubs["pages/management/subscriptions.vue"]
 end
 TAuth --> UAuth
 TAuth --> SAuth
@@ -75,13 +87,15 @@ TSupport --> CompTicket
 TSupport --> PageSupport
 TTeam --> UTeamVal
 TTeam --> UTeamXform
+TSubscription --> PageSubs
 CApi --> SAuth
 ```
 
 **Diagram sources**
 - [auth.ts:1-64](file://app/types/auth.ts#L1-L64)
-- [customer.ts:1-103](file://app/types/customer.ts#L1-L103)
-- [driver.ts:1-106](file://app/types/driver.ts#L1-L106)
+- [customer.ts:1-105](file://app/types/customer.ts#L1-L105)
+- [driver.ts:1-127](file://app/types/driver.ts#L1-L127)
+- [subscription.ts:1-66](file://app/types/subscription.ts#L1-L66)
 - [support.ts:1-81](file://app/types/support.ts#L1-L81)
 - [team.ts:1-65](file://app/types/team.ts#L1-L65)
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
@@ -93,11 +107,13 @@ CApi --> SAuth
 - [SupportTicketModal.vue:1-200](file://app/components/SupportTicketModal.vue#L1-L200)
 - [customers/[id].vue](file://app/pages/customers/[id].vue#L1-L200)
 - [support/index.vue:1-200](file://app/pages/support/index.vue#L1-L200)
+- [subscriptions.vue:1-1055](file://app/pages/management/subscriptions.vue#L1-L1055)
 
 **Section sources**
 - [auth.ts:1-64](file://app/types/auth.ts#L1-L64)
-- [customer.ts:1-103](file://app/types/customer.ts#L1-L103)
-- [driver.ts:1-106](file://app/types/driver.ts#L1-L106)
+- [customer.ts:1-105](file://app/types/customer.ts#L1-L105)
+- [driver.ts:1-127](file://app/types/driver.ts#L1-L127)
+- [subscription.ts:1-66](file://app/types/subscription.ts#L1-L66)
 - [support.ts:1-81](file://app/types/support.ts#L1-L81)
 - [team.ts:1-65](file://app/types/team.ts#L1-L65)
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
@@ -109,6 +125,7 @@ CApi --> SAuth
 - [SupportTicketModal.vue:1-200](file://app/components/SupportTicketModal.vue#L1-L200)
 - [customers/[id].vue](file://app/pages/customers/[id].vue#L1-L200)
 - [support/index.vue:1-200](file://app/pages/support/index.vue#L1-L200)
+- [subscriptions.vue:1-1055](file://app/pages/management/subscriptions.vue#L1-L1055)
 
 ## Core Components
 This section documents the primary type interfaces and their roles.
@@ -119,7 +136,7 @@ This section documents the primary type interfaces and their roles.
 
 - AuthTeamMember
   - Represents the admin profile returned from the user profile endpoint. Contains personal details, role object, permissions, and timestamps.
-  - Consumed by the auth store to enrich the current user’s role and permissions.
+  - Consumed by the auth store to enrich the current user's role and permissions.
 
 - Customer
   - Represents a customer entity including address, location, phone, status, and related references to user, customer type, and zone. Also includes pickup history entry shapes and pagination envelope for history lists.
@@ -137,16 +154,23 @@ This section documents the primary type interfaces and their roles.
   - Represents internal team members with role details and permissions. Includes payloads for create/update operations and role definitions.
   - Used in team management UI and validation/transformation utilities.
 
+- **Subscription** *(New)*
+  - Represents customer subscriptions with dual pricing models supporting both legacy fixed plans and calculated bin capacity rates.
+  - Key fields include pricingSource ('plan' or 'calculated'), frequency options (weekly, biweekly, monthly), payment plans (prepaid, postpaid), and billing cycles (monthly, quarterly, yearly).
+  - Used in subscription management interface for plan administration and customer subscription viewing.
+
 Key relationships and constraints:
 - Role flexibility: AuthUser.role can be string or AuthRole; utilities normalize this to a consistent display format.
 - Enumerations: SupportTicket uses strict union types for status, priority, and category to constrain inputs.
 - Optional enrichment: AuthUser gains role and permissions after fetching the profile; consumers must handle undefined cases.
 - Pagination envelopes: CustomerPickupHistoryResponse and TicketListResponse standardize list responses.
+- **Dual pricing models**: Subscription supports both 'plan' (legacy fixed plans) and 'calculated' (bin capacity rates) pricing sources with conditional field population.
 
 **Section sources**
 - [auth.ts:1-64](file://app/types/auth.ts#L1-L64)
-- [customer.ts:1-103](file://app/types/customer.ts#L1-L103)
-- [driver.ts:1-106](file://app/types/driver.ts#L1-L106)
+- [customer.ts:1-105](file://app/types/customer.ts#L1-L105)
+- [driver.ts:1-127](file://app/types/driver.ts#L1-L127)
+- [subscription.ts:1-66](file://app/types/subscription.ts#L1-L66)
 - [support.ts:1-81](file://app/types/support.ts#L1-L81)
 - [team.ts:1-65](file://app/types/team.ts#L1-L65)
 - [auth.ts (utils):1-58](file://app/utils/auth.ts#L1-L58)
@@ -172,14 +196,18 @@ Store-->>UI : Updated AuthUser with role/permissions
 UI->>Api : PATCH /support/admin/tickets/{id}/status
 Api-->>UI : SupportTicket (typed)
 UI->>UI : Update local ticket state
+UI->>Api : GET /subscription/admin/plans
+Api-->>UI : Plan[] (typed)
+UI->>UI : Display subscription plans
 ```
 
 **Diagram sources**
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
 - [auth store:1-230](file://app/stores/auth.ts#L1-L230)
 - [auth.ts:1-64](file://app/types/auth.ts#L1-L64)
-- [customer.ts:1-103](file://app/types/customer.ts#L1-L103)
+- [customer.ts:1-105](file://app/types/customer.ts#L1-L105)
 - [support.ts:1-81](file://app/types/support.ts#L1-L81)
+- [subscription.ts:1-66](file://app/types/subscription.ts#L1-L66)
 
 ## Detailed Component Analysis
 
@@ -275,12 +303,12 @@ Submit --> Update["Update local Customer state"]
 ```
 
 **Diagram sources**
-- [customer.ts:1-103](file://app/types/customer.ts#L1-L103)
+- [customer.ts:1-105](file://app/types/customer.ts#L1-L105)
 - [EditCustomerModal.vue:1-200](file://app/components/EditCustomerModal.vue#L1-L200)
 - [customers/[id].vue](file://app/pages/customers/[id].vue#L1-L200)
 
 **Section sources**
-- [customer.ts:1-103](file://app/types/customer.ts#L1-L103)
+- [customer.ts:1-105](file://app/types/customer.ts#L1-L105)
 - [EditCustomerModal.vue:1-200](file://app/components/EditCustomerModal.vue#L1-L200)
 - [customers/[id].vue](file://app/pages/customers/[id].vue#L1-L200)
 
@@ -352,10 +380,10 @@ Truck --> TruckDriver : "assigned"
 ```
 
 **Diagram sources**
-- [driver.ts:1-106](file://app/types/driver.ts#L1-L106)
+- [driver.ts:1-127](file://app/types/driver.ts#L1-L127)
 
 **Section sources**
-- [driver.ts:1-106](file://app/types/driver.ts#L1-L106)
+- [driver.ts:1-127](file://app/types/driver.ts#L1-L127)
 
 ### Support Ticket Types and Usage
 - SupportTicket defines ticket metadata with strict enums for status, priority, and category.
@@ -423,6 +451,84 @@ Payload --> API["POST/PATCH team endpoints"]
 - [teamValidation.ts:1-122](file://app/utils/teamValidation.ts#L1-L122)
 - [teamTransform.ts:1-88](file://app/utils/teamTransform.ts#L1-L88)
 
+### Subscription Types and Dual Pricing Models *(New Section)*
+- **Subscription** represents customer subscriptions with dual pricing models supporting both legacy fixed plans and calculated bin capacity rates.
+- **PricingSource** distinguishes between 'plan' (fixed plans) and 'calculated' (bin capacity rates) pricing methods.
+- **SubscriptionFrequency** defines pickup schedules: weekly, biweekly, or monthly.
+- **SubscriptionPaymentPlan** supports prepaid and postpaid payment flows.
+- **PlanBillingCycle** handles legacy plan billing: monthly, quarterly, or yearly.
+- **SubscriptionPlan** contains legacy fixed plan details including pickups, bins, pricing, and configuration.
+- **SubscriptionResponse** wraps subscription data with payment plan information.
+
+Usage patterns:
+- The subscriptions page manages plan creation, editing, and deletion with proper payload transformation.
+- API integration handles multiple response formats and transforms data between UI and API representations.
+- Validation ensures proper field mapping and data integrity during CRUD operations.
+
+```mermaid
+classDiagram
+class Subscription {
++string id
++string status
++string startDate
++string endDate
++number outstandingBalance
++SubscriptionPlan|null plan
++SubscriptionFrequency|null frequency
++number|null pickupsPerCycle
++number|null amountPerCycle
++PricingSource pricingSource
++Record~string, unknown~|null payment
++string createdAt
++string updatedAt
+}
+class SubscriptionPlan {
++string id
++string name
++string description
++SubscriptionPaymentPlan type
++number pickups
++number bins
++PlanBillingCycle billingCycle
++number price
++string badgeColor
++number gracePeriodDays
+}
+class PricingSource {
+<<enumeration>>
+'plan' | 'calculated'
+}
+class SubscriptionFrequency {
+<<enumeration>>
+'weekly' | 'biweekly' | 'monthly'
+}
+class SubscriptionPaymentPlan {
+<<enumeration>>
+'prepaid' | 'postpaid'
+}
+class PlanBillingCycle {
+<<enumeration>>
+'monthly' | 'quarterly' | 'yearly'
+}
+class SubscriptionResponse {
++SubscriptionPaymentPlan paymentPlan
++Subscription subscription
+}
+Subscription --> SubscriptionPlan : "conditional"
+Subscription --> PricingSource : "uses"
+Subscription --> SubscriptionFrequency : "conditional"
+SubscriptionPlan --> SubscriptionPaymentPlan : "has"
+SubscriptionPlan --> PlanBillingCycle : "uses"
+SubscriptionResponse --> Subscription : "contains"
+```
+
+**Diagram sources**
+- [subscription.ts:1-66](file://app/types/subscription.ts#L1-L66)
+
+**Section sources**
+- [subscription.ts:1-66](file://app/types/subscription.ts#L1-L66)
+- [subscriptions.vue:1-1055](file://app/pages/management/subscriptions.vue#L1-L1055)
+
 ## Dependency Analysis
 The following diagram shows how types are consumed across layers:
 
@@ -440,8 +546,9 @@ Store --> UI
 
 **Diagram sources**
 - [auth.ts:1-64](file://app/types/auth.ts#L1-L64)
-- [customer.ts:1-103](file://app/types/customer.ts#L1-L103)
-- [driver.ts:1-106](file://app/types/driver.ts#L1-L106)
+- [customer.ts:1-105](file://app/types/customer.ts#L1-L105)
+- [driver.ts:1-127](file://app/types/driver.ts#L1-L127)
+- [subscription.ts:1-66](file://app/types/subscription.ts#L1-L66)
 - [support.ts:1-81](file://app/types/support.ts#L1-L81)
 - [team.ts:1-65](file://app/types/team.ts#L1-L65)
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
@@ -452,8 +559,9 @@ Store --> UI
 
 **Section sources**
 - [auth.ts:1-64](file://app/types/auth.ts#L1-L64)
-- [customer.ts:1-103](file://app/types/customer.ts#L1-L103)
-- [driver.ts:1-106](file://app/types/driver.ts#L1-L106)
+- [customer.ts:1-105](file://app/types/customer.ts#L1-L105)
+- [driver.ts:1-127](file://app/types/driver.ts#L1-L127)
+- [subscription.ts:1-66](file://app/types/subscription.ts#L1-L66)
 - [support.ts:1-81](file://app/types/support.ts#L1-L81)
 - [team.ts:1-65](file://app/types/team.ts#L1-L65)
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
@@ -467,6 +575,7 @@ Store --> UI
 - Use computed properties for derived fields (e.g., labels, initials) to avoid recomputation.
 - Leverage union types for enums to prevent invalid states at compile time.
 - Minimize deep object mutations; prefer immutable updates when refreshing data from APIs.
+- **For subscription types**: Use conditional field access patterns to handle dual pricing models efficiently without unnecessary null checks.
 
 ## Troubleshooting Guide
 Common issues and resolutions:
@@ -474,15 +583,17 @@ Common issues and resolutions:
 - Incorrect status strings: For support tickets, map between UI-friendly values and API enums consistently in components.
 - Validation failures: Use provided validators for team member forms to catch empty fields, invalid emails, and phone formats early.
 - Payload mismatches: Use transformation utilities to convert form data to API payloads, aligning field names and casing.
+- **Subscription pricing model issues**: When working with dual pricing models, always check the `pricingSource` field first to determine which fields are populated (`plan` vs calculated fields like `frequency`, `pickupsPerCycle`, `amountPerCycle`).
 
 **Section sources**
 - [auth store:1-230](file://app/stores/auth.ts#L1-L230)
 - [SupportTicketModal.vue:1-200](file://app/components/SupportTicketModal.vue#L1-L200)
 - [teamValidation.ts:1-122](file://app/utils/teamValidation.ts#L1-L122)
 - [teamTransform.ts:1-88](file://app/utils/teamTransform.ts#L1-L88)
+- [subscription.ts:1-66](file://app/types/subscription.ts#L1-L66)
 
 ## Conclusion
-The type system provides strong contracts across authentication, customers, drivers, support tickets, and team management. By centralizing domain models in dedicated type files and enforcing them through composables, stores, and UI components, the application maintains consistency and reduces runtime errors. Following best practices—using union types for enums, validating inputs early, transforming payloads explicitly, and handling optional enrichment—ensures robust and maintainable code.
+The type system provides strong contracts across authentication, customers, drivers, support tickets, team management, and subscription management. By centralizing domain models in dedicated type files and enforcing them through composables, stores, and UI components, the application maintains consistency and reduces runtime errors. Following best practices—using union types for enums, validating inputs early, transforming payloads explicitly, and handling optional enrichment—ensures robust and maintainable code. The addition of subscription types with dual pricing models demonstrates the system's flexibility in supporting complex business requirements while maintaining type safety.
 
 ## Appendices
 
@@ -492,5 +603,6 @@ The type system provides strong contracts across authentication, customers, driv
 - Normalize flexible fields (e.g., role as string or object) with utility functions.
 - Separate concerns: keep validation in utils, transformations in utils, and API calls in composables.
 - Keep component props and emits narrowly typed to improve developer experience and catch mistakes early.
+- **For dual pricing models**: Always check the pricing source field before accessing conditional fields to prevent runtime errors.
 
 [No sources needed since this section provides general guidance]

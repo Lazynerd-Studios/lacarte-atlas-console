@@ -180,7 +180,6 @@ async function submit() {
     phoneNumber: form.phone.trim(),
     customerTypeId: form.customerTypeId,
     zoneId: form.zoneId,
-    noBins: form.binCount,
     address: form.address.trim(),
     city: form.city.trim(),
     region: form.region.trim(),
@@ -192,9 +191,15 @@ async function submit() {
       longitude: Number(form.longitude) || 0,
     },
   }
-  // Only per_bin customers get a capacity rate assigned at profile level
-  if (isPerBinType.value && form.capacityRateId) {
+  // per_bin customers are priced by capacity rate × number of bins, so both
+  // fields are sent. full_truck customers are priced by the truck tier chosen at
+  // booking time, so bin fields don't apply — but the backend still requires
+  // noBins, so send a minimal default and omit capacityRateId.
+  if (isPerBinType.value) {
     payload.capacityRateId = form.capacityRateId
+    payload.noBins = form.binCount
+  } else {
+    payload.noBins = 1
   }
   const result = await api.post('/customer/admin/', payload, 'Failed to create customer')
   loading.value = false
@@ -290,20 +295,42 @@ function onBlur(e: Event, field: string) {
           <span v-if="errors.customerTypeId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.customerTypeId }}</span>
         </div>
 
-        <!-- Bin Capacity (per_bin pricing mode only) -->
-        <div v-if="isPerBinType" style="display:flex;flex-direction:column;gap:6px">
-          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Bin Capacity</label>
-          <select
-            v-model="form.capacityRateId"
-            :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid ${errors.capacityRateId ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:${form.capacityRateId ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
-            @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
-            @blur="($event.target as HTMLElement).style.borderColor=errors.capacityRateId ? '#ef4444' : '#e5e7eb'"
-          >
-            <option value="" disabled>Select bin capacity</option>
-            <option v-for="tier in capacityTiers" :key="tier.id" :value="tier.id">{{ tier.capacityLiters }}L — GHS {{ tier.prepayRate }}/pickup</option>
-          </select>
-          <span v-if="errors.capacityRateId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.capacityRateId }}</span>
-        </div>
+        <!-- Bin fields (per_bin pricing mode only) -->
+        <template v-if="isPerBinType">
+          <!-- Bin Capacity -->
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Bin Capacity</label>
+            <select
+              v-model="form.capacityRateId"
+              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid ${errors.capacityRateId ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:${form.capacityRateId ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+              @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+              @blur="($event.target as HTMLElement).style.borderColor=errors.capacityRateId ? '#ef4444' : '#e5e7eb'"
+            >
+              <option value="" disabled>Select bin capacity</option>
+              <option v-for="tier in capacityTiers" :key="tier.id" :value="tier.id">{{ tier.capacityLiters }}L — GHS {{ tier.prepayRate }}/pickup</option>
+            </select>
+            <span v-if="errors.capacityRateId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.capacityRateId }}</span>
+          </div>
+
+          <!-- Assigned BINs -->
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Assigned BINs</label>
+            <div style="display:flex;align-items:center;gap:12px">
+              <button
+                type="button"
+                style="width:36px;height:36px;border:1px solid #e5e7eb;border-radius:12px;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;color:#6b7280"
+                @click="form.binCount = Math.max(1, form.binCount - 1)"
+              >−</button>
+              <span style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;min-width:32px;text-align:center">{{ form.binCount }}</span>
+              <button
+                type="button"
+                style="width:36px;height:36px;border:1px solid #e5e7eb;border-radius:12px;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;color:#6b7280"
+                @click="form.binCount++"
+              >+</button>
+              <span style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">bin{{ form.binCount !== 1 ? 's' : '' }} assigned</span>
+            </div>
+          </div>
+        </template>
 
         <!-- Address -->
         <div style="display:flex;flex-direction:column;gap:6px;position:relative">
@@ -403,25 +430,6 @@ function onBlur(e: Event, field: string) {
             <option v-for="z in zones" :key="z.id" :value="z.id">{{ z.name }}</option>
           </select>
           <span v-if="errors.zoneId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.zoneId }}</span>
-        </div>
-
-        <!-- Assigned BINs -->
-        <div style="display:flex;flex-direction:column;gap:6px">
-          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Assigned BINs</label>
-          <div style="display:flex;align-items:center;gap:12px">
-            <button
-              type="button"
-              style="width:36px;height:36px;border:1px solid #e5e7eb;border-radius:12px;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;color:#6b7280"
-              @click="form.binCount = Math.max(1, form.binCount - 1)"
-            >−</button>
-            <span style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;min-width:32px;text-align:center">{{ form.binCount }}</span>
-            <button
-              type="button"
-              style="width:36px;height:36px;border:1px solid #e5e7eb;border-radius:12px;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;color:#6b7280"
-              @click="form.binCount++"
-            >+</button>
-            <span style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">bin{{ form.binCount !== 1 ? 's' : '' }} assigned</span>
-          </div>
         </div>
 
       </div>
