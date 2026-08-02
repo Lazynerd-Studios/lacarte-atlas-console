@@ -345,7 +345,7 @@ function setupMapInteractions(mapLibreMap: any) {
 
 function connectSSE() {
   if (!authStore.token) {
-    mapError.value = 'Not authenticated. Please log in again.'
+    streamError.value = 'Not authenticated. Please log in again.'
     return
   }
 
@@ -360,16 +360,19 @@ function connectSSE() {
     signal: abortController.signal,
   }).then(async (response) => {
     if (!response.ok) {
-      mapError.value = `Failed to connect to tracking stream (${response.status})`
+      streamError.value = `Failed to connect to tracking stream (${response.status})`
+      connected.value = false
       return
     }
 
     connected.value = true
+    streamError.value = ''
     loading.value = false
 
     const reader = response.body?.getReader()
     if (!reader) {
-      mapError.value = 'Failed to read tracking stream'
+      streamError.value = 'Failed to read tracking stream'
+      connected.value = false
       return
     }
 
@@ -390,7 +393,7 @@ function connectSSE() {
             const data = JSON.parse(line.slice(6))
             if (data && data.driverId) {
               drivers.value.set(data.driverId, data)
-              if (map?.mapLibreMap?.isStyleLoaded()) {
+              if (mapReady) {
                 updateMarkers()
               }
             }
@@ -403,7 +406,7 @@ function connectSSE() {
   }).catch((err) => {
     if (err.name !== 'AbortError') {
       console.error('SSE connection error:', err)
-      mapError.value = 'Lost connection to tracking stream'
+      streamError.value = 'Lost connection to tracking stream'
       connected.value = false
     }
   })
@@ -430,20 +433,34 @@ const reconnecting = ref(false)
 async function reconnectStream() {
   reconnecting.value = true
   disconnectSSE()
-  mapError.value = ''
+  streamError.value = ''
   connectSSE()
   await new Promise(r => setTimeout(r, 1000))
   reconnecting.value = false
+}
+
+// Flip drivers to offline if their last fix is too old (server stopped sending)
+function markStaleDriversOffline() {
+  const now = Date.now()
+  for (const [id, d] of Array.from(drivers.value.entries())) {
+    if (d.isOnline && d.recordedAt && now - new Date(d.recordedAt).getTime() > STALE_AFTER_MS) {
+      drivers.value.set(id, { ...d, isOnline: false })
+    }
+  }
 }
 
 onMounted(async () => {
   fetchDriverDetails()
   await initMap()
   connectSSE()
+  staleTimer = setInterval(markStaleDriversOffline, 15_000)
+  detailsTimer = setInterval(fetchDriverDetails, 60_000)
 })
 
 onUnmounted(() => {
   disconnectSSE()
+  if (staleTimer) clearInterval(staleTimer)
+  if (detailsTimer) clearInterval(detailsTimer)
   if (map?.remove) map.remove()
 })
 </script>
@@ -476,6 +493,22 @@ onUnmounted(() => {
       </div>
     </div>
 
+    <!-- Non-blocking stream error banner (map stays visible) -->
+    <div
+      v-if="streamError"
+      style="display:flex;align-items:center;gap:12px;background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:12px 20px"
+    >
+      <UIcon name="i-lucide-alert-triangle" style="width:20px;height:20px;color:#ef4444;flex-shrink:0" />
+      <p style="font-size:13px;color:#991b1b;font-family:'Manrope',sans-serif;flex:1">{{ streamError }}</p>
+      <button
+        style="display:flex;align-items:center;gap:6px;background:#ef4444;color:white;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-family:'Manrope',sans-serif;font-weight:600;cursor:pointer"
+        @click="reconnectStream"
+      >
+        <UIcon name="i-lucide-refresh-cw" style="width:12px;height:12px" />
+        Retry
+      </button>
+    </div>
+
     <!-- Map + driver panel -->
     <div style="display:flex;gap:24px;align-items:stretch">
     <div
@@ -484,7 +517,7 @@ onUnmounted(() => {
     >
       <!-- Loading overlay -->
       <div
-        v-if="loading"
+        v-if="loading && !mapFailed"
         style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.8);z-index:100;border-radius:16px"
       >
         <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
@@ -493,9 +526,9 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- Error state -->
+      <!-- Fatal map error overlay -->
       <div
-        v-if="mapError"
+        v-if="mapFailed"
         style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:white;z-index:100;border-radius:16px"
       >
         <div style="display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;padding:32px">
