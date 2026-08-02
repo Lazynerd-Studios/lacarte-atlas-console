@@ -22,10 +22,6 @@ const { format } = useCurrency()
 function feeInGhs(fee: number): string {
   return format(Number(fee))
 }
-
-function feeInPesewas(fee: number): string {
-  return `${Math.round(Number(fee) * 100)} pesewas`
-}
 </script>
 
 <template>
@@ -68,9 +64,8 @@ function feeInPesewas(fee: number): string {
           <div>
             <p style="font-size:14px;font-weight:600;color:#1a1a1a;margin:0">{{ zone.zoneName }}</p>
             <p style="font-size:14px;font-weight:600;color:#1a1a1a;margin:2px 0 0">{{ feeInGhs(zone.fee) }}</p>
-            <p style="font-size:12px;color:#9ca3af;margin:2px 0 0">
-              {{ feeInPesewas(zone.fee) }}
-              <span v-if="zone.freeDeliveryMinQuantity > 0"> · Free from {{ zone.freeDeliveryMinQuantity }} items</span>
+            <p v-if="zone.freeDeliveryMinQuantity > 0" style="font-size:12px;color:#9ca3af;margin:2px 0 0">
+              Free from {{ zone.freeDeliveryMinQuantity }} items
             </p>
           </div>
         </div>

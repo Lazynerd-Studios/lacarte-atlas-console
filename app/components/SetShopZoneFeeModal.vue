@@ -42,9 +42,6 @@ watch(() => props.zone, (zone) => {
   error.value = ''
 }, { immediate: true })
 
-const feeInPesewas = computed(() => Math.round(feeGhs.value * 100))
-const formattedPreview = computed(() => `${feeInPesewas.value} pesewas`)
-
 function submit() {
   error.value = ''
 
@@ -70,10 +67,13 @@ function submit() {
   }
 
   submitting.value = true
+  // TEMPORARY WORKAROUND: the backend currently interprets the fee as pesewas
+  // (it divides the sent value by 100), so send GHS × 100 to store the intended
+  // cedis amount. Remove the × 100 once the backend accepts whole cedis directly.
   emit('submit', {
     zoneId: props.zone.zoneId,
     configId: props.zone.configId,
-    fee,
+    fee: fee * 100,
     freeDeliveryMinQuantity: Math.round(Number(freeDeliveryMinQuantity.value)),
     isActive: isActive.value,
   })
@@ -112,7 +112,6 @@ function handleDelete() {
               style="width:100%;padding:10px 14px 10px 52px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box"
             />
           </div>
-          <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">Preview: {{ formattedPreview }}</p>
         </div>
 
         <div>
