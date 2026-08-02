@@ -36,19 +36,22 @@ watch(() => props.config, (config) => {
   error.value = ''
 }, { immediate: true })
 
-const feeInPesewas = computed(() => Math.round(feeGhs.value * 100))
-const formattedPreview = computed(() => `${feeInPesewas.value} pesewas`)
-
 function submit() {
   error.value = ''
 
-  if (Number.isNaN(Number(feeGhs.value)) || Number(feeGhs.value) < 0) {
+  const fee = Number(feeGhs.value)
+  if (Number.isNaN(fee) || fee < 0) {
     error.value = 'Please enter a valid fee amount.'
+    return
+  }
+  // The backend stores the fee as an integer number of cedis
+  if (!Number.isInteger(fee)) {
+    error.value = 'Fee must be a whole number of cedis (no decimals).'
     return
   }
 
   submitting.value = true
-  emit('submit', { fee: Number(feeGhs.value), isActive: isActive.value })
+  emit('submit', { fee, isActive: isActive.value })
 }
 </script>
 
@@ -73,12 +76,11 @@ function submit() {
               v-model.number="feeGhs"
               type="number"
               min="0"
-              step="0.01"
-              placeholder="0.00"
+              step="1"
+              placeholder="0"
               style="width:100%;padding:10px 14px 10px 52px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box"
             />
           </div>
-          <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">Preview: {{ formattedPreview }}</p>
         </div>
 
         <div style="display:flex;align-items:center;justify-content:space-between;background:#f9fafb;border-radius:10px;padding:14px 16px">

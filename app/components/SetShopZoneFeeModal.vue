@@ -53,8 +53,14 @@ function submit() {
     return
   }
 
-  if (Number.isNaN(Number(feeGhs.value)) || Number(feeGhs.value) < 0) {
+  const fee = Number(feeGhs.value)
+  if (Number.isNaN(fee) || fee < 0) {
     error.value = 'Please enter a valid fee amount.'
+    return
+  }
+  // The backend stores the fee as an integer number of cedis
+  if (!Number.isInteger(fee)) {
+    error.value = 'Fee must be a whole number of cedis (no decimals).'
     return
   }
 
@@ -67,7 +73,7 @@ function submit() {
   emit('submit', {
     zoneId: props.zone.zoneId,
     configId: props.zone.configId,
-    fee: Number(feeGhs.value),
+    fee,
     freeDeliveryMinQuantity: Math.round(Number(freeDeliveryMinQuantity.value)),
     isActive: isActive.value,
   })
@@ -101,8 +107,8 @@ function handleDelete() {
               v-model.number="feeGhs"
               type="number"
               min="0"
-              step="0.01"
-              placeholder="0.00"
+              step="1"
+              placeholder="0"
               style="width:100%;padding:10px 14px 10px 52px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box"
             />
           </div>

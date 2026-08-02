@@ -14,7 +14,21 @@
 - [dashboard.vue](file://app/layouts/dashboard.vue)
 - [default.vue](file://app/layouts/default.vue)
 - [app.vue](file://app/app.vue)
+- [index.vue](file://app/pages/index.vue)
+- [inventory/index.vue](file://app/pages/inventory/index.vue)
+- [shop/orders/index.vue](file://app/pages/shop/orders/index.vue)
+- [support/index.vue](file://app/pages/support/index.vue)
+- [drivers/index.vue](file://app/pages/drivers/index.vue)
+- [trucks/index.vue](file://app/pages/trucks/index.vue)
+- [team/[id]/edit.vue](file://app/pages/team/[id]/edit.vue)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Updated PageSkeleton component documentation to reflect comprehensive implementation across major application pages
+- Added detailed usage examples from dashboard, inventory, orders, support tickets, drivers, trucks, and team member edit page
+- Enhanced skeleton layout patterns with custom form structures matching actual page layouts
+- Expanded component integration patterns showing real-world usage scenarios
 
 ## Table of Contents
 1. Introduction
@@ -29,6 +43,8 @@
 
 ## Introduction
 This document describes the core UI components library used across the application. It covers reusable building blocks for navigation, header and user controls, pagination, search, toast notifications, confirmation dialogs, page skeletons, and session warnings. For each component, you will find props, events, slots (if any), customization options, usage patterns, responsive behavior, accessibility notes, and integration examples with other components.
+
+**Updated** The PageSkeleton component has been comprehensively implemented across all major application pages with custom skeleton layouts that match their respective form structures and data presentations.
 
 ## Project Structure
 The UI components are organized under app/components and integrated via Nuxt layouts and the root app shell. The dashboard layout composes AppSidebar and AppHeader around page content. The root app mounts global overlays like SessionWarning and AppToast.
@@ -89,7 +105,7 @@ K --> R
 - [app.vue:1-33](file://app/app.vue#L1-L33)
 
 ## Core Components
-Below is a concise overview of each component’s purpose, props, events, slots, and key behaviors.
+Below is a concise overview of each component's purpose, props, events, slots, and key behaviors.
 
 - AppSidebar
   - Purpose: Collapsible navigation with permission-based visibility and grouped sections.
@@ -140,12 +156,12 @@ Below is a concise overview of each component’s purpose, props, events, slots,
   - Behavior: Dismissed on backdrop click; shows spinner when loading.
 
 - PageSkeleton
-  - Purpose: Full-page loading placeholders for different page shapes.
+  - Purpose: Full-page loading placeholders for different page shapes with comprehensive implementation across major application pages.
   - Props: type ('table' | 'detail' | 'dashboard' | 'card-grid' | 'tracking'), rows (number, default 6), cards (number, default 4).
   - Events: none.
   - Slots: none.
   - Customization: Add new skeleton variants by extending the prop union and template branches.
-  - Behavior: Renders structured placeholders matching real page layouts.
+  - Behavior: Renders structured placeholders matching real page layouts including dashboard statistics, table data, detail views, card grids, and tracking interfaces.
 
 - SessionWarning
   - Purpose: Warning banner indicating imminent session expiration.
@@ -423,7 +439,7 @@ Note over Dialog : Backdrop click also emits "cancel"
 
 ### PageSkeleton
 - Responsibilities
-  - Provide full-page loading placeholders for multiple page templates.
+  - Provide full-page loading placeholders for multiple page templates with comprehensive implementation across major application pages.
 - Props
   - type: 'table' | 'detail' | 'dashboard' | 'card-grid' | 'tracking'
   - rows?: number (default 6)
@@ -433,8 +449,72 @@ Note over Dialog : Backdrop click also emits "cancel"
 - Extensibility
   - Add new skeleton types by extending the prop union and adding a template branch.
 
+**Updated** The PageSkeleton component is now comprehensively implemented across all major application pages with custom skeleton layouts that match their specific form structures and data presentations:
+
+#### Dashboard Skeleton Implementation
+Used in the main dashboard page (`app/pages/index.vue`) with `type="dashboard"` to display loading placeholders for analytics metrics, revenue charts, and operational data panels.
+
+#### Table Skeleton Implementations  
+Used across multiple data-heavy pages:
+- **Inventory Management** (`app/pages/inventory/index.vue`): Table skeleton with 8 rows for product listings
+- **Orders Management** (`app/pages/shop/orders/index.vue`): Table skeleton for order data presentation
+- **Customers Management** (`app/pages/customers/index.vue`): Table skeleton with 8 rows for customer records
+- **Truck Management** (`app/pages/trucks/index.vue`): Table skeleton with 5 rows for fleet vehicle data
+
+#### Card Grid Skeleton Implementation
+Used in the Drivers page (`app/pages/drivers/index.vue`) with `type="card-grid"` to display loading placeholders for driver profile cards with avatar, contact information, and performance metrics.
+
+#### Detail Skeleton Implementations
+Used in detail view pages:
+- **Customer Details** (`app/pages/customers/[id].vue`): Detail skeleton for individual customer profiles
+- **Driver Details** (`app/pages/drivers/[id].vue`): Detail skeleton for driver information pages  
+- **Truck Details** (`app/pages/trucks/[id].vue`): Detail skeleton for truck specification pages
+
+#### Tracking Skeleton Implementation
+Available for map-based interfaces with `type="tracking"` to display loading placeholders for map areas and sidebar navigation elements.
+
+#### Custom Form Skeleton Implementation
+The Team Member Edit page (`app/pages/team/[id]/edit.vue`) implements a custom skeleton layout that matches its specific form structure with two-column layout, form fields, and role/permission sections.
+
+```mermaid
+flowchart TD
+A["Page Load"] --> B{"Loading State?"}
+B --> |Yes| C["Show PageSkeleton"]
+B --> |No| D["Render Actual Content"]
+C --> E{"Skeleton Type"}
+E --> F["Dashboard Stats"]
+E --> G["Table Data"]
+E --> H["Card Grid"]
+E --> I["Detail View"]
+E --> J["Tracking Interface"]
+E --> K["Custom Form Layout"]
+F --> L["Hide Skeleton"]
+G --> L
+H --> L
+I --> L
+J --> L
+K --> L
+```
+
+**Diagram sources**
+- [PageSkeleton.vue:1-300](file://app/components/PageSkeleton.vue#L1-L300)
+- [index.vue:309](file://app/pages/index.vue#L309)
+- [inventory/index.vue:182](file://app/pages/inventory/index.vue#L182)
+- [shop/orders/index.vue:169](file://app/pages/shop/orders/index.vue#L169)
+- [customers/index.vue:182](file://app/pages/customers/index.vue#L182)
+- [drivers/index.vue:49](file://app/pages/drivers/index.vue#L49)
+- [trucks/index.vue:69](file://app/pages/trucks/index.vue#L69)
+- [team/[id]/edit.vue:280](file://app/pages/team/[id]/edit.vue#L280)
+
 **Section sources**
 - [PageSkeleton.vue:1-300](file://app/components/PageSkeleton.vue#L1-L300)
+- [index.vue:309](file://app/pages/index.vue#L309)
+- [inventory/index.vue:182](file://app/pages/inventory/index.vue#L182)
+- [shop/orders/index.vue:169](file://app/pages/shop/orders/index.vue#L169)
+- [customers/index.vue:182](file://app/pages/customers/index.vue#L182)
+- [drivers/index.vue:49](file://app/pages/drivers/index.vue#L49)
+- [trucks/index.vue:69](file://app/pages/trucks/index.vue#L69)
+- [team/[id]/edit.vue:280](file://app/pages/team/[id]/edit.vue#L280)
 
 ### SessionWarning
 - Responsibilities
@@ -476,6 +556,8 @@ Warning-->>Store : emit("dismiss") -> dismissSessionWarning()
   - Root app mounts SessionWarning and AppToast globally.
 - Toast dependency chain
   - AppToast consumes useAppToast; consumers call useAppToast() directly to trigger toasts.
+- PageSkeleton integration
+  - Multiple pages import and conditionally render PageSkeleton based on loading states.
 
 ```mermaid
 graph LR
@@ -485,6 +567,7 @@ Root["app.vue"] --> Session["SessionWarning.vue"]
 Root --> Toast["AppToast.vue"]
 Toast --> Compose["useToast.ts"]
 Header --> Compose
+Pages["Multiple Pages"] --> Skeleton["PageSkeleton.vue"]
 ```
 
 **Diagram sources**
@@ -492,6 +575,12 @@ Header --> Compose
 - [app.vue:1-33](file://app/app.vue#L1-L33)
 - [AppToast.vue:1-115](file://app/components/AppToast.vue#L1-L115)
 - [useToast.ts:1-37](file://app/composables/useToast.ts#L1-L37)
+- [index.vue:309](file://app/pages/index.vue#L309)
+- [inventory/index.vue:182](file://app/pages/inventory/index.vue#L182)
+- [shop/orders/index.vue:169](file://app/pages/shop/orders/index.vue#L169)
+- [customers/index.vue:182](file://app/pages/customers/index.vue#L182)
+- [drivers/index.vue:49](file://app/pages/drivers/index.vue#L49)
+- [trucks/index.vue:69](file://app/pages/trucks/index.vue#L69)
 
 **Section sources**
 - [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
@@ -509,6 +598,8 @@ Header --> Compose
   - Limit concurrent toasts; consider auto-dismiss durations to prevent memory growth.
 - Skeletons
   - Prefer lightweight placeholders; avoid complex nested structures.
+  - Use conditional rendering to minimize DOM manipulation during loading states.
+  - Optimize skeleton complexity based on page type to reduce initial render overhead.
 
 ## Troubleshooting Guide
 - Sidebar not closing on mobile
@@ -521,6 +612,10 @@ Header --> Compose
   - Check that both @confirm and @cancel handlers set the controlling boolean to false.
 - SessionWarning not showing
   - Ensure auth store flags and methods are wired in the root app shell.
+- PageSkeleton not displaying
+  - Verify that loading state is properly managed and PageSkeleton is imported correctly.
+  - Check that the correct skeleton type is specified for the page layout.
+  - Ensure proper conditional rendering with v-if directives.
 
 **Section sources**
 - [dashboard.vue:1-25](file://app/layouts/dashboard.vue#L1-L25)
@@ -529,6 +624,9 @@ Header --> Compose
 - [AppPagination.vue:1-48](file://app/components/AppPagination.vue#L1-L48)
 - [ConfirmDialog.vue:1-53](file://app/components/ConfirmDialog.vue#L1-L53)
 - [SessionWarning.vue:1-66](file://app/components/SessionWarning.vue#L1-L66)
+- [PageSkeleton.vue:1-300](file://app/components/PageSkeleton.vue#L1-L300)
 
 ## Conclusion
 The core UI components provide a cohesive foundation for navigation, user interactions, feedback, and loading states. They are designed to be composable, accessible, and responsive. By following the documented props, events, and integration patterns, teams can consistently build feature-rich pages with predictable UX and maintainable code.
+
+**Updated** The comprehensive implementation of PageSkeleton across all major application pages demonstrates the component's versatility and effectiveness in providing consistent loading experiences. The custom skeleton layouts that match specific page structures enhance user experience by maintaining visual continuity during data loading operations.
