@@ -15,6 +15,7 @@ interface CustomerOption {
   customerTypeId?: string | null
   customerType?: { id: string } | null
   user?: { name?: string; email?: string } | null
+  paymentMode?: string | null
 }
 interface DisposableItem {
   id: string
@@ -162,7 +163,8 @@ async function fetchAllCustomers(): Promise<CustomerOption[]> {
         if (!c.name && c.user?.name) c.name = c.user.name
         if (!c.placeName) c.placeName = (c as any).address ?? null
       }
-      all.push(...res.data)
+      // Pickups are created for subscribed customers only — drop pay-as-you-go accounts
+      all.push(...res.data.filter(c => c.paymentMode === 'subscription'))
     }
     hasNext = !!res.pagination?.hasNextPage
     page++
@@ -253,7 +255,7 @@ function inputStyle(field: string) {
       <!-- Header -->
       <div style="padding:24px 24px 16px;flex-shrink:0;border-bottom:1px solid #e5e7eb">
         <p style="font-size:20px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Create Pickup Request</p>
-        <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:4px">Payment type: Auto-resolved by the system</p>
+        <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:4px">Subscribed customers only · Payment type: Auto-resolved by the system</p>
       </div>
 
       <!-- Close -->
@@ -303,7 +305,7 @@ function inputStyle(field: string) {
               </button>
             </div>
             <div v-else-if="customerDropdownOpen && customerSearch && filteredCustomers.length === 0" style="position:absolute;top:calc(100% + 4px);left:0;right:0;background:white;border:1px solid #e5e7eb;border-radius:12px;padding:12px;text-align:center;z-index:10">
-              <span style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">No customers found</span>
+              <span style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">No subscribed customers found</span>
             </div>
           </div>
 
