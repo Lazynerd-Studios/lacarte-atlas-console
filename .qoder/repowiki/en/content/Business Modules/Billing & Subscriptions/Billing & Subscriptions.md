@@ -6,7 +6,12 @@
 - [billing/[id].vue](file://app/pages/billing/[id].vue)
 - [management/subscriptions.vue](file://app/pages/management/subscriptions.vue)
 - [management/rates.vue](file://app/pages/management/rates.vue)
+- [management/fees.vue](file://app/pages/management/fees.vue)
 - [pay/[id].vue](file://app/pages/pay/[id].vue)
+- [ShopZoneFeeCard.vue](file://app/components/ShopZoneFeeCard.vue)
+- [SetShopZoneFeeModal.vue](file://app/components/SetShopZoneFeeModal.vue)
+- [EmergencyFeeCard.vue](file://app/components/EmergencyFeeCard.vue)
+- [SetEmergencyFeeModal.vue](file://app/components/SetEmergencyFeeModal.vue)
 - [useApi.ts](file://app/composables/useApi.ts)
 - [useCurrency.ts](file://app/composables/useCurrency.ts)
 - [rateValidation.ts](file://app/utils/rateValidation.ts)
@@ -20,6 +25,8 @@
 - Integrated new API endpoint `/subscription/admin/plans?status=active` for fetching active plans
 - Added color-coded billing type badges and interactive table interface
 - Enhanced subscription management with improved data visualization and user experience
+- **Updated** Enhanced shop zone fee management with backend compatibility workarounds and simplified currency presentation
+- **Updated** Removed pesewas display complexity in favor of direct GHS formatting across all fee components
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -36,13 +43,14 @@
 ## Introduction
 This document provides comprehensive documentation for the Billing and Subscription management system within the application. It covers payment processing workflows, subscription plan management, rate configuration, billing cycle handling, invoice generation, payment status tracking, subscription tier management, and revenue analytics integration. The system is implemented as a Nuxt 3 frontend with Vue 3 components that interact with backend APIs via a centralized API composable.
 
-**Updated** The billing system has undergone a major enhancement including complete transition from mock data to live API integration, comprehensive TypeScript interface definitions for all data models, enhanced invoice management with PDF download and send capabilities, robust error handling, sophisticated loading state management throughout the entire billing workflow, and the addition of comprehensive active subscription tiers display with dual pricing model support.
+**Updated** The billing system has undergone a major enhancement including complete transition from mock data to live API integration, comprehensive TypeScript interface definitions for all data models, enhanced invoice management with PDF download and send capabilities, robust error handling, sophisticated loading state management throughout the entire billing workflow, the addition of comprehensive active subscription tiers display with dual pricing model support, and enhanced shop zone fee management with simplified currency presentation and backend compatibility workarounds.
 
 ## Project Structure
 The billing and subscriptions features are organized by pages and utilities:
 - Billing overview and invoice detail views with real-time API integration and enhanced invoice management
 - Subscription plan management (prepaid/postpaid) with active tiers display
 - Pay-as-you-go rate management
+- Shop and emergency fee management with simplified currency presentation
 - Customer-facing payment portal
 - Shared composables and utilities for API calls, currency formatting, and validation
 
@@ -55,6 +63,7 @@ end
 subgraph "Management"
 SubPlans["Subscription Plans<br/>CRUD, stats, toggle, Active Tiers Display"]
 Rates["Rate Management<br/>pay-as-you-go rates"]
+Fees["Fee Management<br/>Emergency & Shop Zone Fees"]
 end
 subgraph "Payments"
 PayPortal["Customer Payment Portal<br/>cash/momo flow"]
@@ -69,15 +78,18 @@ BIndex --> Api
 BDetail --> Api
 SubPlans --> Api
 Rates --> Api
+Fees --> Api
 PayPortal --> Api
 BIndex --> Currency
 BDetail --> Currency
 SubPlans --> Currency
 Rates --> Currency
+Fees --> Currency
 Rates --> Validation
 BDetail --> Types
 BIndex --> Types
 SubPlans --> Types
+Fees --> Types
 ```
 
 **Diagram sources**
@@ -85,6 +97,7 @@ SubPlans --> Types
 - [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
 - [management/subscriptions.vue:1-1055](file://app/pages/management/subscriptions.vue#L1-L1055)
 - [management/rates.vue:1-882](file://app/pages/management/rates.vue#L1-L882)
+- [management/fees.vue:1-259](file://app/pages/management/fees.vue#L1-L259)
 - [pay/[id].vue](file://app/pages/pay/[id].vue#L1-L353)
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
 - [useCurrency.ts:1-12](file://app/composables/useCurrency.ts#L1-L12)
@@ -95,6 +108,7 @@ SubPlans --> Types
 - [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
 - [management/subscriptions.vue:1-1055](file://app/pages/management/subscriptions.vue#L1-L1055)
 - [management/rates.vue:1-882](file://app/pages/management/rates.vue#L1-L882)
+- [management/fees.vue:1-259](file://app/pages/management/fees.vue#L1-L259)
 - [pay/[id].vue](file://app/pages/pay/[id].vue#L1-L353)
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
 - [useCurrency.ts:1-12](file://app/composables/useCurrency.ts#L1-L12)
@@ -104,29 +118,31 @@ SubPlans --> Types
 - **Billing Dashboard**: Real-time KPI display with skeleton loading, searchable paginated invoices with server-side filtering, dynamic revenue breakdown charts, and SVG-based payment aging visualization. Features comprehensive error handling and loading states.
 - **Enhanced Invoice Detail**: Shows invoice metadata, line items, totals, and comprehensive actions including PDF download functionality, send invoice feature, and enhanced error handling with loading states.
 - **Enhanced Subscription Plan Management**: Full CRUD for prepaid/postpaid plans with billing cycles, pricing, feature counts, active toggling, statistics, and comprehensive active subscription tiers display with dual pricing model support.
+- **Enhanced Fee Management**: Manages both emergency pickup fees and shop delivery fees with simplified currency presentation, backend compatibility workarounds, and consistent user experience across both fee types.
 - Rate Management: Configures pay-as-you-go pickup rates per customer type and estimated quantity tiers with effective dates and notes.
 - Customer Payment Portal: Accepts cash or mobile money payments with validation, countdown, and success states.
 
 Key shared utilities:
 - useApi: Centralized HTTP client with authentication headers, error handling, and typed helpers.
-- useCurrency: Formats amounts in GHS using Intl.NumberFormat.
+- useCurrency: Formats amounts in GHS using Intl.NumberFormat with simplified presentation.
 - rateValidation: Validates and transforms rate form data into API payloads.
 - **Updated** Comprehensive TypeScript interfaces for Invoice, Customer, Items, and Subscription structures providing compile-time type safety.
 
-**Updated** The billing system now includes comprehensive TypeScript interfaces for all data models, enhanced invoice management with PDF download and send capabilities, sophisticated loading state management, robust error handling throughout the entire component lifecycle, and the addition of comprehensive active subscription tiers display with enhanced subscriber count tracking and dual pricing model support.
+**Updated** The billing system now includes comprehensive TypeScript interfaces for all data models, enhanced invoice management with PDF download and send capabilities, sophisticated loading state management, robust error handling throughout the entire component lifecycle, the addition of comprehensive active subscription tiers display with enhanced subscriber count tracking and dual pricing model support, and enhanced shop zone fee management with simplified currency presentation and backend compatibility workarounds.
 
 **Section sources**
 - [billing/index.vue:1-599](file://app/pages/billing/index.vue#L1-L599)
 - [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
 - [management/subscriptions.vue:1-1055](file://app/pages/management/subscriptions.vue#L1-L1055)
 - [management/rates.vue:1-882](file://app/pages/management/rates.vue#L1-L882)
+- [management/fees.vue:1-259](file://app/pages/management/fees.vue#L1-L259)
 - [pay/[id].vue](file://app/pages/pay/[id].vue#L1-L353)
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
 - [useCurrency.ts:1-12](file://app/composables/useCurrency.ts#L1-L12)
 - [rateValidation.ts:1-69](file://app/utils/rateValidation.ts#L1-L69)
 
 ## Architecture Overview
-The system follows a component-driven architecture where each page encapsulates its own state and API interactions. Data flows from backend endpoints through useApi into reactive UI state, which renders tables, charts, and forms. The billing dashboard implements a sophisticated multi-API data fetching pattern with proper loading states and error handling, while the invoice detail view provides comprehensive invoice management capabilities. The subscription management system now includes enhanced active tiers display with dual pricing model support.
+The system follows a component-driven architecture where each page encapsulates its own state and API interactions. Data flows from backend endpoints through useApi into reactive UI state, which renders tables, charts, and forms. The billing dashboard implements a sophisticated multi-API data fetching pattern with proper loading states and error handling, while the invoice detail view provides comprehensive invoice management capabilities. The subscription management system now includes enhanced active tiers display with dual pricing model support. The fee management system provides consistent handling of both emergency and shop delivery fees with simplified currency presentation.
 
 ```mermaid
 sequenceDiagram
@@ -134,6 +150,7 @@ participant Admin as "Admin UI"
 participant BillingPage as "Billing Dashboard"
 participant InvoiceDetail as "Invoice Detail View"
 participant SubPlans as "Subscription Plans"
+participant FeeManagement as "Fee Management"
 participant API as "useApi Composable"
 participant Backend as "Backend APIs"
 Admin->>BillingPage : Open /billing
@@ -163,12 +180,26 @@ SubPlans->>API : GET /subscription/admin/plans?status=active
 API->>Backend : HTTP GET for active tiers
 Backend-->>API : { activeTiers[] }
 API-->>SubPlans : Active subscription tiers with dual pricing support
+Admin->>FeeManagement : Open /management/fees
+FeeManagement->>API : GET /pickup-requests/admin/emergency-fee
+API->>Backend : HTTP GET for emergency fee
+Backend-->>API : { config : { fee, isActive } }
+API-->>FeeManagement : Emergency fee configuration
+FeeManagement->>API : GET /store-orders/admin/delivery-fees/
+API->>Backend : HTTP GET for shop delivery fees
+Backend-->>API : { deliveryConfigs[] }
+API-->>FeeManagement : Shop delivery fee configurations
+FeeManagement->>API : PUT/PATCH/POST for fee updates
+API->>Backend : HTTP operations with backend compatibility workarounds
+Backend-->>API : Updated fee configurations
+API-->>FeeManagement : Success responses with simplified currency handling
 ```
 
 **Diagram sources**
 - [billing/index.vue:21-38](file://app/pages/billing/index.vue#L21-L38)
 - [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
 - [management/subscriptions.vue:153-285](file://app/pages/management/subscriptions.vue#L153-L285)
+- [management/fees.vue:58-107](file://app/pages/management/fees.vue#L58-L107)
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
 
 ## Detailed Component Analysis
@@ -305,6 +336,48 @@ API-->>SubPlans : Active subscription tiers with dual pricing support
 - [management/subscriptions.vue:792-852](file://app/pages/management/subscriptions.vue#L792-L852)
 - [management/subscriptions.vue:153-285](file://app/pages/management/subscriptions.vue#L153-L285)
 
+### Enhanced Fee Management System
+**Updated** The fee management system provides comprehensive management of both emergency pickup fees and shop delivery fees with simplified currency presentation and backend compatibility workarounds.
+
+#### Simplified Currency Presentation
+- **Direct GHS Formatting**: Both ShopZoneFeeCard and EmergencyFeeCard use simplified currency formatting without pesewas display complexity
+- **Consistent Display**: All fee amounts are displayed directly in GHS format using the useCurrency composable
+- **Clean User Interface**: Removal of complex currency conversion logic in favor of straightforward presentation
+
+#### Backend Compatibility Workaround
+- **Pesewas Conversion**: Both modal components implement temporary workarounds where fees are multiplied by 100 before submission to account for backend interpretation
+- **Future-proofing**: Comments indicate this workaround should be removed once backend accepts whole cedis directly
+- **Validation Consistency**: Both systems enforce integer-only fee inputs to maintain consistency
+
+#### Shop Zone Fee Management
+- **Zone-based Configuration**: Each service zone can have individual delivery fee settings
+- **Free Delivery Thresholds**: Configurable minimum quantity thresholds for free delivery eligibility
+- **Active/Inactive Status**: Toggle functionality for enabling/disabling fees per zone
+- **CRUD Operations**: Full create, read, update, and delete capabilities for zone-specific fees
+
+#### Emergency Fee Management
+- **Global Emergency Fee**: Single emergency fee applied to same-day pickup requests
+- **Simple Toggle Interface**: Easy activation/deactivation of emergency fee policy
+- **Real-time Updates**: Immediate reflection of fee changes across the system
+
+#### Unified User Experience
+- **Consistent Modal Design**: Both fee types use similar modal interfaces for editing
+- **Standardized Validation**: Consistent validation rules across both fee types
+- **Integrated Refresh**: Both fee types refresh together when changes are made
+
+**New Features**:
+- **Simplified Currency Handling**: Removal of pesewas display complexity for cleaner user experience
+- **Backend Compatibility Layer**: Transparent handling of backend currency interpretation differences
+- **Unified Fee Management**: Single interface for managing both emergency and shop delivery fees
+- **Enhanced Validation**: Comprehensive validation for fee amounts and delivery thresholds
+
+**Section sources**
+- [ShopZoneFeeCard.vue:1-86](file://app/components/ShopZoneFeeCard.vue#L1-L86)
+- [SetShopZoneFeeModal.vue:1-161](file://app/components/SetShopZoneFeeModal.vue#L1-L161)
+- [EmergencyFeeCard.vue:1-71](file://app/components/EmergencyFeeCard.vue#L1-L71)
+- [SetEmergencyFeeModal.vue:1-112](file://app/components/SetEmergencyFeeModal.vue#L1-L112)
+- [management/fees.vue:1-259](file://app/pages/management/fees.vue#L1-L259)
+
 ### Rate Management (Pay-as-you-go)
 - Filters: By customer type and status (active/upcoming/inactive)
 - Stats: Total rates, active, upcoming, customer types
@@ -350,10 +423,11 @@ Flow:
 
 ## Dependency Analysis
 - Pages depend on useApi for all HTTP requests, including auth token injection and error handling.
-- All monetary values are formatted via useCurrency.
+- All monetary values are formatted via useCurrency with simplified presentation.
 - Rate management depends on rateValidation for consistent validation and payload mapping.
 - Subscription management uses internal transformations between API and UI models.
 - **Updated** Billing dashboard now implements multiple concurrent API calls with independent loading states and comprehensive error handling.
+- **Updated** Fee management components share common patterns for backend compatibility workarounds and simplified currency handling.
 - **New** Invoice detail view depends on comprehensive TypeScript interfaces for type-safe data handling.
 - **New** Subscription management integrates with enhanced API endpoints for active tiers display.
 
@@ -364,12 +438,17 @@ Rates["rates.vue"] --> Api
 Billing["billing/index.vue"] --> Api
 InvoiceDetail["billing/[id].vue"] --> Api
 PayPortal["pay/[id].vue"] --> Api
+FeeManagement["management/fees.vue"] --> Api
+ShopZoneCard["ShopZoneFeeCard.vue"] --> Currency["useCurrency.ts"]
+EmergencyCard["EmergencyFeeCard.vue"] --> Currency
+ShopZoneModal["SetShopZoneFeeModal.vue"] --> Currency
+EmergencyModal["SetEmergencyFeeModal.vue"] --> Currency
 Rates --> Validation["rateValidation.ts"]
-SubPlans --> Currency["useCurrency.ts"]
-Rates --> Currency
+SubPlans --> Currency
 Billing --> Currency
 InvoiceDetail --> Currency
 PayPortal --> Currency
+FeeManagement --> Currency
 Billing -.-> KPIs["Billing KPIs API"]
 Billing -.-> Invoices["Invoices API"]
 Billing -.-> Revenue["Revenue Breakdown API"]
@@ -380,6 +459,8 @@ InvoiceDetail -.-> Types["TypeScript Interfaces"]
 SubPlans -.-> ActiveTiers["Active Tiers API"]
 SubPlans -.-> PlanStats["Plan Statistics API"]
 SubPlans -.-> Types["Subscription Types"]
+FeeManagement -.-> EmergencyFee["Emergency Fee API"]
+FeeManagement -.-> ShopDelivery["Shop Delivery Fee API"]
 ```
 
 **Diagram sources**
@@ -387,6 +468,7 @@ SubPlans -.-> Types["Subscription Types"]
 - [management/rates.vue:57-124](file://app/pages/management/rates.vue#L57-L124)
 - [billing/index.vue:21-38](file://app/pages/billing/index.vue#L21-L38)
 - [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
+- [management/fees.vue:58-107](file://app/pages/management/fees.vue#L58-L107)
 - [pay/[id].vue](file://app/pages/pay/[id].vue#L1-L353)
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
 - [useCurrency.ts:1-12](file://app/composables/useCurrency.ts#L1-L12)
@@ -409,6 +491,8 @@ SubPlans -.-> Types["Subscription Types"]
 - **New** Optimized error handling reduces unnecessary re-renders during error states
 - **New** Active tiers display uses graceful degradation to avoid blocking UI on API failures
 - **New** Enhanced subscriber count tracking minimizes re-renders through computed properties
+- **Updated** Simplified currency presentation reduces computational overhead in fee components
+- **Updated** Backend compatibility workarounds are handled transparently without impacting performance
 
 [No sources needed since this section provides general guidance]
 
@@ -425,6 +509,8 @@ Common issues and resolutions:
 - **New** Invoice data loading: Verify invoice ID format and ensure invoice exists in the database before attempting to load details.
 - **New** Active tiers display issues: Check console logs for API call failures and verify the `/subscription/admin/plans?status=active` endpoint is accessible.
 - **New** Subscriber count not updating: Ensure the subscription plan has valid subscriber data and check for API response format issues.
+- **Updated** Fee management issues: Verify backend compatibility workarounds are functioning correctly and check for pesewas conversion problems.
+- **Updated** Currency display problems: Ensure useCurrency composable is properly configured and check for formatting issues in fee components.
 
 Operational tips:
 - Inspect console logs emitted by useApi for request/response details.
@@ -436,11 +522,14 @@ Operational tips:
 - **New** Verify email service credentials and SMTP configuration for invoice sending functionality.
 - **New** Verify active tiers endpoint returns proper data structure for dual pricing model support.
 - **New** Check subscriber count data integrity in subscription plan responses.
+- **Updated** Test fee management endpoints to ensure backend compatibility workarounds are working correctly.
+- **Updated** Verify currency formatting is consistent across all fee components and check for pesewas display issues.
 
 **Section sources**
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
 - [management/subscriptions.vue:289-449](file://app/pages/management/subscriptions.vue#L289-L449)
 - [management/rates.vue:230-387](file://app/pages/management/rates.vue#L230-L387)
+- [management/fees.vue:117-207](file://app/pages/management/fees.vue#L117-L207)
 - [pay/[id].vue](file://app/pages/pay/[id].vue#L64-L97)
 - [billing/index.vue:21-31](file://app/pages/billing/index.vue#L21-L31)
 - [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
@@ -448,7 +537,7 @@ Operational tips:
 ## Conclusion
 The Billing & Subscriptions module provides a robust foundation for managing subscription plans, configuring pay-as-you-go rates, viewing invoices and payment statuses, and processing customer payments. The architecture leverages reusable composables for API access and currency formatting, while maintaining clear separation of concerns across pages. 
 
-**Updated** The billing system has been significantly enhanced with comprehensive TypeScript interfaces for all data models, enhanced invoice management with PDF download and send capabilities, sophisticated loading state management, robust error handling, seamless transition from mock data to live API integration, and the addition of comprehensive active subscription tiers display with dual pricing model support. The subscription management system now provides enhanced subscriber count tracking, color-coded billing type badges, and an interactive table interface for better data visualization. Future enhancements can include server-side pagination for other lists, richer analytics dashboards, deeper integrations with external payment gateways, and advanced reporting capabilities.
+**Updated** The billing system has been significantly enhanced with comprehensive TypeScript interfaces for all data models, enhanced invoice management with PDF download and send capabilities, sophisticated loading state management, robust error handling, seamless transition from mock data to live API integration, the addition of comprehensive active subscription tiers display with dual pricing model support, and enhanced shop zone fee management with simplified currency presentation and backend compatibility workarounds. The subscription management system now provides enhanced subscriber count tracking, color-coded billing type badges, and an interactive table interface for better data visualization. The fee management system offers consistent handling of both emergency and shop delivery fees with streamlined currency presentation. Future enhancements can include server-side pagination for other lists, richer analytics dashboards, deeper integrations with external payment gateways, advanced reporting capabilities, and removal of backend compatibility workarounds once backend services are updated.
 
 [No sources needed since this section summarizes without analyzing specific files]
 
@@ -479,6 +568,13 @@ The Billing & Subscriptions module provides a robust foundation for managing sub
   - DELETE /rates/admin/:id
   - GET /customer/admin/types
   - GET /disposable/quantities
+- **New** Fee Management Endpoints
+  - GET /pickup-requests/admin/emergency-fee - Returns emergency fee configuration
+  - PUT /pickup-requests/admin/emergency-fee - Updates emergency fee configuration
+  - GET /store-orders/admin/delivery-fees/ - Returns shop delivery fee configurations
+  - POST /store-orders/admin/delivery-fees/ - Creates new shop delivery fee
+  - PATCH /store-orders/admin/delivery-fees/:id - Updates existing shop delivery fee
+  - DELETE /store-orders/admin/delivery-fees/:id - Deletes shop delivery fee configuration
 
 **Section sources**
 - [billing/index.vue:21-38](file://app/pages/billing/index.vue#L21-L38)
@@ -488,6 +584,7 @@ The Billing & Subscriptions module provides a robust foundation for managing sub
 - [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
 - [management/subscriptions.vue:153-285](file://app/pages/management/subscriptions.vue#L153-L285)
 - [management/rates.vue:57-124](file://app/pages/management/rates.vue#L57-L124)
+- [management/fees.vue:58-107](file://app/pages/management/fees.vue#L58-L107)
 
 ### Enhanced Data Models Overview
 - **Updated** Billing Dashboard Interfaces
@@ -507,14 +604,22 @@ The Billing & Subscriptions module provides a robust foundation for managing sub
 - Rate (UI/API): id, customerTypeId, estimatedQuantityId, rate, effectiveDate, note, isActive, createdAt, updatedAt
 - Transfer (UI): id, customer, paymentType, amount, reference, submitted
 - **New** Subscription Types: Comprehensive TypeScript definitions for dual pricing model support (plan vs calculated)
+- **New** Fee Management Interfaces
+  - EmergencyFeeConfig: id, fee, isActive, createdAt, updatedAt
+  - DeliveryFeeConfig: id, zoneId, zoneName, fee, freeDeliveryMinQuantity, isActive, createdAt, updatedAt
+  - ShopZoneFee: zoneId, zoneName, configId, fee, freeDeliveryMinQuantity, isActive
+  - **Updated** Simplified currency handling with direct GHS formatting and backend compatibility workarounds
 
 **Section sources**
 - [billing/index.vue:6-11](file://app/pages/billing/index.vue#L6-L11)
 - [billing/index.vue:102-121](file://app/pages/billing/index.vue#L102-L121)
-- [billing/index.vue:181-185](file://app/pages/billing/index.vue#L181-L185)
-- [billing/index.vue:217-222](file://app/pages/billing/index.vue#L217-L222)
+- [billing/index.vue:181-185](file://app/pages/billing/index.vue#L181-185)
+- [billing/index.vue:217-222](file://app/pages/billing/index.vue#L217-222)
 - [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
 - [management/subscriptions.vue:1-130](file://app/pages/management/subscriptions.vue#L1-L130)
 - [management/rates.vue:1-50](file://app/pages/management/rates.vue#L1-L50)
+- [management/fees.vue:4-44](file://app/pages/management/fees.vue#L4-L44)
+- [ShopZoneFeeCard.vue:2-9](file://app/components/ShopZoneFeeCard.vue#L2-L9)
+- [EmergencyFeeCard.vue:2-8](file://app/components/EmergencyFeeCard.vue#L2-L8)
 - [billing/index.vue:34-79](file://app/pages/billing/index.vue#L34-L79)
 - [subscription.ts:1-66](file://app/types/subscription.ts#L1-L66)
