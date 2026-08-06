@@ -30,8 +30,40 @@ async function fetchKpis() {
   }
 }
 
+interface InvoiceStats {
+  totalInvoices: number
+  pendingCount: number
+  overdueCount: number
+  totalRevenue: number
+  pendingAmount: number
+  overdueAmount: number
+}
+
+const invoiceStats = ref<InvoiceStats>({
+  totalInvoices: 0,
+  pendingCount: 0,
+  overdueCount: 0,
+  totalRevenue: 0,
+  pendingAmount: 0,
+  overdueAmount: 0,
+})
+const statsLoading = ref(true)
+
+async function fetchInvoiceStats() {
+  statsLoading.value = true
+  try {
+    const data = await api.get<InvoiceStats>('/invoices/admin/stats', 'Failed to load invoice stats')
+    if (data) {
+      invoiceStats.value = data
+    }
+  } finally {
+    statsLoading.value = false
+  }
+}
+
 onMounted(() => {
   fetchKpis()
+  fetchInvoiceStats()
   fetchPaymentAging()
   fetchRevenueBreakdown()
   fetchInvoices()
@@ -47,6 +79,7 @@ function handleInvoiceCreated() {
   showCreateInvoiceModal.value = false
   fetchInvoices()
   fetchKpis()
+  fetchInvoiceStats()
   fetchRevenueBreakdown()
 }
 
@@ -270,13 +303,12 @@ const agingSlices = computed(() => {
   ]
 })
 
-function planBadge(p: string) {
-  if (p === 'subscription') return { bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)', color: '#3b82f6', label: 'Subscription' }
-  return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: 'PAYG' }
-}
-
-function normalizeType(t: string) {
-  return t === 'subscription' ? 'subscription' : 'payg'
+function typeBadge(t: string) {
+  if (t === 'subscription')  return { bg: 'rgba(59,130,246,0.1)',  border: 'rgba(59,130,246,0.2)',  color: '#3b82f6', label: 'Subscription' }
+  if (t === 'pay_as_you_go') return { bg: 'rgba(34,197,94,0.1)',   border: 'rgba(34,197,94,0.2)',   color: '#22c55e', label: 'Pay-as-you-go' }
+  if (t === 'store_order')   return { bg: 'rgba(139,92,246,0.1)',  border: 'rgba(139,92,246,0.2)',  color: '#8b5cf6', label: 'Store Order' }
+  if (t === 'manual')        return { bg: 'rgba(107,114,128,0.1)', border: 'rgba(107,114,128,0.2)', color: '#6b7280', label: 'Manual' }
+  return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: t }
 }
 
 function statusBadge(s: string) {
@@ -317,23 +349,40 @@ const donutSlices = computed(() => {
     <div class="grid-cols-4">
       <div
         v-for="stat in [
-          { icon: 'i-lucide-alert-circle',  label: 'Total Outstanding',    value: format(kpis.totalOutstanding) },
-          { icon: 'i-lucide-repeat',        label: 'Subscription Revenue', value: format(kpis.subscriptionRevenue) },
-          { icon: 'i-lucide-banknote',   label: 'PAYG Revenue',         value: format(kpis.paygRevenue) },
-          { icon: 'i-lucide-clock',         label: 'Avg Collection Time',  value: `${kpis.avgCollectionTimeDays} days` },
+          { label: 'Total Outstanding',    value: format(kpis.totalOutstanding) },
+          { label: 'Subscription Revenue', value: format(kpis.subscriptionRevenue) },
+          { label: 'PAYG Revenue',         value: format(kpis.paygRevenue) },
+          { label: 'Avg Collection Time',  value: `${kpis.avgCollectionTimeDays} days` },
         ]"
         :key="stat.label"
         style="background:white;border:1px solid #ececec;border-radius:16px;padding:1px;box-shadow:0 1px 3px rgba(0,0,0,0.1)"
       >
-        <div style="padding:0 24px 24px">
-          <div style="padding-top:24px;margin-bottom:16px">
-            <div style="width:48px;height:48px;background:#f8f9fa;border-radius:16px;display:flex;align-items:center;justify-content:center">
-              <UIcon :name="stat.icon" style="width:24px;height:24px;color:#6b7280" />
-            </div>
-          </div>
+        <div style="padding:24px">
           <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">{{ stat.label }}</p>
           <p style="font-size:24px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">
             <span v-if="kpisLoading" class="skeleton" style="display:inline-block;height:28px;width:100px;border-radius:6px;vertical-align:middle" />
+            <span v-else>{{ stat.value }}</span>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Invoice stats -->
+    <div class="grid-cols-4">
+      <div
+        v-for="stat in [
+          { label: 'Total Invoices', value: String(invoiceStats.totalInvoices) },
+          { label: 'Total Revenue',  value: format(invoiceStats.totalRevenue) },
+          { label: 'Pending Amount', value: format(invoiceStats.pendingAmount) },
+          { label: 'Overdue Amount', value: format(invoiceStats.overdueAmount) },
+        ]"
+        :key="stat.label"
+        style="background:white;border:1px solid #ececec;border-radius:16px;padding:1px;box-shadow:0 1px 3px rgba(0,0,0,0.1)"
+      >
+        <div style="padding:24px">
+          <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:4px">{{ stat.label }}</p>
+          <p style="font-size:24px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">
+            <span v-if="statsLoading" class="skeleton" style="display:inline-block;height:28px;width:100px;border-radius:6px;vertical-align:middle" />
             <span v-else>{{ stat.value }}</span>
           </p>
         </div>
@@ -532,7 +581,7 @@ const donutSlices = computed(() => {
           <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Invoice ID</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Customer</th>
-            <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Plan Type</th>
+            <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Type</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Amount</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Issue Date</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Due Date</th>
@@ -551,8 +600,8 @@ const donutSlices = computed(() => {
             <td style="padding:20px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ inv.invoiceNumber }}</td>
             <td style="padding:20px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ inv.customerName }}</td>
             <td style="padding:20px 16px">
-              <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;color:${planBadge(normalizeType(inv.type)).color};background:${planBadge(normalizeType(inv.type)).bg};border:1px solid ${planBadge(normalizeType(inv.type)).border}`">
-                {{ planBadge(normalizeType(inv.type)).label }}
+              <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;color:${typeBadge(inv.type).color};background:${typeBadge(inv.type).bg};border:1px solid ${typeBadge(inv.type).border}`">
+                {{ typeBadge(inv.type).label }}
               </span>
             </td>
             <td style="padding:20px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ format(inv.totalAmount) }}</td>
