@@ -125,11 +125,13 @@ function handleStatusUpdated(updated: InvoiceDetail) {
 }
 
 // --- BluPay payment prompt ------------------------------------------------------
-// Only shown for collectable statuses — paid/void/cancelled invoices and
-// drafts (standalone manual invoices have no linked payment, backend 400s).
+// Only these invoice types have a linked payment the prompt can collect
+// against — anything else (e.g. manual invoices) would 400 on the backend.
+const PAYABLE_INVOICE_TYPES = ['subscription', 'pay_as_you_go', 'store_order']
 const initiatingPayment = ref(false)
 const canInitiatePayment = computed(() =>
-  ['pending', 'overdue'].includes(invoice.value?.status ?? '')
+  ['pending', 'overdue'].includes(invoice.value?.status ?? '') &&
+  PAYABLE_INVOICE_TYPES.includes(invoice.value?.type ?? '')
 )
 
 async function initiatePayment() {
