@@ -115,10 +115,44 @@ async function sendInvoice() {
   }
 }
 
+// --- Status update modal ------------------------------------------------------
+const showStatusModal = ref(false)
+
+function handleStatusUpdated(updated: InvoiceDetail) {
+  // The PATCH returns the full updated invoice
+  if (updated?.id) invoice.value = updated
+  showStatusModal.value = false
+}
+
+// --- BluPay payment prompt ------------------------------------------------------
+// Only shown for collectable statuses — paid/void/cancelled invoices and
+// drafts (standalone manual invoices have no linked payment, backend 400s).
+const initiatingPayment = ref(false)
+const canInitiatePayment = computed(() =>
+  ['pending', 'overdue'].includes(invoice.value?.status ?? '')
+)
+
+async function initiatePayment() {
+  if (!invoice.value || initiatingPayment.value) return
+  initiatingPayment.value = true
+  const result = await api.post<{ success: boolean; message?: string }>(
+    `/invoices/admin/${id}/initiate-payment`,
+    {},
+    'Failed to initiate payment'
+  )
+  initiatingPayment.value = false
+  if (result?.success) {
+    toast.success(result.message || 'Payment prompt sent to customer')
+  }
+}
+
 function statusBadge(s: string) {
   if (s === 'paid')    return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e', label: 'Paid' }
   if (s === 'pending') return { bg: 'rgba(255,180,0,0.1)',  border: 'rgba(255,180,0,0.2)',  color: '#d49a00', label: 'Pending' }
   if (s === 'overdue') return { bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.2)',  color: '#ef4444', label: 'Overdue' }
+  if (s === 'draft')   return { bg: 'rgba(107,114,128,0.1)', border: 'rgba(107,114,128,0.2)', color: '#6b7280', label: 'Draft' }
+  if (s === 'cancelled') return { bg: '#e5e7eb', border: '#d1d5db', color: '#6b7280', label: 'Cancelled' }
+  if (s === 'void')    return { bg: '#f3f4f6', border: '#d1d5db', color: '#9ca3af', label: 'Void' }
   return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: s }
 }
 </script>
@@ -167,6 +201,25 @@ function statusBadge(s: string) {
             >{{ statusBadge(invoice.status).label }}</span>
           </div>
           <div style="display:flex;gap:8px;align-items:center">
+            <button
+              v-if="canInitiatePayment"
+              :disabled="initiatingPayment"
+              :style="`height:40px;padding:0 16px 0 40px;background:${initiatingPayment ? '#93c5fd' : '#3b82f6'};border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:${initiatingPayment ? 'not-allowed' : 'pointer'};position:relative;display:flex;align-items:center;gap:8px`"
+              title="Send a BluPay mobile-money collection prompt to the customer"
+              @click="initiatePayment"
+            >
+              <UIcon :name="initiatingPayment ? 'i-lucide-loader-2' : 'i-lucide-smartphone'" :style="`width:16px;height:16px;color:white;position:absolute;left:16px;${initiatingPayment ? 'animation:spin 1s linear infinite' : ''}`" />
+              {{ initiatingPayment ? 'Sending Prompt...' : 'Request Payment' }}
+            </button>
+            <button
+              style="height:40px;padding:0 16px 0 40px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer;position:relative;display:flex;align-items:center;gap:8px"
+              @click="showStatusModal = true"
+              @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
+              @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
+            >
+              <UIcon name="i-lucide-pencil" style="width:16px;height:16px;color:#111;position:absolute;left:16px" />
+              Update Status
+            </button>
             <button
               :disabled="downloading"
               :style="`height:40px;padding:0 16px 0 40px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:${downloading ? 'not-allowed' : 'pointer'};position:relative;display:flex;align-items:center;gap:8px;opacity:${downloading ? '0.7' : '1'}`"
@@ -278,6 +331,12 @@ function statusBadge(s: string) {
           </div>
         </div>
 
+        <!-- Notes -->
+        <div v-if="invoice.notes" style="background:#f8f9fa;border-radius:12px;padding:16px">
+          <p style="font-size:14px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin-bottom:6px">Notes</p>
+          <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;line-height:1.6;white-space:pre-wrap">{{ invoice.notes }}</p>
+        </div>
+
       </div>
     </div>
 
@@ -287,6 +346,14 @@ function statusBadge(s: string) {
       <p style="font-size:18px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0 0 6px">Invoice not found</p>
       <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">The invoice you're looking for doesn't exist or couldn't be loaded.</p>
     </div>
+
+    <!-- Update status modal -->
+    <UpdateInvoiceStatusModal
+      v-if="showStatusModal && invoice"
+      :invoice="invoice"
+      @close="showStatusModal = false"
+      @updated="handleStatusUpdated"
+    />
 
   </div>
 </template>

@@ -22,6 +22,7 @@ async function fetchCustomer() {
   )
   if (data) {
     customer.value = data
+    fetchCreatedBy()
     if (activeTab.value === 'Pickup History') {
       fetchPickupStats()
       fetchPickupHistory()
@@ -31,6 +32,30 @@ async function fetchCustomer() {
   }
   loading.value = false
 }
+
+// Resolve the "created by" admin name from createdById via the team endpoint.
+// Fails quietly — the creator may no longer be a team member.
+const createdByName = ref('')
+
+async function fetchCreatedBy() {
+  const id = customer.value?.createdById
+  if (!id) return
+  const api = useApi()
+  try {
+    const member = await api.request<{ user?: { name?: string; email?: string }; name?: string }>(`/team/${id}`)
+    createdByName.value = member?.user?.name || member?.name || ''
+  } catch {
+    createdByName.value = ''
+  }
+}
+
+const createdByDisplay = computed(() => {
+  const c = customer.value
+  if (!c) return '—'
+  if (c.createdById) return createdByName.value || 'Unknown admin'
+  if (c.createdVia === 'customer') return 'Self sign-up'
+  return '—'
+})
 
 onMounted(fetchCustomer)
 
@@ -548,6 +573,7 @@ const billingHistory = ref<any[]>([])
                 { label: 'Account Role',    value: customer.user.role },
                 { label: 'Email Verified',  value: customer.user.emailVerified ? 'Yes' : 'No' },
                 { label: 'Customer Since',  value: customerSince },
+                { label: 'Created By',      value: createdByDisplay },
               ]" :key="row.label" style="display:flex;flex-direction:column;gap:2px">
                 <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">{{ row.label }}</p>
                 <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;text-transform:capitalize">{{ row.value }}</p>

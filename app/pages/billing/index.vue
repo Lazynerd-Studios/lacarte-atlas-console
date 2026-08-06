@@ -37,67 +37,77 @@ onMounted(() => {
   fetchInvoices()
 })
 
-const showDeclineModal = ref(false)
-const selectedDeclineTransfer = ref<{ id: string; customer: string; paymentType: string; amount: string; reference: string; submitted: string } | null>(null)
+// Pending Bank Transfers — disabled for now (mock data, no backend endpoint yet)
+// const showDeclineModal = ref(false)
+// const selectedDeclineTransfer = ref<{ id: string; customer: string; paymentType: string; amount: string; reference: string; submitted: string } | null>(null)
 
-function openDecline(t: typeof transfers.value[0]) {
-  selectedDeclineTransfer.value = { ...t, amount: format(t.amount) }
-  showDeclineModal.value = true
+const showCreateInvoiceModal = ref(false)
+
+function handleInvoiceCreated() {
+  showCreateInvoiceModal.value = false
+  fetchInvoices()
+  fetchKpis()
+  fetchRevenueBreakdown()
 }
 
-function handleDecline(id: string) {
-  transfers.value = transfers.value.filter(t => t.id !== id)
-  showDeclineModal.value = false
-  selectedDeclineTransfer.value = null
-}
+// function openDecline(t: typeof transfers.value[0]) {
+//   selectedDeclineTransfer.value = { ...t, amount: format(t.amount) }
+//   showDeclineModal.value = true
+// }
 
-const showApproveModal = ref(false)
-const selectedTransfer = ref<{ id: string; customer: string; paymentType: string; amount: string; reference: string; submitted: string } | null>(null)
+// function handleDecline(id: string) {
+//   transfers.value = transfers.value.filter(t => t.id !== id)
+//   showDeclineModal.value = false
+//   selectedDeclineTransfer.value = null
+// }
 
-function openApprove(t: typeof transfers.value[0]) {
-  selectedTransfer.value = { ...t, amount: format(t.amount) }
-  showApproveModal.value = true
-}
+// const showApproveModal = ref(false)
+// const selectedTransfer = ref<{ id: string; customer: string; paymentType: string; amount: string; reference: string; submitted: string } | null>(null)
 
-function handleApprove(id: string) {
-  transfers.value = transfers.value.filter(t => t.id !== id)
-  showApproveModal.value = false
-  selectedTransfer.value = null
-}
+// function openApprove(t: typeof transfers.value[0]) {
+//   selectedTransfer.value = { ...t, amount: format(t.amount) }
+//   showApproveModal.value = true
+// }
+
+// function handleApprove(id: string) {
+//   transfers.value = transfers.value.filter(t => t.id !== id)
+//   showApproveModal.value = false
+//   selectedTransfer.value = null
+// }
 
 const { format } = useCurrency()
 
-const transfers = ref([
-  { id: 'BT-001', customer: 'Michael Chen',   paymentType: 'Pickup',       amount: 65,  reference: 'REF123456789', submitted: '2026-03-03' },
-  { id: 'BT-002', customer: 'David Wilson',   paymentType: 'Subscription', amount: 120, reference: 'REF987654321', submitted: '2026-03-04' },
-  { id: 'BT-003', customer: 'Lisa Anderson',  paymentType: 'Pickup',       amount: 45,  reference: 'REF456789123', submitted: '2026-03-04' },
-  { id: 'BT-004', customer: 'James Martinez', paymentType: 'Subscription', amount: 90,  reference: 'REF321654987', submitted: '2026-03-05' },
-  { id: 'BT-005', customer: 'Olivia Brown',   paymentType: 'Pickup',       amount: 55,  reference: 'REF654321098', submitted: '2026-03-05' },
-  { id: 'BT-006', customer: 'Sarah Johnson',  paymentType: 'Subscription', amount: 75,  reference: 'REF789012345', submitted: '2026-03-06' },
-  { id: 'BT-007', customer: 'Emma Williams',  paymentType: 'Pickup',       amount: 110, reference: 'REF012345678', submitted: '2026-03-06' },
-])
+// const transfers = ref([
+//   { id: 'BT-001', customer: 'Michael Chen',   paymentType: 'Pickup',       amount: 65,  reference: 'REF123456789', submitted: '2026-03-03' },
+//   { id: 'BT-002', customer: 'David Wilson',   paymentType: 'Subscription', amount: 120, reference: 'REF987654321', submitted: '2026-03-04' },
+//   { id: 'BT-003', customer: 'Lisa Anderson',  paymentType: 'Pickup',       amount: 45,  reference: 'REF456789123', submitted: '2026-03-04' },
+//   { id: 'BT-004', customer: 'James Martinez', paymentType: 'Subscription', amount: 90,  reference: 'REF321654987', submitted: '2026-03-05' },
+//   { id: 'BT-005', customer: 'Olivia Brown',   paymentType: 'Pickup',       amount: 55,  reference: 'REF654321098', submitted: '2026-03-05' },
+//   { id: 'BT-006', customer: 'Sarah Johnson',  paymentType: 'Subscription', amount: 75,  reference: 'REF789012345', submitted: '2026-03-06' },
+//   { id: 'BT-007', customer: 'Emma Williams',  paymentType: 'Pickup',       amount: 110, reference: 'REF012345678', submitted: '2026-03-06' },
+// ])
 
-const transferSearch = ref('')
-const transferPage = ref(1)
-const transferPerPage = 5
+// const transferSearch = ref('')
+// const transferPage = ref(1)
+// const transferPerPage = 5
 
-const filteredTransfers = computed(() => {
-  const q = transferSearch.value.toLowerCase()
-  if (!q) return transfers.value
-  return transfers.value.filter(t =>
-    t.customer.toLowerCase().includes(q) ||
-    t.id.toLowerCase().includes(q) ||
-    t.paymentType.toLowerCase().includes(q) ||
-    t.reference.toLowerCase().includes(q)
-  )
-})
+// const filteredTransfers = computed(() => {
+//   const q = transferSearch.value.toLowerCase()
+//   if (!q) return transfers.value
+//   return transfers.value.filter(t =>
+//     t.customer.toLowerCase().includes(q) ||
+//     t.id.toLowerCase().includes(q) ||
+//     t.paymentType.toLowerCase().includes(q) ||
+//     t.reference.toLowerCase().includes(q)
+//   )
+// })
 
-const paginatedTransfers = computed(() => {
-  const start = (transferPage.value - 1) * transferPerPage
-  return filteredTransfers.value.slice(start, start + transferPerPage)
-})
+// const paginatedTransfers = computed(() => {
+//   const start = (transferPage.value - 1) * transferPerPage
+//   return filteredTransfers.value.slice(start, start + transferPerPage)
+// })
 
-watch(transferSearch, () => { transferPage.value = 1 })
+// watch(transferSearch, () => { transferPage.value = 1 })
 
 interface Invoice {
   id: string
@@ -273,6 +283,9 @@ function statusBadge(s: string) {
   if (s === 'paid')    return { bg: 'rgba(34,197,94,0.1)',   border: 'rgba(34,197,94,0.2)',   color: '#22c55e', label: 'paid' }
   if (s === 'pending') return { bg: 'rgba(255,180,0,0.1)',   border: 'rgba(255,180,0,0.2)',   color: '#d49a00', label: 'pending' }
   if (s === 'overdue') return { bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.2)',   color: '#ef4444', label: 'overdue' }
+  if (s === 'draft')   return { bg: 'rgba(107,114,128,0.1)', border: 'rgba(107,114,128,0.2)', color: '#6b7280', label: 'draft' }
+  if (s === 'cancelled') return { bg: '#e5e7eb', border: '#d1d5db', color: '#6b7280', label: 'cancelled' }
+  if (s === 'void')    return { bg: '#f3f4f6', border: '#d1d5db', color: '#9ca3af', label: 'void' }
   return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: s }
 }
 
@@ -327,7 +340,7 @@ const donutSlices = computed(() => {
       </div>
     </div>
 
-    <!-- Pending Bank Transfers -->
+    <!-- Pending Bank Transfers — disabled for now (mock data, no backend endpoint yet)
     <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:25px 25px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
         <div>
@@ -339,7 +352,6 @@ const donutSlices = computed(() => {
         </span>
       </div>
 
-      <!-- Search -->
       <div style="position:relative;margin-bottom:16px;max-width:320px">
         <UIcon name="i-lucide-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#6b7280;pointer-events:none" />
         <input
@@ -415,7 +427,6 @@ const donutSlices = computed(() => {
       </table>
       </div>
 
-      <!-- Pagination -->
       <div style="padding-top:16px;border-top:1px solid #e5e7eb;margin-top:4px">
         <AppPagination
           :page="transferPage"
@@ -425,6 +436,7 @@ const donutSlices = computed(() => {
         />
       </div>
     </div>
+    -->
 
     <!-- Payment Aging + Revenue Breakdown -->
     <div class="grid-billing-charts">
@@ -483,11 +495,22 @@ const donutSlices = computed(() => {
     <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:25px 25px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
         <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Recent Invoices</p>
-        <button
-          style="height:32px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
-          @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
-          @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
-        >Export All</button>
+        <div style="display:flex;gap:8px">
+          <button
+            style="height:32px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px"
+            @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
+            @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
+            @click="showCreateInvoiceModal = true"
+          >
+            <UIcon name="i-lucide-plus" style="width:14px;height:14px" />
+            Create Invoice
+          </button>
+          <button
+            style="height:32px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
+            @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
+            @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
+          >Export All</button>
+        </div>
       </div>
 
       <!-- Search -->
@@ -570,6 +593,7 @@ const donutSlices = computed(() => {
 
   </div>
 
+  <!-- Pending Bank Transfers modals — disabled along with the section above
   <ApproveTransferModal
     v-if="showApproveModal && selectedTransfer"
     :transfer="selectedTransfer"
@@ -582,6 +606,13 @@ const donutSlices = computed(() => {
     :transfer="selectedDeclineTransfer"
     @close="showDeclineModal = false"
     @decline="handleDecline"
+  />
+  -->
+
+  <CreateInvoiceModal
+    v-if="showCreateInvoiceModal"
+    @close="showCreateInvoiceModal = false"
+    @created="handleInvoiceCreated"
   />
 </template>
 

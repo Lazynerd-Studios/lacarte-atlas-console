@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { geocode } from '@tomtom-org/maps-sdk/services'
+import { geocode, reverseGeocode } from '@tomtom-org/maps-sdk/services'
 import type { Feature, Point } from 'geojson'
 
 const emit = defineEmits<{
@@ -124,6 +124,76 @@ watch(() => form.address, (query) => {
   if (suppressAddressWatch) return
   debouncedGeocode(query)
 })
+
+// --- Device location (field sign-ups) -------------------------------------
+// Staff sign customers up on-site, so one tap grabs the device GPS position
+// and reverse-geocodes it to fill the address fields automatically.
+const locating = ref(false)
+const geoError = ref('')
+
+function fillFormFromPlace(place: TomTomPlace) {
+  const addr = place.properties.address || {}
+  suppressAddressWatch = true
+  form.address = addr.streetNameAndNumber || addr.freeformAddress || form.address
+  form.city = addr.municipality || addr.localName || form.city
+  form.region = addr.countrySubdivision || form.region
+  form.postalCode = addr.postalCode || form.postalCode
+  form.country = addr.country || form.country
+  form.placeName = addr.municipality || addr.localName || form.placeName
+  const [lng, lat] = place.geometry.coordinates
+  form.longitude = String(lng)
+  form.latitude = String(lat)
+  nextTick(() => { suppressAddressWatch = false })
+}
+
+async function fetchCurrentLocation() {
+  if (locating.value) return
+  geoError.value = ''
+
+  if (!('geolocation' in navigator)) {
+    geoError.value = 'Location is not supported on this device.'
+    return
+  }
+
+  locating.value = true
+  try {
+    const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      })
+    })
+    const { latitude, longitude } = position.coords
+    form.latitude = String(latitude)
+    form.longitude = String(longitude)
+
+    // Resolve the coordinates into address fields; the pickup still works with
+    // just coordinates if the lookup fails
+    try {
+      const place = await reverseGeocode({
+        position: [longitude, latitude],
+        apiKey: config.public.tomtomApiKey as string,
+      }) as TomTomPlace
+      if (place) fillFormFromPlace(place)
+      toast.success('Location captured')
+    } catch (err) {
+      console.error('Reverse geocode error:', err)
+      toast.success('Coordinates captured — fill the address details manually')
+    }
+  } catch (err) {
+    const e = err as GeolocationPositionError
+    if (e?.code === e.PERMISSION_DENIED) {
+      geoError.value = 'Location permission denied. Allow location access for this site and try again.'
+    } else if (e?.code === e.TIMEOUT) {
+      geoError.value = 'Getting your location timed out. Try again in an open area.'
+    } else {
+      geoError.value = 'Could not determine your location. Check GPS/network and try again.'
+    }
+  } finally {
+    locating.value = false
+  }
+}
 
 async function fetchCustomerTypes() {
   const data = await api.get<CustomerType[]>('/customer/admin/types/', 'Failed to load customer types')
@@ -332,6 +402,24 @@ function onBlur(e: Event, field: string) {
           </div>
         </template>
 
+        <!-- Current location capture (field sign-ups) -->
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button
+            type="button"
+            :disabled="locating"
+            :style="`width:100%;height:42px;display:flex;align-items:center;justify-content:center;gap:8px;background:${locating ? '#fffbeb' : 'rgba(255,180,0,0.1)'};border:1px dashed #ffb400;border-radius:16px;font-size:14px;font-weight:600;color:#b45309;font-family:'Manrope',sans-serif;cursor:${locating ? 'wait' : 'pointer'};opacity:${locating ? 0.7 : 1}`"
+            @click="fetchCurrentLocation"
+          >
+            <UIcon
+              :name="locating ? 'i-lucide-loader-2' : 'i-lucide-locate-fixed'"
+              :style="`width:16px;height:16px;${locating ? 'animation:spinPlain 1s linear infinite' : ''}`"
+            />
+            {{ locating ? 'Getting location...' : 'Use My Current Location' }}
+          </button>
+          <span v-if="geoError" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ geoError }}</span>
+          <span v-else style="font-size:12px;color:#9ca3af;font-family:'Manrope',sans-serif">Standing at the customer's place? Tap to capture GPS and auto-fill the address.</span>
+        </div>
+
         <!-- Address -->
         <div style="display:flex;flex-direction:column;gap:6px;position:relative">
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Address</label>
@@ -454,5 +542,9 @@ function onBlur(e: Event, field: string) {
 @keyframes spin {
   from { transform: translateY(-50%) rotate(0deg); }
   to { transform: translateY(-50%) rotate(360deg); }
+}
+@keyframes spinPlain {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 </style>

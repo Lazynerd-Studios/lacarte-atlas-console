@@ -41,6 +41,8 @@ export interface Customer {
   noBins: number
   capacityRateId?: string | null
   status: string
+  createdVia?: string | null
+  createdById?: string | null
   address: string | null
   city: string | null
   region: string | null
