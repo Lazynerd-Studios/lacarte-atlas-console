@@ -77,10 +77,12 @@ const showCreateInvoiceModal = ref(false)
 
 function handleInvoiceCreated() {
   showCreateInvoiceModal.value = false
+  // Refresh every data section on the page
   fetchInvoices()
   fetchKpis()
   fetchInvoiceStats()
   fetchRevenueBreakdown()
+  fetchPaymentAging()
 }
 
 // function openDecline(t: typeof transfers.value[0]) {
@@ -248,8 +250,14 @@ async function fetchRevenueBreakdown() {
 
 const revenue = computed(() => {
   const d = revenueData.value
-  const total = d.monthlySubscriptions + d.payAsYouGo + d.outstanding
-  const pct = (v: number) => total > 0 ? Math.round((v / total) * 100) : 0
+  // Scale each bar against the largest amount so one category growing
+  // (e.g. outstanding) never shrinks the others visually. Any non-zero
+  // amount keeps a minimum sliver so tiny values never disappear.
+  const max = Math.max(d.monthlySubscriptions, d.payAsYouGo, d.outstanding, 0)
+  const pct = (v: number) => {
+    if (max <= 0 || v <= 0) return 0
+    return Math.max(2, Math.round((v / max) * 100))
+  }
   return [
     { label: 'Monthly Subscriptions', amount: d.monthlySubscriptions, pct: pct(d.monthlySubscriptions), color: '#22c55e' },
     { label: 'Pay-as-you-go',         amount: d.payAsYouGo,         pct: pct(d.payAsYouGo),         color: '#3b82f6' },

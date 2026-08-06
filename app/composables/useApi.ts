@@ -24,7 +24,11 @@ export function useApi() {
       hasAuth: !!authStore.token,
     })
 
+    // no-store: admin data (KPIs, stats, lists) must always be fresh —
+    // heuristic browser caching of repeated GET URLs otherwise serves
+    // stale values after creates/status updates.
     const res = await fetch(fullUrl, {
+      cache: 'no-store',
       ...options,
       headers,
     })
