@@ -51,10 +51,7 @@ function submit() {
   }
 
   submitting.value = true
-  // TEMPORARY WORKAROUND: the backend currently interprets the fee as pesewas
-  // (it divides the sent value by 100), so send GHS × 100 to store the intended
-  // cedis amount. Remove the × 100 once the backend accepts whole cedis directly.
-  emit('submit', { fee: fee * 100, isActive: isActive.value })
+  emit('submit', { fee: fee, isActive: isActive.value })
 }
 </script>
 
