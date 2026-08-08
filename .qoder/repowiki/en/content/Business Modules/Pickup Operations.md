@@ -4,6 +4,8 @@
 **Referenced Files in This Document**
 - [index.vue](file://app/pages/pickups/index.vue)
 - [detail.vue](file://app/pages/pickups/[id].vue)
+- [AdjustLoadModal.vue](file://app/components/AdjustLoadModal.vue)
+- [AssignDriverModal.vue](file://app/components/AssignDriverModal.vue)
 - [CreatePickupModal.vue](file://app/components/CreatePickupModal.vue)
 - [EmergencyFeeCard.vue](file://app/components/EmergencyFeeCard.vue)
 - [SetEmergencyFeeModal.vue](file://app/components/SetEmergencyFeeModal.vue)
@@ -12,6 +14,7 @@
 - [CreateSupportTicketModal.vue](file://app/components/CreateSupportTicketModal.vue)
 - [AssignDriverToTruckModal.vue](file://app/components/AssignDriverToTruckModal.vue)
 - [useApi.ts](file://app/composables/useApi.ts)
+- [usePermissions.ts](file://app/composables/usePermissions.ts)
 - [driver.ts](file://app/types/driver.ts)
 - [subscription.ts](file://app/types/subscription.ts)
 - [rates.vue](file://app/pages/management/rates.vue)
@@ -20,11 +23,11 @@
 
 ## Update Summary
 **Changes Made**
-- Enhanced CreatePickupModal with truck load tier dropdown functionality for full_truck customers
-- Improved payment type handling based on customer subscription state with auto-resolution
-- Strengthened validation logic for truck load tier selection and conditional field requirements
-- Added comprehensive pricing mode support (per_bin vs full_truck) with dynamic form field visibility
-- Implemented robust customer type pricing mode detection and validation
+- Added comprehensive load adjustment system with new AdjustLoadModal component supporting per_bin and full_truck pricing modes
+- Enhanced AssignDriverModal with improved form state management and validation
+- Enhanced pickup detail page with load adjustment capabilities and permission-based access controls
+- Integrated permission system for load adjustment functionality
+- Added support for actual load tracking and settlement processing
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -34,24 +37,28 @@
 5. [Detailed Component Analysis](#detailed-component-analysis)
 6. [Emergency Pickup and Fee Management System](#emergency-pickup-and-fee-management-system)
 7. [Enhanced CreatePickupModal Functionality](#enhanced-createpickupmodal-functionality)
-8. [Pricing Mode and Truck Load Tier System](#pricing-mode-and-truck-load-tier-system)
-9. [Dependency Analysis](#dependency-analysis)
-10. [Performance Considerations](#performance-considerations)
-11. [Troubleshooting Guide](#troubleshooting-guide)
-12. [Conclusion](#conclusion)
+8. [Load Adjustment System](#load-adjustment-system)
+9. [Pricing Mode and Truck Load Tier System](#pricing-mode-and-truck-load-tier-system)
+10. [Permission-Based Access Controls](#permission-based-access-controls)
+11. [Dependency Analysis](#dependency-analysis)
+12. [Performance Considerations](#performance-considerations)
+13. [Troubleshooting Guide](#troubleshooting-guide)
+14. [Conclusion](#conclusion)
 
 ## Introduction
-This document explains the end-to-end Pickup Operations management in the console application. It covers the pickup request lifecycle from creation to completion, including driver assignment and reassignment workflows, status transitions, priority handling, and integration with fleet management (drivers and trucks). The system now includes a comprehensive emergency pickup and fee management system that allows administrators to handle urgent pickup requests and manage associated fees. **Updated**: The CreatePickupModal has been significantly enhanced with truck load tier dropdown functionality for full_truck customers, improved payment type handling based on customer subscription state, and strengthened validation logic for truck load tier selection. The system now supports two pricing modes: per_bin (automatic pricing by bin capacity) and full_truck (manual truck tier selection at booking time).
+This document explains the end-to-end Pickup Operations management in the console application. It covers the pickup request lifecycle from creation to completion, including driver assignment and reassignment workflows, status transitions, priority handling, and integration with fleet management (drivers and trucks). The system now includes a comprehensive emergency pickup and fee management system that allows administrators to handle urgent pickup requests and manage associated fees. **Updated**: The system has been enhanced with a comprehensive load adjustment system that supports both per_bin and full_truck pricing modes, allowing operators to adjust actual collected loads after initial booking. The AssignDriverModal has been improved with better form state management and validation, while the pickup detail page now includes permission-based access controls for load adjustment functionality.
 
 ## Project Structure
 The pickup operations are implemented primarily through:
 - A list page for browsing, filtering, sorting, and assigning/reassigning pickups
-- A detail page for deep inspection, status progression, and activity log review
-- Modal components for creating requests, assigning drivers, and managing emergency fees
+- A detail page for deep inspection, status progression, activity log review, and load adjustment
+- Modal components for creating requests, assigning drivers, adjusting loads, and managing emergency fees
 - An API composable that centralizes HTTP calls and error handling
 - Type definitions for drivers, trucks, and subscriptions used by the UI
 - Emergency fee management components for handling urgent pickup scenarios
-- **New**: Pricing mode management for different customer types (per_bin vs full_truck)
+- Pricing mode management for different customer types (per_bin vs full_truck)
+- **New**: Permission system integration for access control
+- **New**: Load adjustment modal for post-booking load modifications
 
 ```mermaid
 graph TB
@@ -62,7 +69,8 @@ RatesPage["Rates Management<br/>app/pages/management/rates.vue"]
 end
 subgraph "Modals"
 CreateM["Create Pickup Modal<br/>app/components/CreatePickupModal.vue"]
-AssignM["Assign Driver Modal<br/>(used by pages)"]
+AssignM["Assign Driver Modal<br/>app/components/AssignDriverModal.vue"]
+AdjustM["Adjust Load Modal<br/>app/components/AdjustLoadModal.vue"]
 EmergencyFee["Emergency Fee Card<br/>app/components/EmergencyFeeCard.vue"]
 SetEmergencyFee["Set Emergency Fee Modal<br/>app/components/SetEmergencyFeeModal.vue"]
 ShopZoneFee["Shop Zone Fee Card<br/>app/components/ShopZoneFeeCard.vue"]
@@ -72,6 +80,7 @@ CustomerModal["Customer Modal<br/>app/components/CustomerModal.vue"]
 end
 subgraph "Shared"
 Api["API Composable<br/>app/composables/useApi.ts"]
+Permissions["Permissions Composable<br/>app/composables/usePermissions.ts"]
 Types["Fleet Types<br/>app/types/driver.ts"]
 SubTypes["Subscription Types<br/>app/types/subscription.ts"]
 end
@@ -80,9 +89,11 @@ PList --> AssignM
 PList --> EmergencyFee
 PList --> ShopZoneFee
 PDetail --> AssignM
+PDetail --> AdjustM
 PDetail --> SupportTicket
 CreateM --> Api
 AssignM --> Api
+AdjustM --> Api
 EmergencyFee --> Api
 SetEmergencyFee --> Api
 ShopZoneFee --> Api
@@ -90,6 +101,7 @@ SetShopZoneFee --> Api
 SupportTicket --> Api
 CustomerModal --> Api
 RatesPage --> Api
+PDetail --> Permissions
 PList -. uses .-> Types
 PDetail -. uses .-> Types
 CreateM -. uses .-> SubTypes
@@ -97,27 +109,21 @@ CustomerModal -. uses .-> SubTypes
 ```
 
 **Diagram sources**
-- [index.vue:1-606](file://app/pages/pickups/index.vue#L1-L606)
-- [detail.vue:1-841](file://app/pages/pickups/[id].vue#L1-L841)
+- [index.vue:1-627](file://app/pages/pickups/index.vue#L1-L627)
+- [detail.vue:1-901](file://app/pages/pickups/[id].vue#L1-L901)
+- [AdjustLoadModal.vue:1-197](file://app/components/AdjustLoadModal.vue#L1-L197)
+- [AssignDriverModal.vue:1-260](file://app/components/AssignDriverModal.vue#L1-L260)
 - [CreatePickupModal.vue:1-416](file://app/components/CreatePickupModal.vue#L1-L416)
-- [EmergencyFeeCard.vue:1-100](file://app/components/EmergencyFeeCard.vue#L1-L100)
-- [SetEmergencyFeeModal.vue:1-100](file://app/components/SetEmergencyFeeModal.vue#L1-L100)
-- [ShopZoneFeeCard.vue:1-100](file://app/components/ShopZoneFeeCard.vue#L1-L100)
-- [SetShopZoneFeeModal.vue:1-100](file://app/components/SetShopZoneFeeModal.vue#L1-L100)
-- [CreateSupportTicketModal.vue:1-100](file://app/components/CreateSupportTicketModal.vue#L1-L100)
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
-- [driver.ts:1-106](file://app/types/driver.ts#L1-L106)
-- [subscription.ts:1-66](file://app/types/subscription.ts#L1-L66)
-- [rates.vue:1-200](file://app/pages/management/rates.vue#L1-L200)
-- [CustomerModal.vue:140-339](file://app/components/CustomerModal.vue#L140-L339)
+- [usePermissions.ts:1-43](file://app/composables/usePermissions.ts#L1-L43)
 
 **Section sources**
-- [index.vue:1-606](file://app/pages/pickups/index.vue#L1-L606)
-- [detail.vue:1-841](file://app/pages/pickups/[id].vue#L1-L841)
-- [CreatePickupModal.vue:1-416](file://app/components/CreatePickupModal.vue#L1-L416)
+- [index.vue:1-627](file://app/pages/pickups/index.vue#L1-L627)
+- [detail.vue:1-901](file://app/pages/pickups/[id].vue#L1-L901)
+- [AdjustLoadModal.vue:1-197](file://app/components/AdjustLoadModal.vue#L1-L197)
+- [AssignDriverModal.vue:1-260](file://app/components/AssignDriverModal.vue#L1-L260)
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
-- [driver.ts:1-106](file://app/types/driver.ts#L1-L106)
-- [subscription.ts:1-66](file://app/types/subscription.ts#L1-L66)
+- [usePermissions.ts:1-43](file://app/composables/usePermissions.ts#L1-L43)
 
 ## Core Components
 - Pickups List Page
@@ -134,17 +140,25 @@ CustomerModal -. uses .-> SubTypes
   - Shows full request details, customer info, assigned driver/truck, and notes
   - Supports status progression: Start Trip → En Route → Picked Up → Complete
   - Allows cancellation and reassignment
+  - **Enhanced**: Now includes load adjustment capabilities with permission-based access controls
   - Displays a timeline and detailed activity log
   - Support ticket creation capability for issue resolution
+- **New**: Adjust Load Modal
+  - Handles post-booking load adjustments for both per_bin and full_truck pricing modes
+  - Validates that actual loads exceed booked amounts
+  - Processes settlement calculations and payment prompts
+  - Integrates with truck load tier system for full_truck customers
+- **Enhanced**: Assign Driver Modal
+  - Improved form state management with better validation
+  - Enhanced driver selection with zone-based filtering
+  - Better user experience with loading states and error handling
 - Create Pickup Modal
   - Collects customer selection, disposable item type, estimated quantity, preferred date, and notes
-  - **Enhanced**: Now includes emergency pickup toggle functionality with specialized validation rules and restricted date selection for emergency scenarios
-  - **New**: Truck load tier dropdown for full_truck customers with conditional field visibility
-  - **New**: Automatic payment type resolution based on customer subscription state
-  - **Enhanced**: Strengthened validation logic for truck load tier selection and pricing mode requirements
+  - Includes emergency pickup toggle functionality with specialized validation rules and restricted date selection for emergency scenarios
+  - Truck load tier dropdown for full_truck customers with conditional field visibility
+  - Automatic payment type resolution based on customer subscription state
+  - Strengthened validation logic for truck load tier selection and pricing mode requirements
   - Submits a new pickup request via admin endpoint with emergency mode support
-- Assign Driver Modal
-  - Captures driver, scheduled date/time slot, and notes; emits submission to parent
 - Emergency Fee Management Components
   - EmergencyFeeCard.vue: Displays and manages emergency fee information
   - SetEmergencyFeeModal.vue: Configures emergency fee settings and rates
@@ -154,101 +168,80 @@ CustomerModal -. uses .-> SubTypes
 - Support Ticket Creation
   - CreateSupportTicketModal.vue: Creates support tickets for pickup-related issues
 - Customer Management Modal
-  - **New**: Conditional field visibility based on customer type pricing mode (per_bin vs full_truck)
-  - **New**: Dynamic form fields for bin capacity and assigned bins based on pricing mode
+  - Conditional field visibility based on customer type pricing mode (per_bin vs full_truck)
+  - Dynamic form fields for bin capacity and assigned bins based on pricing mode
 - API Composable
   - Centralized fetch wrapper with auth header injection, unified error handling, and typed helpers
+- **New**: Permissions Composable
+  - Provides permission checking utilities for access control
+  - Supports role-based and permission-based access control
 - Fleet Types
   - Shared TypeScript interfaces for drivers, trucks, zones, and tracking data
 - Subscription Types
-  - **New**: Comprehensive subscription type definitions supporting both plan-based and calculated pricing models
+  - Comprehensive subscription type definitions supporting both plan-based and calculated pricing models
 
 **Section sources**
-- [index.vue:1-606](file://app/pages/pickups/index.vue#L1-L606)
-- [detail.vue:1-841](file://app/pages/pickups/[id].vue#L1-L841)
+- [index.vue:1-627](file://app/pages/pickups/index.vue#L1-L627)
+- [detail.vue:1-901](file://app/pages/pickups/[id].vue#L1-L901)
+- [AdjustLoadModal.vue:1-197](file://app/components/AdjustLoadModal.vue#L1-L197)
+- [AssignDriverModal.vue:1-260](file://app/components/AssignDriverModal.vue#L1-L260)
 - [CreatePickupModal.vue:1-416](file://app/components/CreatePickupModal.vue#L1-L416)
-- [EmergencyFeeCard.vue:1-100](file://app/components/EmergencyFeeCard.vue#L1-L100)
-- [SetEmergencyFeeModal.vue:1-100](file://app/components/SetEmergencyFeeModal.vue#L1-L100)
-- [ShopZoneFeeCard.vue:1-100](file://app/components/ShopZoneFeeCard.vue#L1-L100)
-- [SetShopZoneFeeModal.vue:1-100](file://app/components/SetShopZoneFeeModal.vue#L1-L100)
-- [CreateSupportTicketModal.vue:1-100](file://app/components/CreateSupportTicketModal.vue#L1-L100)
-- [CustomerModal.vue:140-339](file://app/components/CustomerModal.vue#L140-L339)
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
-- [driver.ts:1-106](file://app/types/driver.ts#L1-L106)
-- [subscription.ts:1-66](file://app/types/subscription.ts#L1-L66)
+- [usePermissions.ts:1-43](file://app/composables/usePermissions.ts#L1-L43)
 
 ## Architecture Overview
-The frontend orchestrates pickup operations by calling admin endpoints for listing, creating, assigning/reassigning, and updating statuses. The detail view enriches context with an activity log and timeline. The list view supports advanced server-side sorting with dynamic parameter passing, reactive state management, and performance optimization. The architecture includes integrated emergency pickup and fee management systems with dedicated components for fee configuration and support ticket creation. **Updated**: The system now supports dual pricing modes (per_bin and full_truck) with dynamic form field visibility and validation based on customer type pricing mode.
+The frontend orchestrates pickup operations by calling admin endpoints for listing, creating, assigning/reassigning, updating statuses, and adjusting loads. The detail view enriches context with an activity log, timeline, and load adjustment capabilities. The list view supports advanced server-side sorting with dynamic parameter passing, reactive state management, and performance optimization. The architecture includes integrated emergency pickup and fee management systems with dedicated components for fee configuration and support ticket creation. **Updated**: The system now supports dual pricing modes (per_bin and full_truck) with dynamic form field visibility and validation based on customer type pricing mode, plus comprehensive load adjustment capabilities with permission-based access controls.
 
 ```mermaid
 sequenceDiagram
 participant Admin as "Admin User"
 participant List as "Pickups List Page"
-participant SortManager as "Sort State Manager"
 participant Detail as "Pickup Detail Page"
-participant Modal as "Create/Assign Modals"
+participant AdjustModal as "Adjust Load Modal"
+participant AssignModal as "Assign Driver Modal"
 participant PricingMode as "Pricing Mode System"
 participant TruckTier as "Truck Load Tier System"
-participant EmergencyFee as "Emergency Fee System"
-participant Support as "Support Ticket System"
+participant Permissions as "Permission System"
 participant API as "useApi.ts"
 participant Backend as "Backend API"
 Admin->>List : Open /pickups
 List->>API : GET /pickup-requests/admin/list?filters&sortBy&sortOrder
 API-->>List : { data[], pagination }
-Admin->>List : Click Sortable Column Header
-List->>SortManager : Update sort state
-SortManager->>API : GET /pickup-requests/admin/list?sortBy=newField&sortOrder=asc/desc
-API-->>List : { data[], pagination }
-Admin->>List : Use Keyboard Navigation
-List->>SortManager : Handle keyboard events
-SortManager->>API : Trigger sorted fetch
-API-->>List : Sorted results
-Admin->>List : Click "Create Pickup"
-List->>Modal : Show CreatePickupModal
-Modal->>PricingMode : Load customer type pricing modes
-PricingMode->>API : GET /customer/admin/types/
-API-->>PricingMode : { id, pricingMode }
-Modal->>TruckTier : Load truck load tiers (if full_truck)
-TruckTier->>API : GET /rates/truck-loads
-API-->>TruckTier : { truckLoadTiers[] }
-Modal->>API : POST /pickup-requests/admin/
-Note over Modal,API : payload includes truckLoadRateId for full_truck customers
-API-->>Modal : Created
-Modal-->>List : created event
-Admin->>List : Toggle Emergency Pickup
-List->>EmergencyFee : Configure emergency fees
-EmergencyFee->>API : POST /feems/emergency/update
-API-->>EmergencyFee : Fee updated
-Admin->>List : Click "Create Support Ticket"
-List->>Support : Show CreateSupportTicketModal
-Support->>API : POST /support/tickets
-API-->>Support : Ticket created
-Admin->>List : Click "Assign Driver"
-List->>Modal : Show AssignDriverModal
-Modal->>API : POST /pickup-requests/admin/ : id/assign
-API-->>List : Success
-List->>API : Refresh list + stats
 Admin->>Detail : Open /pickups/ : id
+Detail->>Permissions : Check 'pickups.manage' permission
+Permissions-->>Detail : Permission granted/denied
 Detail->>API : GET /pickup-requests/admin/ : id
-API-->>Detail : Request + assignment
-Detail->>API : GET /pickup-requests/admin/ : id/activity-log
-API-->>Detail : Timeline + activities
+API-->>Detail : Request + assignment + pricing info
+Admin->>Detail : Click "Adjust Load"
+Detail->>AdjustModal : Show with pricing mode & current bins
+AdjustModal->>API : GET /rates/truck-loads (if full_truck)
+API-->>AdjustModal : Truck load tiers
+AdjustModal->>API : PATCH /pickup-requests/admin/ : id/actual-load
+API-->>AdjustModal : Delta amount + settlement
+AdjustModal-->>Detail : Success event
+Detail->>API : Refresh details + activity-log
 Admin->>Detail : Start Trip / En Route / Picked Up / Complete
 Detail->>API : PATCH /pickup-requests/admin/ : id/status
 API-->>Detail : Updated
-Detail->>API : Refresh details + activity-log
+Admin->>List : Click "Assign Driver"
+List->>AssignModal : Open with request context
+AssignModal->>API : POST /pickup-requests/admin/ : id/assign
+API-->>List : Success
+List->>API : Refresh list + stats
 ```
 
 **Diagram sources**
-- [index.vue:58-75](file://app/pages/pickups/index.vue#L58-L75)
-- [index.vue:124-158](file://app/pages/pickups/index.vue#L124-L158)
-- [index.vue:187-239](file://app/pages/pickups/index.vue#L187-L239)
-- [detail.vue:117-153](file://app/pages/pickups/[id].vue#L117-L153)
-- [detail.vue:290-379](file://app/pages/pickups/[id].vue#L290-379)
-- [CreatePickupModal.vue:107-123](file://app/components/CreatePickupModal.vue#L107-L123)
-- [CreatePickupModal.vue:131-152](file://app/components/CreatePickupModal.vue#L131-L152)
-- [useApi.ts:9-67](file://app/composables/useApi.ts#L9-L67)
+- [detail.vue:301-315](file://app/pages/pickups/[id].vue#L301-L315)
+- [detail.vue:811-820](file://app/pages/pickups/[id].vue#L811-L820)
+- [AdjustLoadModal.vue:51-120](file://app/components/AdjustLoadModal.vue#L51-L120)
+- [AssignDriverModal.vue:38-77](file://app/components/AssignDriverModal.vue#L38-L77)
+- [usePermissions.ts:3-43](file://app/composables/usePermissions.ts#L3-L43)
+
+**Section sources**
+- [detail.vue:1-901](file://app/pages/pickups/[id].vue#L1-L901)
+- [AdjustLoadModal.vue:1-197](file://app/components/AdjustLoadModal.vue#L1-L197)
+- [AssignDriverModal.vue:1-260](file://app/components/AssignDriverModal.vue#L1-L260)
+- [usePermissions.ts:1-43](file://app/composables/usePermissions.ts#L1-L43)
 
 ## Detailed Component Analysis
 
@@ -260,7 +253,7 @@ Detail->>API : Refresh details + activity-log
   - Assignment object with driver and truck details when available
   - Operational fields: preferredPickupDate, additionalNotes, status, paymentType, paymentStatus
   - Emergency pickup flag and associated fee information
-  - **New**: truckLoadRateId for full_truck customers
+  - **Enhanced**: truckLoadRateId, truckLoadLabel, pricingMode, loadAdjustedAt for load adjustment tracking
 - Status Values
   - pending, assigned, truck_dispatched, en_route, picked_up, completed, cancelled
 - Payment Status Values
@@ -271,9 +264,12 @@ Detail->>API : Refresh details + activity-log
   - Emergency pickups have elevated priority levels automatically
 - Time Slots
   - UI presents Morning/Afternoon/Evening; mapped to morning/afternoon/evening for the backend
-- **New**: Pricing Modes
+- **Enhanced**: Pricing Modes
   - per_bin: Automatic pricing based on bin capacity × number of bins
   - full_truck: Manual truck load tier selection at booking time
+- **New**: Load Adjustment Tracking
+  - loadAdjustedAt timestamp tracks when load was adjusted
+  - Supports delta amount calculation and settlement processing
 
 ```mermaid
 stateDiagram-v2
@@ -294,17 +290,16 @@ EmergencyAssigned --> EmergencyDispatched : "Immediate Dispatch"
 EmergencyDispatched --> EmergencyEnRoute : "Rush Delivery"
 EmergencyEnRoute --> EmergencyPickedUp : "Urgent Pickup"
 EmergencyPickedUp --> EmergencyCompleted : "Emergency Completion"
+Note over Pending,Completed : "Load Adjustment Available"
 ```
 
 **Diagram sources**
-- [index.vue:167-176](file://app/pages/pickups/index.vue#L167-L176)
-- [detail.vue:202-214](file://app/pages/pickups/[id].vue#L202-L214)
+- [index.vue:191-200](file://app/pages/pickups/index.vue#L191-L200)
+- [detail.vue:211-233](file://app/pages/pickups/[id].vue#L211-L233)
 
 **Section sources**
-- [index.vue:4-31](file://app/pages/pickups/index.vue#L4-L31)
-- [detail.vue:7-65](file://app/pages/pickups/[id].vue#L7-L65)
-- [index.vue:167-176](file://app/pages/pickups/index.vue#L167-L176)
-- [detail.vue:202-214](file://app/pages/pickups/[id].vue#L202-L214)
+- [index.vue:1-627](file://app/pages/pickups/index.vue#L1-L627)
+- [detail.vue:1-901](file://app/pages/pickups/[id].vue#L1-L901)
 
 ### Advanced Sorting Functionality
 The pickup requests list includes comprehensive server-side sorting capabilities that significantly enhance data navigation and management efficiency with improved performance and accessibility.
@@ -363,30 +358,28 @@ function handleSortKeydown(event: KeyboardEvent, field: string) {
 - **High Contrast**: Clear visual indicators for sort state changes
 
 **Section sources**
-- [index.vue:58-75](file://app/pages/pickups/index.vue#L58-L75)
-- [index.vue:124-158](file://app/pages/pickups/index.vue#L124-L158)
-- [index.vue:463-471](file://app/pages/pickups/index.vue#L463-L471)
-- [index.vue:522-525](file://app/pages/pickups/index.vue#L522-L525)
+- [index.vue:60-77](file://app/pages/pickups/index.vue#L60-L77)
+- [index.vue:126-160](file://app/pages/pickups/index.vue#L126-L160)
 
 ### Enhanced Pickup Creation Workflow
 - Inputs
   - Customer search and selection (supports name, phone, area)
   - Disposable item type and estimated quantity dropdowns
   - Preferred pickup date and optional notes
-  - **Enhanced**: Emergency pickup toggle with conditional validation and restricted date selection
-  - **New**: Truck load tier dropdown for full_truck customers with conditional visibility
+  - Emergency pickup toggle with conditional validation and restricted date selection
+  - Truck load tier dropdown for full_truck customers with conditional visibility
 - Validation
   - Required fields enforced before submission
-  - **Enhanced**: Emergency pickup mode triggers additional validation rules and priority handling
-  - **New**: Truck load tier validation for full_truck customers
-  - **New**: Pricing mode-based field validation (per_bin vs full_truck)
-  - **New**: Date selection restrictions when emergency mode is activated
+  - Emergency pickup mode triggers additional validation rules and priority handling
+  - Truck load tier validation for full_truck customers
+  - Pricing mode-based field validation (per_bin vs full_truck)
+  - Date selection restrictions when emergency mode is activated
 - Submission
   - Creates a pickup request via admin endpoint
   - Emits success event to refresh list and stats
-  - **Enhanced**: Emergency pickups are flagged and processed with higher priority
-  - **New**: Automatic payment type resolution based on customer subscription state
-  - **New**: Conditional payload construction based on pricing mode
+  - Emergency pickups are flagged and processed with higher priority
+  - Automatic payment type resolution based on customer subscription state
+  - Conditional payload construction based on pricing mode
 
 ```mermaid
 flowchart TD
@@ -413,22 +406,19 @@ HandleError --> End
 CloseAndRefresh --> End
 ```
 
-**Diagram sources**
-- [CreatePickupModal.vue:75-119](file://app/components/CreatePickupModal.vue#L75-L119)
-- [CreatePickupModal.vue:121-152](file://app/components/CreatePickupModal.vue#L121-L152)
-- [CreatePickupModal.vue:196-208](file://app/components/CreatePickupModal.vue#L196-L208)
-
 **Section sources**
 - [CreatePickupModal.vue:1-416](file://app/components/CreatePickupModal.vue#L1-L416)
 
-### Driver Assignment and Reassignment
+### Enhanced Driver Assignment and Reassignment
 - Initial Assignment
   - Triggered from list or detail when status is pending
   - Payload includes driverId, scheduledDate, timeSlot, priorityLevel, adminNotes
-  - **Enhanced**: Emergency pickups automatically set high priority level
-- Reassignment
+  - Emergency pickups automatically set high priority level
+- **Enhanced**: Reassignment
   - Triggered when status is assigned or when changing driver later
   - Uses reassign endpoint without priorityLevel
+  - Improved form state management with better validation
+  - Zone-based driver filtering for better assignment accuracy
 - Time Slot Mapping
   - UI labels map to backend values: morning, afternoon, evening
 
@@ -436,28 +426,31 @@ CloseAndRefresh --> End
 sequenceDiagram
 participant Admin as "Admin"
 participant List as "Pickups List"
-participant Modal as "Assign Driver Modal"
+participant Detail as "Pickup Detail"
+participant AssignModal as "Assign Driver Modal"
 participant API as "useApi"
 participant Backend as "Backend"
 Admin->>List : Click "Assign Driver"
-List->>Modal : Open with request context
-Modal->>API : POST /pickup-requests/admin/ : id/assign {driverId, scheduledDate, timeSlot, priorityLevel, adminNotes}
+List->>AssignModal : Open with request context
+AssignModal->>API : GET /drivers/admin/by-zone/ : zoneId
+API-->>AssignModal : Active drivers
+AssignModal->>API : POST /pickup-requests/admin/ : id/assign
 API-->>List : Success
 List->>API : Refresh list + stats
-Admin->>List : Click "Reassign"
-List->>Modal : Open with request context
-Modal->>API : PATCH /pickup-requests/admin/ : id/reassign {driverId, scheduledDate, timeSlot, adminNotes}
-API-->>List : Success
-List->>API : Refresh list + stats
+Admin->>Detail : Click "Reassign"
+Detail->>AssignModal : Open with request context
+AssignModal->>API : PATCH /pickup-requests/admin/ : id/reassign
+API-->>Detail : Success
+Detail->>API : Refresh details + activity-log
 ```
 
 **Diagram sources**
-- [index.vue:187-239](file://app/pages/pickups/index.vue#L187-L239)
-- [detail.vue:381-431](file://app/pages/pickups/[id].vue#L381-L431)
+- [AssignDriverModal.vue:38-77](file://app/components/AssignDriverModal.vue#L38-L77)
+- [detail.vue:408-462](file://app/pages/pickups/[id].vue#L408-L462)
 
 **Section sources**
-- [index.vue:178-239](file://app/pages/pickups/index.vue#L178-L239)
-- [detail.vue:381-431](file://app/pages/pickups/[id].vue#L381-L431)
+- [AssignDriverModal.vue:1-260](file://app/components/AssignDriverModal.vue#L1-L260)
+- [detail.vue:408-462](file://app/pages/pickups/[id].vue#L408-L462)
 
 ### Status Transitions and Real-Time Tracking
 - Status Updates
@@ -469,7 +462,7 @@ List->>API : Refresh list + stats
 - Activity Log and Timeline
   - Fetches timeline milestones and chronological activities
   - Displays actor, timestamp, and action description
-  - **Enhanced**: Emergency pickup activities are highlighted with special indicators
+  - Emergency pickup activities are highlighted with special indicators
 
 ```mermaid
 sequenceDiagram
@@ -496,13 +489,8 @@ API-->>Detail : OK
 Detail->>API : GET .../activity-log
 ```
 
-**Diagram sources**
-- [detail.vue:290-379](file://app/pages/pickups/[id].vue#L290-379)
-- [detail.vue:139-153](file://app/pages/pickups/[id].vue#L139-L153)
-
 **Section sources**
-- [detail.vue:117-153](file://app/pages/pickups/[id].vue#L117-L153)
-- [detail.vue:290-379](file://app/pages/pickups/[id].vue#L290-379)
+- [detail.vue:317-406](file://app/pages/pickups/[id].vue#L317-L406)
 
 ### Integration with Fleet Management
 - Drivers and Trucks
@@ -540,13 +528,8 @@ PickupAssignment --> Driver : "has"
 PickupAssignment --> Truck : "has"
 ```
 
-**Diagram sources**
-- [detail.vue:44-64](file://app/pages/pickups/[id].vue#L44-L64)
-- [driver.ts:19-38](file://app/types/driver.ts#L19-L38)
-- [driver.ts:65-80](file://app/types/driver.ts#L65-L80)
-
 **Section sources**
-- [detail.vue:44-64](file://app/pages/pickups/[id].vue#L44-L64)
+- [detail.vue:49-69](file://app/pages/pickups/[id].vue#L49-L69)
 - [driver.ts:1-106](file://app/types/driver.ts#L1-L106)
 
 ## Emergency Pickup and Fee Management System
@@ -596,14 +579,6 @@ IssueTracking --> ResolutionProcess["Resolution Process"]
 ResolutionProcess --> CustomerNotification["Customer Notification"]
 ```
 
-**Diagram sources**
-- [CreatePickupModal.vue:1-416](file://app/components/CreatePickupModal.vue#L1-L416)
-- [EmergencyFeeCard.vue:1-100](file://app/components/EmergencyFeeCard.vue#L1-L100)
-- [SetEmergencyFeeModal.vue:1-100](file://app/components/SetEmergencyFeeModal.vue#L1-L100)
-- [ShopZoneFeeCard.vue:1-100](file://app/components/ShopZoneFeeCard.vue#L1-L100)
-- [SetShopZoneFeeModal.vue:1-100](file://app/components/SetShopZoneFeeModal.vue#L1-L100)
-- [CreateSupportTicketModal.vue:1-100](file://app/components/CreateSupportTicketModal.vue#L1-L100)
-
 **Section sources**
 - [CreatePickupModal.vue:1-416](file://app/components/CreatePickupModal.vue#L1-L416)
 - [EmergencyFeeCard.vue:1-100](file://app/components/EmergencyFeeCard.vue#L1-L100)
@@ -615,7 +590,7 @@ ResolutionProcess --> CustomerNotification["Customer Notification"]
 ## Enhanced CreatePickupModal Functionality
 
 ### Emergency Pickup Toggle System
-The CreatePickupModal has been significantly enhanced with a comprehensive emergency pickup toggle system that provides specialized functionality for urgent pickup scenarios.
+The CreatePickupModal includes a comprehensive emergency pickup toggle system that provides specialized functionality for urgent pickup scenarios.
 
 #### Toggle Implementation
 - **Conditional UI Elements**: Form fields dynamically adjust based on emergency mode activation
@@ -647,23 +622,69 @@ EmergencyValidation --> EmergencySubmission["Emergency Submission"]
 EmergencySubmission --> EmergencySuccess["Emergency Success Notification"]
 ```
 
-**Diagram sources**
-- [CreatePickupModal.vue:75-119](file://app/components/CreatePickupModal.vue#L75-L119)
-- [CreatePickupModal.vue:121-152](file://app/components/CreatePickupModal.vue#L121-L152)
-
-### Enhanced Form Behavior
-- **Dynamic Field Visibility**: Conditional display of emergency-specific fields and options
-- **Real-time Validation**: Instant validation feedback as users interact with emergency mode fields
-- **Contextual Help**: Emergency-specific guidance and tooltips throughout the form
-- **Data Persistence**: Proper handling of emergency mode state across form interactions
-
 **Section sources**
 - [CreatePickupModal.vue:1-416](file://app/components/CreatePickupModal.vue#L1-L416)
+
+## Load Adjustment System
+
+### New Load Adjustment Capabilities
+The system now includes comprehensive load adjustment functionality that allows operators to modify actual collected loads after initial booking, supporting both per_bin and full_truck pricing modes.
+
+#### AdjustLoadModal Component
+- **Dual Pricing Mode Support**: Handles both per_bin (actual bins input) and full_truck (truck load tier selection) pricing modes
+- **Validation Logic**: Ensures actual loads exceed booked amounts with appropriate error messaging
+- **Settlement Processing**: Calculates delta amounts and determines settlement methods (payment prompt or deferred invoicing)
+- **Permission-Based Access**: Requires 'pickups.manage' permission for load adjustment functionality
+
+#### Load Adjustment Workflow
+- **Eligibility Check**: Only available for non-completed/non-cancelled pickups that haven't been adjusted yet
+- **Real-time Validation**: Validates inputs against current booking data and pricing mode
+- **Backend Integration**: Calls `/pickup-requests/admin/:id/actual-load` endpoint with appropriate payload
+- **Success Handling**: Triggers detail page refresh and activity log updates
+
+#### Settlement Processing
+- **Payment Prompt**: For immediate payment collection, sends payment prompt to customer
+- **Deferred Invoicing**: Adds extra charges to customer's next invoice
+- **Amount Calculation**: Computes delta amounts based on pricing mode and selected adjustments
+
+```mermaid
+flowchart TD
+LoadAdjust["Load Adjustment Request"] --> CheckPermission{"Has 'pickups.manage' permission?"}
+CheckPermission -- No --> DenyAccess["Deny Access"]
+CheckPermission -- Yes --> CheckEligible{"Pickup eligible for adjustment?"}
+CheckEligible -- No --> ShowDisabled["Show Disabled Button"]
+CheckEligible -- Yes --> ShowModal["Show AdjustLoadModal"]
+ShowModal --> CheckPricingMode{"Pricing Mode?"}
+CheckPricingMode -- per_bin --> BinInput["Input Actual Bins"]
+CheckPricingMode -- full_truck --> TierSelect["Select Truck Load Tier"]
+BinInput --> ValidateBins{"Bins > Booked Bins?"}
+TierSelect --> ValidateTier{"Tier > Booked Tier?"}
+ValidateBins -- No --> ShowError["Show Validation Error"]
+ValidateTier -- No --> ShowError
+ValidateBins -- Yes --> CalculateDelta["Calculate Delta Amount"]
+ValidateTier -- Yes --> CalculateDelta
+CalculateDelta --> DetermineSettlement{"Settlement Method?"}
+DetermineSettlement -- payment_prompt --> SendPayment["Send Payment Prompt"]
+DetermineSettlement -- deferred_to_invoice --> AddToInvoice["Add to Next Invoice"]
+SendPayment --> Success["Success Event"]
+AddToInvoice --> Success
+Success --> RefreshData["Refresh Details & Activity Log"]
+```
+
+**Diagram sources**
+- [AdjustLoadModal.vue:35-120](file://app/components/AdjustLoadModal.vue#L35-L120)
+- [detail.vue:303-315](file://app/pages/pickups/[id].vue#L303-L315)
+- [detail.vue:811-820](file://app/pages/pickups/[id].vue#L811-L820)
+
+**Section sources**
+- [AdjustLoadModal.vue:1-197](file://app/components/AdjustLoadModal.vue#L1-L197)
+- [detail.vue:303-315](file://app/pages/pickups/[id].vue#L303-L315)
+- [detail.vue:811-820](file://app/pages/pickups/[id].vue#L811-L820)
 
 ## Pricing Mode and Truck Load Tier System
 
 ### Dual Pricing Mode Architecture
-The system now supports two distinct pricing modes based on customer type:
+The system supports two distinct pricing modes based on customer type:
 
 #### Per Bin Pricing Mode
 - **Automatic Pricing**: Calculated based on bin capacity × number of bins
@@ -710,17 +731,50 @@ FullTruckSubmission --> AutoPayment
 AutoPayment --> BackendProcessing["Backend Processing"]
 ```
 
-**Diagram sources**
-- [CreatePickupModal.vue:97-104](file://app/components/CreatePickupModal.vue#L97-L104)
-- [CreatePickupModal.vue:107-123](file://app/components/CreatePickupModal.vue#L107-L123)
-- [CreatePickupModal.vue:196-208](file://app/components/CreatePickupModal.vue#L196-L208)
-- [CreatePickupModal.vue:210-238](file://app/components/CreatePickupModal.vue#L210-L238)
-
 **Section sources**
 - [CreatePickupModal.vue:1-416](file://app/components/CreatePickupModal.vue#L1-L416)
 - [CustomerModal.vue:140-339](file://app/components/CustomerModal.vue#L140-L339)
 - [rates.vue:1-200](file://app/pages/management/rates.vue#L1-L200)
 - [subscription.ts:1-66](file://app/types/subscription.ts#L1-L66)
+
+## Permission-Based Access Controls
+
+### New Permission System Integration
+The system now includes comprehensive permission-based access controls for sensitive operations like load adjustment.
+
+#### Permission Checking
+- **usePermissions Composable**: Provides centralized permission checking utilities
+- **Role-Based Access**: Supports both permission-based and role-based access control
+- **Contextual Access**: Different permissions required for different operations
+- **Real-time Evaluation**: Permissions evaluated at runtime for dynamic UI control
+
+#### Load Adjustment Permissions
+- **Required Permission**: 'pickups.manage' permission needed for load adjustment
+- **Conditional UI**: Adjust Load button only shown when user has required permissions
+- **Status-Based Access**: Load adjustment disabled for completed/cancelled pickups
+- **One-Time Adjustment**: Prevents multiple adjustments with loadAdjustedAt tracking
+
+#### Permission Flow
+```mermaid
+flowchart TD
+UserAction["User Attempts Load Adjustment"] --> CheckPermission["Check 'pickups.manage' permission"]
+CheckPermission --> HasPerm{"Has Permission?"}
+HasPerm -- No --> ShowDenied["Hide Adjust Load Button"]
+HasPerm -- Yes --> CheckStatus{"Check Pickup Status"}
+CheckStatus --> StatusOK{"Not completed/cancelled?"}
+StatusOK -- No --> ShowDisabled["Disable Adjust Load Button"]
+StatusOK -- Yes --> CheckAdjusted{"Already adjusted?"}
+CheckAdjusted -- Yes --> ShowDisabled
+CheckAdjusted -- No --> AllowAccess["Allow Load Adjustment"]
+```
+
+**Diagram sources**
+- [detail.vue:301-310](file://app/pages/pickups/[id].vue#L301-L310)
+- [usePermissions.ts:3-43](file://app/composables/usePermissions.ts#L3-L43)
+
+**Section sources**
+- [detail.vue:301-310](file://app/pages/pickups/[id].vue#L301-L310)
+- [usePermissions.ts:1-43](file://app/composables/usePermissions.ts#L1-L43)
 
 ## Dependency Analysis
 - UI Pages depend on the API composable for all network operations
@@ -728,16 +782,19 @@ AutoPayment --> BackendProcessing["Backend Processing"]
 - Type definitions provide shared contracts for drivers, trucks, and subscriptions
 - Filtering and pagination logic resides in the list page and drives API queries
 - **Enhanced**: Sorting functionality integrates with both client-side reactive state management and server-side API parameters with performance optimization
-- **New**: Pricing mode system integrates with customer type management and truck load tier APIs
+- **New**: Load adjustment system integrates with permission system and truck load tier APIs
 - **Enhanced**: CreatePickupModal dependencies include emergency validation utilities, priority assignment logic, and pricing mode detection
 - **New**: Customer modal dependencies include conditional field logic based on pricing mode
+- **New**: Permission system integration for access control throughout the application
 
 ```mermaid
 graph LR
 Index["Pickups List"] --> Api["useApi"]
 Detail["Pickup Detail"] --> Api
-CreateModal["Create Pickup Modal"] --> Api
+Detail --> Permissions["usePermissions"]
+AdjustModal["Adjust Load Modal"] --> Api
 AssignModal["Assign Driver Modal"] --> Api
+CreateModal["Create Pickup Modal"] --> Api
 EmergencyFee["Emergency Fee System"] --> Api
 ShopZoneFee["Shop Zone Fee System"] --> Api
 SupportTicket["Support Ticket System"] --> Api
@@ -749,6 +806,9 @@ CustomerModal --> SubTypes
 Index -. sorting params .-> Api
 Index -. sort state .-> Index
 Index -. cache .-> Index
+Detail -. permission checks .-> Permissions
+AdjustModal -. load adjustment .-> Api
+AssignModal -. driver assignment .-> Api
 EmergencyFee -. fee config .-> Api
 ShopZoneFee -. zone pricing .-> Api
 SupportTicket -. ticket creation .-> Api
@@ -760,21 +820,19 @@ CustomerModal -. conditional fields .-> Api
 ```
 
 **Diagram sources**
-- [index.vue:58-75](file://app/pages/pickups/index.vue#L58-L75)
-- [index.vue:124-158](file://app/pages/pickups/index.vue#L124-L158)
-- [detail.vue:117-153](file://app/pages/pickups/[id].vue#L117-L153)
-- [CreatePickupModal.vue:131-152](file://app/components/CreatePickupModal.vue#L131-L152)
-- [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
-- [driver.ts:1-106](file://app/types/driver.ts#L1-L106)
-- [subscription.ts:1-66](file://app/types/subscription.ts#L1-L66)
+- [index.vue:60-77](file://app/pages/pickups/index.vue#L60-L77)
+- [detail.vue:301-315](file://app/pages/pickups/[id].vue#L301-L315)
+- [AdjustLoadModal.vue:51-120](file://app/components/AdjustLoadModal.vue#L51-L120)
+- [AssignDriverModal.vue:38-77](file://app/components/AssignDriverModal.vue#L38-L77)
+- [usePermissions.ts:3-43](file://app/composables/usePermissions.ts#L3-L43)
 
 **Section sources**
-- [index.vue:1-606](file://app/pages/pickups/index.vue#L1-L606)
-- [detail.vue:1-841](file://app/pages/pickups/[id].vue#L1-L841)
-- [CreatePickupModal.vue:1-416](file://app/components/CreatePickupModal.vue#L1-L416)
+- [index.vue:1-627](file://app/pages/pickups/index.vue#L1-L627)
+- [detail.vue:1-901](file://app/pages/pickups/[id].vue#L1-L901)
+- [AdjustLoadModal.vue:1-197](file://app/components/AdjustLoadModal.vue#L1-L197)
+- [AssignDriverModal.vue:1-260](file://app/components/AssignDriverModal.vue#L1-L260)
 - [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
-- [driver.ts:1-106](file://app/types/driver.ts#L1-L106)
-- [subscription.ts:1-66](file://app/types/subscription.ts#L1-L66)
+- [usePermissions.ts:1-43](file://app/composables/usePermissions.ts#L1-L43)
 
 ## Performance Considerations
 - Pagination and Filtering
@@ -786,16 +844,15 @@ CustomerModal -. conditional fields .-> Api
   - Debounce rapid sort changes to prevent excessive network requests
   - Optimize component rendering during sort operations
   - Implement proper memory management for sort state cleanup
-- **New**: Pricing Mode Performance
-  - Cache customer type pricing modes to avoid repeated API calls
-  - Optimize truck load tier loading with conditional fetching
-  - Minimize re-renders when switching between pricing modes
+- **New**: Load Adjustment Performance
+  - Optimize permission checks for responsive UI updates
+  - Minimize API calls for truck load tier fetching with caching
   - Efficient validation processing for different pricing modes
-- **New**: Emergency Processing Performance
-  - Prioritize emergency pickup requests in processing queues
-  - Implement efficient fee calculation algorithms for dynamic pricing
-  - Optimize support ticket creation with minimal overhead
-  - Cache fee configurations to reduce API calls
+  - Optimize settlement calculation algorithms
+- **New**: Permission System Performance
+  - Cache permission checks to avoid repeated evaluations
+  - Optimize permission state management for reactive updates
+  - Minimize re-renders when permission state changes
 - **Enhanced**: CreatePickupModal Performance
   - Optimize emergency toggle state management for smooth UI transitions
   - Minimize re-renders when switching between regular and emergency modes
@@ -826,11 +883,16 @@ CustomerModal -. conditional fields .-> Api
   - Ensure proper handling of invalid sort combinations
   - Debug reactive state synchronization between client and server
   - Verify keyboard navigation and accessibility features are working correctly
-- **New**: Pricing Mode Issues
-  - Verify customer type pricing mode configuration in backend
-  - Check truck load tier availability for full_truck customers
-  - Ensure proper conditional field visibility based on pricing mode
-  - Debug pricing mode detection and caching mechanisms
+- **New**: Load Adjustment Issues
+  - Verify user has 'pickups.manage' permission for load adjustment functionality
+  - Check that pickup is not in completed/cancelled status
+  - Ensure load hasn't been previously adjusted (loadAdjustedAt check)
+  - Verify pricing mode configuration and truck load tier availability
+  - Debug settlement calculation and payment prompt functionality
+- **New**: Permission Issues
+  - Verify permission system configuration and user roles
+  - Check that permission checks are properly integrated into UI components
+  - Debug permission state management and reactive updates
 - **New**: Truck Load Tier Issues
   - Verify truck load tier endpoint returns valid data
   - Check validation rules for truck load tier selection
@@ -855,6 +917,7 @@ CustomerModal -. conditional fields .-> Api
   - Verify proper cleanup of event listeners and timers
   - Monitor emergency processing queue performance
   - Optimize fee calculation and support ticket creation performance
+  - **New**: Monitor permission check performance and caching effectiveness
 - **Enhanced**: CreatePickupModal Issues
   - Verify emergency toggle state persistence across form interactions
   - Check validation rule conflicts between regular and emergency modes
@@ -869,10 +932,11 @@ CustomerModal -. conditional fields .-> Api
 **Section sources**
 - [useApi.ts:39-67](file://app/composables/useApi.ts#L39-L67)
 - [CreatePickupModal.vue:121-152](file://app/components/CreatePickupModal.vue#L121-L152)
-- [index.vue:58-75](file://app/pages/pickups/index.vue#L58-L75)
-- [index.vue:124-158](file://app/pages/pickups/index.vue#L124-L158)
-- [detail.vue:290-379](file://app/pages/pickups/[id].vue#L290-379)
-- [CustomerModal.vue:140-339](file://app/components/CustomerModal.vue#L140-L339)
+- [index.vue:60-77](file://app/pages/pickups/index.vue#L60-L77)
+- [index.vue:126-160](file://app/pages/pickups/index.vue#L126-L160)
+- [detail.vue:301-315](file://app/pages/pickups/[id].vue#L301-L315)
+- [AdjustLoadModal.vue:60-120](file://app/components/AdjustLoadModal.vue#L60-L120)
+- [usePermissions.ts:3-43](file://app/composables/usePermissions.ts#L3-L43)
 
 ## Conclusion
-The pickup operations module provides a comprehensive workflow for managing waste pickup requests. It supports creation, assignment/reassignment with priority handling, clear status transitions, and rich visibility through activity logs and timelines. The addition of comprehensive server-side sorting functionality significantly enhances data management capabilities, allowing users to efficiently navigate and analyze pickup requests by creation date, preferred pickup date, and last update time. **Enhanced**: The CreatePickupModal has been substantially upgraded with emergency pickup toggle functionality, specialized validation rules for emergency scenarios, customized success notifications, and restrictions on preferred date selection when emergency mode is activated. **New**: The system now includes a sophisticated pricing mode system supporting both per_bin and full_truck pricing strategies with dynamic form field visibility and validation. The truck load tier dropdown functionality provides flexible pricing options for full_truck customers, while automatic payment type resolution ensures accurate billing based on customer subscription state. The emergency pickup feature includes enhanced validation rules, automatic priority assignment, and specialized processing workflows. The fee management system provides flexible configuration for both emergency and shop zone fees with real-time calculation capabilities. Integration with fleet management is achieved via structured driver and truck references, enabling robust scheduling and tracking capabilities. The enhanced sorting features, emergency pickup system, pricing mode architecture, and fee management demonstrate the system's commitment to providing intuitive, powerful, and accessible administrative tools for effective operations management at scale. The comprehensive support ticket integration ensures that any issues can be quickly reported and resolved, maintaining operational efficiency and customer satisfaction. The enhanced CreatePickupModal functionality represents a significant improvement in handling urgent pickup scenarios with proper validation, user feedback, and priority processing, while the new pricing mode system enables flexible business models for different customer segments.
+The pickup operations module provides a comprehensive workflow for managing waste pickup requests. It supports creation, assignment/reassignment with priority handling, clear status transitions, and rich visibility through activity logs and timelines. The addition of comprehensive server-side sorting functionality significantly enhances data management capabilities, allowing users to efficiently navigate and analyze pickup requests by creation date, preferred pickup date, and last update time. **Enhanced**: The CreatePickupModal has been substantially upgraded with emergency pickup toggle functionality, specialized validation rules for emergency scenarios, customized success notifications, and restrictions on preferred date selection when emergency mode is activated. **New**: The system now includes a sophisticated pricing mode system supporting both per_bin and full_truck pricing strategies with dynamic form field visibility and validation, plus comprehensive load adjustment capabilities with permission-based access controls. The truck load tier dropdown functionality provides flexible pricing options for full_truck customers, while automatic payment type resolution ensures accurate billing based on customer subscription state. The emergency pickup feature includes enhanced validation rules, automatic priority assignment, and specialized processing workflows. The fee management system provides flexible configuration for both emergency and shop zone fees with real-time calculation capabilities. Integration with fleet management is achieved via structured driver and truck references, enabling robust scheduling and tracking capabilities. The enhanced sorting features, emergency pickup system, pricing mode architecture, load adjustment system, and fee management demonstrate the system's commitment to providing intuitive, powerful, and accessible administrative tools for effective operations management at scale. The comprehensive support ticket integration ensures that any issues can be quickly reported and resolved, maintaining operational efficiency and customer satisfaction. The enhanced CreatePickupModal functionality represents a significant improvement in handling urgent pickup scenarios with proper validation, user feedback, and priority processing, while the new pricing mode system enables flexible business models for different customer segments. **New**: The load adjustment system provides operators with the ability to modify actual collected loads after booking, supporting both per_bin and full_truck pricing modes with appropriate validation and settlement processing. The permission-based access controls ensure that sensitive operations are properly secured while maintaining usability for authorized users. The enhanced AssignDriverModal improvements provide better form state management and validation, improving the overall user experience for driver assignment workflows.

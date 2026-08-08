@@ -15,34 +15,34 @@ interface Payout {
   driverName: string
   periodMonth: string
   paymentSchedule: string
-  perTripRate: number
-  expectedTripsPerMonth: number
-  truckCapacity: number
-  minimumFillRate: number
-  monthlySalary: number
-  monthlyBinTarget: number
-  minimumBinThreshold: number
-  binsAssigned: number
-  binsCompleted: number
-  tripsCompleted: number
-  performanceDeduction: number
-  manualBonuses: number
-  manualDeductions: number
-  totalPayout: number
+  monthlySalary: string
+  totalPayout: string
   currency: string
   status: 'draft' | 'approved' | 'paid'
-  approvedAt: string | null
-  paidAt: string | null
-  notes: string | null
-  earnings: any[]
+  createdAt: string | null
+  approvedAt?: string | null
+  paidAt?: string | null
+  notes?: string | null
+  // Optional fields that may or may not be present
+  perTripRate?: number
+  expectedTripsPerMonth?: number
+  truckCapacity?: number
+  minimumFillRate?: number
+  monthlyBinTarget?: number
+  minimumBinThreshold?: number
+  binsAssigned?: number
+  binsCompleted?: number
+  tripsCompleted?: number
+  performanceDeduction?: number | string
+  manualBonuses?: number | string
+  manualDeductions?: number | string
+  earnings?: any[]
 }
 
 interface PayoutListResponse {
   success: boolean
-  data: {
-    items: Payout[]
-    pagination: { page: number; limit: number; total: number; totalPages: number; hasNextPage: boolean; hasPreviousPage: boolean }
-  }
+  data: Payout[]
+  pagination: { page: number; limit: number; total: number; totalPages: number; hasNextPage: boolean; hasPreviousPage: boolean }
 }
 
 interface GenerateResponse {
@@ -60,6 +60,9 @@ const perPage = 20
 
 const statusFilter = ref<string>('')
 const searchQuery = ref('')
+// debouncedSearch is the committed value sent to the API after the user stops typing
+const debouncedSearch = ref('')
+let searchTimer: ReturnType<typeof setTimeout> | null = null
 const generateMonth = ref(new Date().toISOString().slice(0, 7))
 const generating = ref(false)
 
@@ -70,22 +73,10 @@ const showApproveConfirm = ref(false)
 const showMarkPaidConfirm = ref(false)
 const approvingId = ref<string | null>(null)
 const markingPaidId = ref<string | null>(null)
+const approving = ref(false)
+const markingPaid = ref(false)
 
 // ── Computed ─────────────────────────────────────────────────────────────────
-
-const filteredPayouts = computed(() => {
-  const list = payouts.value || []
-  if (statusFilter.value) {
-    return list.filter(p => p.status === statusFilter.value)
-  }
-  if (searchQuery.value.trim()) {
-    const q = searchQuery.value.trim().toLowerCase()
-    return list.filter(p => p.driverName.toLowerCase().includes(q))
-  }
-  return list
-})
-
-const totalFiltered = computed(() => (filteredPayouts.value || []).length)
 
 const statusBadge = (s: string) => {
   if (s === 'paid')   return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e', label: 'Paid' }
@@ -94,8 +85,10 @@ const statusBadge = (s: string) => {
   return { bg: '#e5e7eb', border: '#d1d5db', color: '#6b7280', label: s }
 }
 
-function formatCurrencyAmount(amount: number, currency = 'GHS') {
-  return `${currency} ${Number(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+function formatCurrencyAmount(amount: number | string, currency = 'GHS') {
+  const num = typeof amount === 'string' ? parseFloat(amount) : amount
+  if (isNaN(num)) return `${currency} 0.00`
+  return `${currency} ${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function formatDate(dateString?: string | null): string {
@@ -125,16 +118,22 @@ async function fetchPayouts() {
     const params = new URLSearchParams()
     params.set('page', String(currentPage.value))
     params.set('limit', String(perPage))
+    // Both status and search are sent to the server simultaneously
     if (statusFilter.value) params.set('status', statusFilter.value)
-    const data = await api.get<PayoutListResponse>(`/driver-earning/admin/payouts?${params.toString()}`, 'Failed to load payouts')
-    if (data?.data) {
-      payouts.value = Array.isArray(data.data.items) ? data.data.items : []
-      totalItems.value = data.data.pagination.total ?? 0
-    } else {
+    if (debouncedSearch.value.trim()) params.set('search', debouncedSearch.value.trim())
+    const raw = await api.get<any>(`/driver-earning/admin/payouts?${params.toString()}`, 'Failed to load payouts')
+    if (!raw) {
       payouts.value = []
+      totalItems.value = 0
+      return
     }
-  } catch {
-    console.error('Failed to fetch payouts')
+    const items = Array.isArray(raw.data) ? raw.data : []
+    const pagination = raw.pagination || {}
+    payouts.value = items
+    totalItems.value = pagination.total ?? items.length
+  } catch (err) {
+    console.error('[payouts] fetchPayouts error:', err)
+    payouts.value = []
   } finally {
     loading.value = false
   }
@@ -170,40 +169,60 @@ async function generatePayouts() {
 
 async function approvePayout() {
   if (!approvingId.value) return
-  const api = useApi()
-  const result = await api.patch<{ success: boolean; data: any }>(
-    `/driver-earning/admin/payouts/${approvingId.value}/approve`,
-    {},
-    'Failed to approve payout'
-  )
-  if (result?.success) {
-    toast.success('Payout approved')
+  const payoutId = approvingId.value
+  approving.value = true
+  try {
+    const result = await api.patch<{ success: boolean; data: any }>(
+      `/driver-earning/admin/payouts/${payoutId}/approve`,
+      {},
+      'Failed to approve payout'
+    )
     showApproveConfirm.value = false
     approvingId.value = null
-    await fetchPayouts()
-    if (selectedPayout.value?.id === approvingId.value) {
-      showDetailModal.value = false
+    if (result?.success) {
+      toast.success('Payout approved')
+      await fetchPayouts()
+      if (selectedPayout.value?.id === payoutId) {
+        showDetailModal.value = false
+      }
     }
+  } finally {
+    approving.value = false
   }
 }
 
 async function markPayoutPaid() {
   if (!markingPaidId.value) return
-  const api = useApi()
-  const result = await api.patch<{ success: boolean; data: any }>(
-    `/driver-earning/admin/payouts/${markingPaidId.value}/mark-paid`,
-    {},
-    'Failed to mark payout as paid'
-  )
-  if (result?.success) {
-    toast.success('Payout marked as paid')
+  const payoutId = markingPaidId.value
+  markingPaid.value = true
+  try {
+    const result = await api.patch<{ success: boolean; data: any }>(
+      `/driver-earning/admin/payouts/${payoutId}/mark-paid`,
+      {},
+      'Failed to mark payout as paid'
+    )
     showMarkPaidConfirm.value = false
     markingPaidId.value = null
-    await fetchPayouts()
-    if (selectedPayout.value?.id === markingPaidId.value) {
-      showDetailModal.value = false
+    if (result?.success) {
+      toast.success('Payout marked as paid')
+      await fetchPayouts()
+      if (selectedPayout.value?.id === payoutId) {
+        showDetailModal.value = false
+      }
     }
+  } finally {
+    markingPaid.value = false
   }
+}
+
+// Debounce search to avoid API call on every keystroke
+function onSearchInput() {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    debouncedSearch.value = searchQuery.value
+    currentPage.value = 1
+    fetchPayouts()
+  }, 350)
 }
 
 function openDetail(payout: Payout) {
@@ -279,6 +298,7 @@ onMounted(() => {
           type="text"
           placeholder="Search by driver name..."
           :style="`height:40px;padding:0 12px;background:white;border:1px solid #e5e7eb;border-radius:12px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box`"
+          @input="onSearchInput"
           @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
           @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
         />
@@ -307,7 +327,7 @@ onMounted(() => {
             </td>
           </tr>
           <tr
-            v-for="p in filteredPayouts"
+            v-for="p in payouts"
             :key="p.id"
             :style="`border-bottom:1px solid #e5e7eb;cursor:pointer`"
             @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
@@ -339,19 +359,19 @@ onMounted(() => {
               >View</button>
               <button
                 v-if="canApprove(p.status)"
-                :disabled="!!approvingId"
-                :style="`height:32px;padding:0 14px;background:${approvingId ? '#93c5fd' : '#3b82f6'};border:none;border-radius:20px;font-size:13px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:${approvingId ? 'not-allowed' : 'pointer'};opacity:${approvingId ? '0.8' : '1'}`"
+                :disabled="approving"
+                :style="`height:32px;padding:0 14px;background:${approving ? '#93c5fd' : '#3b82f6'};border:none;border-radius:20px;font-size:13px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:${approving ? 'not-allowed' : 'pointer'};opacity:${approving ? '0.8' : '1'}`"
                 @click="approvingId = p.id; showApproveConfirm = true"
               >Approve</button>
               <button
                 v-if="canMarkPaid(p.status)"
-                :disabled="!!markingPaidId"
-                :style="`height:32px;padding:0 14px;background:${markingPaidId ? '#86efac' : '#22c55e'};border:none;border-radius:20px;font-size:13px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:${markingPaidId ? 'not-allowed' : 'pointer'};opacity:${markingPaidId ? '0.8' : '1'}`"
+                :disabled="markingPaid"
+                :style="`height:32px;padding:0 14px;background:${markingPaid ? '#86efac' : '#22c55e'};border:none;border-radius:20px;font-size:13px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:${markingPaid ? 'not-allowed' : 'pointer'};opacity:${markingPaid ? '0.8' : '1'}`"
                 @click="markingPaidId = p.id; showMarkPaidConfirm = true"
               >Mark Paid</button>
             </td>
           </tr>
-          <tr v-if="!loading && filteredPayouts.length === 0">
+          <tr v-if="!loading && payouts.length === 0">
             <td colspan="7" style="padding:48px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No payouts found</td>
           </tr>
         </tbody>
@@ -359,10 +379,10 @@ onMounted(() => {
     </div>
 
     <!-- Pagination -->
-    <div v-if="totalFiltered > perPage" style="background:white;border:1px solid #ececec;border-radius:16px;padding:16px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+    <div v-if="totalItems > perPage" style="background:white;border:1px solid #ececec;border-radius:16px;padding:16px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
       <AppPagination
         :page="currentPage"
-        :total="totalFiltered"
+        :total="totalItems"
         :per-page="perPage"
         @update:page="currentPage = $event"
       />
@@ -403,15 +423,15 @@ onMounted(() => {
             </div>
             <div style="background:#f8f9fa;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:4px">
               <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">Performance Deduction</p>
-              <p :style="`font-size:16px;font-weight:700;font-family:'Manrope',sans-serif;margin:0;color:${selectedPayout.performanceDeduction > 0 ? '#ef4444' : '#1a1a1a'}`">{{ formatCurrencyAmount(selectedPayout.performanceDeduction, selectedPayout.currency) }}</p>
+              <p :style="`font-size:16px;font-weight:700;font-family:'Manrope',sans-serif;margin:0;color:${Number(selectedPayout.performanceDeduction) > 0 ? '#ef4444' : '#1a1a1a'}`">{{ formatCurrencyAmount(selectedPayout.performanceDeduction ?? 0, selectedPayout.currency) }}</p>
             </div>
             <div style="background:#f8f9fa;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:4px">
               <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">Manual Bonuses</p>
-              <p :style="`font-size:16px;font-weight:700;font-family:'Manrope',sans-serif;margin:0;color:${selectedPayout.manualBonuses > 0 ? '#22c55e' : '#1a1a1a'}`">{{ formatCurrencyAmount(selectedPayout.manualBonuses, selectedPayout.currency) }}</p>
+              <p :style="`font-size:16px;font-weight:700;font-family:'Manrope',sans-serif;margin:0;color:${Number(selectedPayout.manualBonuses) > 0 ? '#22c55e' : '#1a1a1a'}`">{{ formatCurrencyAmount(selectedPayout.manualBonuses ?? 0, selectedPayout.currency) }}</p>
             </div>
             <div style="background:#f8f9fa;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:4px">
               <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">Manual Deductions</p>
-              <p :style="`font-size:16px;font-weight:700;font-family:'Manrope',sans-serif;margin:0;color:${selectedPayout.manualDeductions > 0 ? '#ef4444' : '#1a1a1a'}`">{{ formatCurrencyAmount(selectedPayout.manualDeductions, selectedPayout.currency) }}</p>
+              <p :style="`font-size:16px;font-weight:700;font-family:'Manrope',sans-serif;margin:0;color:${Number(selectedPayout.manualDeductions) > 0 ? '#ef4444' : '#1a1a1a'}`">{{ formatCurrencyAmount(selectedPayout.manualDeductions ?? 0, selectedPayout.currency) }}</p>
             </div>
           </div>
 
@@ -419,15 +439,15 @@ onMounted(() => {
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
             <div style="background:#f8f9fa;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:4px">
               <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">Bins Completed</p>
-              <p style="font-size:16px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0">{{ selectedPayout.binsCompleted }} / {{ selectedPayout.binsAssigned }}</p>
+              <p style="font-size:16px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0">{{ selectedPayout.binsCompleted ?? '—' }} / {{ selectedPayout.binsAssigned ?? '—' }}</p>
             </div>
             <div style="background:#f8f9fa;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:4px">
               <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">Trips Completed</p>
-              <p style="font-size:16px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0">{{ selectedPayout.tripsCompleted }}</p>
+              <p style="font-size:16px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0">{{ selectedPayout.tripsCompleted ?? '—' }}</p>
             </div>
             <div style="background:#f8f9fa;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:4px">
               <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">Payment Schedule</p>
-              <p style="font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0;text-transform:capitalize">{{ selectedPayout.paymentSchedule }}</p>
+              <p style="font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0;text-transform:capitalize">{{ selectedPayout.paymentSchedule ?? '—' }}</p>
             </div>
           </div>
 
@@ -458,14 +478,14 @@ onMounted(() => {
           >Close</button>
           <button
             v-if="canApprove(selectedPayout.status)"
-            :disabled="!!approvingId"
-            :style="`height:40px;padding:0 20px;background:${approvingId ? '#93c5fd' : '#3b82f6'};border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:${approvingId ? 'not-allowed' : 'pointer'};opacity:${approvingId ? '0.8' : '1'}`"
+            :disabled="approving"
+            :style="`height:40px;padding:0 20px;background:${approving ? '#93c5fd' : '#3b82f6'};border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:${approving ? 'not-allowed' : 'pointer'};opacity:${approving ? '0.8' : '1'}`"
             @click="approvingId = selectedPayout.id; showApproveConfirm = true"
           >Approve Payout</button>
           <button
             v-if="canMarkPaid(selectedPayout.status)"
-            :disabled="!!markingPaidId"
-            :style="`height:40px;padding:0 20px;background:${markingPaidId ? '#86efac' : '#22c55e'};border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:${markingPaidId ? 'not-allowed' : 'pointer'};opacity:${markingPaidId ? '0.8' : '1'}`"
+            :disabled="markingPaid"
+            :style="`height:40px;padding:0 20px;background:${markingPaid ? '#86efac' : '#22c55e'};border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:${markingPaid ? 'not-allowed' : 'pointer'};opacity:${markingPaid ? '0.8' : '1'}`"
             @click="markingPaidId = selectedPayout.id; showMarkPaidConfirm = true"
           >Mark as Paid</button>
         </div>
@@ -479,7 +499,7 @@ onMounted(() => {
       :message="'Are you sure you want to approve this payout? This will lock the payout amount for the selected period.'"
       confirm-text="Approve"
       confirm-color="#3b82f6"
-      :loading="!!approvingId"
+      :loading="approving"
       @confirm="approvePayout"
       @cancel="showApproveConfirm = false"
     />
@@ -491,7 +511,7 @@ onMounted(() => {
       :message="'Confirm that this payout has been paid to the driver. This action cannot be undone.'"
       confirm-text="Mark as Paid"
       confirm-color="#22c55e"
-      :loading="!!markingPaidId"
+      :loading="markingPaid"
       @confirm="markPayoutPaid"
       @cancel="showMarkPaidConfirm = false"
     />

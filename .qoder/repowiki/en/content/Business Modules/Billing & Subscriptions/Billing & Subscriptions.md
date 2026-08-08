@@ -22,13 +22,9 @@
 
 ## Update Summary
 **Changes Made**
-- **Added** New InvoiceStats interface with comprehensive invoice statistics including totalInvoices, pendingCount, overdueCount, totalRevenue, pendingAmount, and overdueAmount
-- **Implemented** fetchInvoiceStats() function for /invoices/admin/stats endpoint integration
-- **Enhanced** billing dashboard with improved KPI displays and new invoice statistics section
-- **Updated** invoice list table with enhanced type badges for subscription, pay-as-you-go, store order, and manual invoices
-- **Improved** error handling and loading states throughout the billing workflow
-- **Enhanced** CreateInvoiceModal with customer search functionality and line item management
-- **Updated** UpdateInvoiceStatusModal with payment method selection and status validation
+- **Removed** references to deprecated administrative guide documents (admin-create-customer-guide.md, admin-create-pickup-guide.md, admin-customer-type-guide.md, admin-rate-management-guide.md, admin-subscription-plans-guide.md) as these comprehensive administrative workflows have been simplified or eliminated from the codebase
+- **Updated** documentation to reflect current simplified administrative workflows and streamlined management interfaces
+- **Maintained** focus on core billing functionality while removing outdated administrative guide references
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -45,7 +41,7 @@
 ## Introduction
 This document provides comprehensive documentation for the Billing and Subscription management system within the application. It covers payment processing workflows, subscription plan management, rate configuration, billing cycle handling, invoice generation, payment status tracking, subscription tier management, and revenue analytics integration. The system is implemented as a Nuxt 3 frontend with Vue 3 components that interact with backend APIs via a centralized API composable.
 
-**Updated** The billing system has undergone significant enhancements including the addition of comprehensive invoice statistics through the new InvoiceStats interface, improved KPI displays with real-time data fetching, enhanced invoice list table with color-coded type badges, and robust error handling throughout the entire billing workflow. The system now provides detailed invoice metrics including total invoices, pending counts, overdue amounts, and revenue tracking.
+**Updated** The billing system has undergone significant enhancements including the addition of comprehensive invoice statistics through the new InvoiceStats interface, improved KPI displays with real-time data fetching, enhanced invoice list table with color-coded type badges, and robust error handling throughout the entire billing workflow. The system now provides detailed invoice metrics including total invoices, pending counts, overdue amounts, and revenue tracking. Administrative workflows have been simplified, removing complex administrative guides in favor of streamlined management interfaces.
 
 ## Project Structure
 The billing and subscriptions features are organized by pages and utilities:
@@ -64,7 +60,7 @@ BDetail["Invoice Detail<br/>PDF Download, Send Invoice, Status Updates"]
 end
 subgraph "Management"
 SubPlans["Subscription Plans<br/>CRUD, stats, toggle, Active Tiers Display"]
-Rates["Rate Management<br/>pay-as-you-go rates"]
+Rates["Rate Management<br/>Capacity & Truck Load Tiers"]
 Fees["Fee Management<br/>Emergency & Shop Zone Fees"]
 end
 subgraph "Payments"
@@ -123,7 +119,7 @@ Fees --> Types
 - **Enhanced Invoice Status Management**: Modal for updating invoice status with payment method selection and validation. Supports all invoice statuses and enforces payment method requirement for paid invoices.
 - **Enhanced Subscription Plan Management**: Full CRUD for prepaid/postpaid plans with billing cycles, pricing, feature counts, active toggling, statistics, and comprehensive active subscription tiers display with dual pricing model support.
 - **Enhanced Fee Management**: Manages both emergency pickup fees and shop delivery fees with simplified currency presentation, backend compatibility workarounds, and consistent user experience across both fee types.
-- Rate Management: Configures pay-as-you-go pickup rates per customer type and estimated quantity tiers with effective dates and notes.
+- **Simplified Rate Management**: Configures capacity tiers and truck load tiers with prepay/postpay rates, effective dates, and notes. Streamlined interface replaces complex administrative workflows.
 - Customer Payment Portal: Accepts cash or mobile money payments with validation, countdown, and success states.
 
 Key shared utilities:
@@ -132,7 +128,7 @@ Key shared utilities:
 - rateValidation: Validates and transforms rate form data into API payloads.
 - **Updated** Comprehensive TypeScript interfaces for Invoice, Customer, Items, and Subscription structures providing compile-time type safety.
 
-**Updated** The billing system now includes comprehensive TypeScript interfaces for all data models, enhanced invoice management with PDF download and send capabilities, sophisticated loading state management, robust error handling throughout the entire component lifecycle, the addition of comprehensive invoice statistics through the new InvoiceStats interface, enhanced active subscription tiers display with enhanced subscriber count tracking and dual pricing model support, and enhanced shop zone fee management with simplified currency presentation and backend compatibility workarounds.
+**Updated** The billing system now includes comprehensive TypeScript interfaces for all data models, enhanced invoice management with PDF download and send capabilities, sophisticated loading state management, robust error handling throughout the entire component lifecycle, the addition of comprehensive invoice statistics through the new InvoiceStats interface, enhanced active subscription tiers display with enhanced subscriber count tracking and dual pricing model support, and enhanced shop zone fee management with simplified currency presentation and backend compatibility workarounds. Administrative workflows have been simplified, removing complex administrative guides in favor of streamlined management interfaces.
 
 **Section sources**
 - [billing/index.vue:1-687](file://app/pages/billing/index.vue#L1-L687)
@@ -490,29 +486,32 @@ API-->>FeeManagement : Success responses with simplified currency handling
 - [SetEmergencyFeeModal.vue:1-112](file://app/components/SetEmergencyFeeModal.vue#L1-L112)
 - [management/fees.vue:1-259](file://app/pages/management/fees.vue#L1-L259)
 
-### Rate Management (Pay-as-you-go)
-- Filters: By customer type and status (active/upcoming/inactive)
-- Stats: Total rates, active, upcoming, customer types
-- Table columns: Customer type, estimated quantity, pickup rate, effective date, status, note, created, actions
-- Actions: Add, Edit, Delete
+### Simplified Rate Management (Capacity & Truck Load Tiers)
+**Updated** The rate management system has been streamlined to focus on capacity tiers and truck load tiers, replacing complex administrative workflows with simplified interfaces.
 
-API integration:
-- Fetch rates: GET /rates/admin
-- Fetch stats: GET /rates/admin/stats
-- Fetch customer types: GET /customer/admin/types
-- Fetch estimated quantities: GET /disposable/quantities
-- Create rate: POST /rates/admin
-- Update rate: PATCH /rates/admin/:id
-- Delete rate: DELETE /rates/admin/:id
+#### Capacity Tier Management
+- **Capacity-based Pricing**: Configure pickup rates based on bin capacity (liters) with separate prepay and postpay rates
+- **Active/Inactive Status**: Toggle functionality for enabling/disabling capacity tiers
+- **CRUD Operations**: Full create, read, update, and delete capabilities for capacity tiers
+- **Validation**: Ensures positive capacity values and valid rate amounts
 
-Validation and transformation:
-- validateForm enforces required fields and positive numeric rate
-- formToApiPayload converts form inputs to API payload (rate, estimatedQuantityId, effectiveDate, note, isActive)
+#### Truck Load Tier Management
+- **Load-based Pricing**: Configure flat rates per truck load with prepay and postpay options
+- **Bin Equivalent Calculation**: Internal calculation for driver pay based on bin equivalents (quarter=100, half=200, full=400)
+- **Display Order**: Configurable sort order for mobile dropdown presentation
+- **Active/Inactive Status**: Toggle functionality for enabling/disabling truck load tiers
 
-Status logic:
-- active if effectiveDate <= today and isActive
-- upcoming if effectiveDate > today and isActive
-- inactive if !isActive
+#### Streamlined Interface
+- **Tabbed Navigation**: Separate tabs for capacity tiers and truck load tiers
+- **Simplified Forms**: Reduced complexity compared to previous administrative workflows
+- **Real-time Updates**: Immediate reflection of changes across the system
+- **Error Handling**: Comprehensive validation and user-friendly error messages
+
+**New Features**:
+- **Dual Rate Support**: Separate prepay and postpay rates for each tier type
+- **Active Tier Management**: Easy activation/deactivation of pricing tiers
+- **Mobile Optimization**: Optimized display order for mobile applications
+- **Internal Calculations**: Automated driver pay calculations based on bin equivalents
 
 **Section sources**
 - [management/rates.vue:1-882](file://app/pages/management/rates.vue#L1-L882)
@@ -619,6 +618,7 @@ FeeManagement -.-> ShopDelivery["Shop Delivery Fee API"]
 - **New** Line item calculations are optimized with computed properties for real-time updates
 - **Updated** Simplified currency presentation reduces computational overhead in fee components
 - **Updated** Backend compatibility workarounds are handled transparently without impacting performance
+- **Updated** Streamlined rate management reduces complexity and improves performance
 
 [No sources needed since this section provides general guidance]
 
@@ -640,6 +640,7 @@ Common issues and resolutions:
 - **New** Status update validation: Ensure payment method is selected when marking invoice as paid.
 - **Updated** Fee management issues: Verify backend compatibility workarounds are functioning correctly and check for pesewas conversion problems.
 - **Updated** Currency display problems: Ensure useCurrency composable is properly configured and check for formatting issues in fee components.
+- **Updated** Rate management issues: Verify capacity and truck load tier endpoints are accessible and return proper data structures.
 
 Operational tips:
 - Inspect console logs emitted by useApi for request/response details.
@@ -657,6 +658,7 @@ Operational tips:
 - **New** Validate status update modal behavior for different invoice types and statuses.
 - **Updated** Test fee management endpoints to ensure backend compatibility workarounds are working correctly.
 - **Updated** Verify currency formatting is consistent across all fee components and check for pesewas display issues.
+- **Updated** Test rate management endpoints for capacity and truck load tier functionality.
 
 **Section sources**
 - [useApi.ts:1-95](file://app/composables/useApi.ts#L1-L95)
@@ -672,7 +674,7 @@ Operational tips:
 ## Conclusion
 The Billing & Subscriptions module provides a robust foundation for managing subscription plans, configuring pay-as-you-go rates, viewing invoices and payment statuses, and processing customer payments. The architecture leverages reusable composables for API access and currency formatting, while maintaining clear separation of concerns across pages. 
 
-**Updated** The billing system has been significantly enhanced with comprehensive TypeScript interfaces for all data models, enhanced invoice management with PDF download and send capabilities, sophisticated loading state management, robust error handling, seamless transition from mock data to live API integration, the addition of comprehensive invoice statistics through the new InvoiceStats interface, enhanced active subscription tiers display with dual pricing model support, and enhanced shop zone fee management with simplified currency presentation and backend compatibility workarounds. The subscription management system now provides enhanced subscriber count tracking, color-coded billing type badges, and an interactive table interface for better data visualization. The fee management system offers consistent handling of both emergency and shop delivery fees with streamlined currency presentation. The invoice creation and status management modals provide comprehensive functionality for complete invoice lifecycle management. Future enhancements can include server-side pagination for other lists, richer analytics dashboards, deeper integrations with external payment gateways, advanced reporting capabilities, and removal of backend compatibility workarounds once backend services are updated.
+**Updated** The billing system has been significantly enhanced with comprehensive TypeScript interfaces for all data models, enhanced invoice management with PDF download and send capabilities, sophisticated loading state management, robust error handling, seamless transition from mock data to live API integration, the addition of comprehensive invoice statistics through the new InvoiceStats interface, enhanced active subscription tiers display with dual pricing model support, and enhanced shop zone fee management with simplified currency presentation and backend compatibility workarounds. The subscription management system now provides enhanced subscriber count tracking, color-coded billing type badges, and an interactive table interface for better data visualization. The fee management system offers consistent handling of both emergency and shop delivery fees with streamlined currency presentation. The invoice creation and status management modals provide comprehensive functionality for complete invoice lifecycle management. Administrative workflows have been simplified, removing complex administrative guides in favor of streamlined management interfaces. Future enhancements can include server-side pagination for other lists, richer analytics dashboards, deeper integrations with external payment gateways, advanced reporting capabilities, and removal of backend compatibility workarounds once backend services are updated.
 
 [No sources needed since this section summarizes without analyzing specific files]
 
@@ -701,14 +703,15 @@ The Billing & Subscriptions module provides a robust foundation for managing sub
   - PATCH /subscription/admin/plans/:id/toggle
   - DELETE /subscription/admin/plans/:id
   - GET /subscription/admin/stats?type={prepaid|postpaid}
-- Rates
-  - GET /rates/admin
-  - GET /rates/admin/stats
-  - POST /rates/admin
-  - PATCH /rates/admin/:id
-  - DELETE /rates/admin/:id
-  - GET /customer/admin/types
-  - GET /disposable/quantities
+- **Updated** Rate Management
+  - GET /rates/admin/capacity?includeInactive=true - Returns capacity tiers
+  - GET /rates/admin/truck-loads?includeInactive=true - Returns truck load tiers
+  - POST /rates/admin/capacity - Creates capacity tier
+  - PATCH /rates/admin/capacity/:id - Updates capacity tier
+  - DELETE /rates/admin/capacity/:id - Deletes capacity tier
+  - POST /rates/admin/truck-loads - Creates truck load tier
+  - PATCH /rates/admin/truck-loads/:id - Updates truck load tier
+  - DELETE /rates/admin/truck-loads/:id - Deletes truck load tier
 - **New** Fee Management Endpoints
   - GET /pickup-requests/admin/emergency-fee - Returns emergency fee configuration
   - PUT /pickup-requests/admin/emergency-fee - Updates emergency fee configuration
@@ -750,9 +753,9 @@ The Billing & Subscriptions module provides a robust foundation for managing sub
   - Plan (UI): id, name, description, billingType, billingCycle, pickupCount, binCount, price, color, subscriberCount, isActive
   - Plan (API): id, name, description, type, pickups, bins, billingCycle, price, badgeColor, subscriberCount, isActive, createdAt, updatedAt
   - **New** Active Tier Display: Enhanced table structure with color-coded billing type badges and interactive hover effects
-- Rate (UI/API): id, customerTypeId, estimatedQuantityId, rate, effectiveDate, note, isActive, createdAt, updatedAt
-- Transfer (UI): id, customer, paymentType, amount, reference, submitted
-- **New** Subscription Types: Comprehensive TypeScript definitions for dual pricing model support (plan vs calculated)
+- **Updated** Rate Management Interfaces
+  - CapacityTier: id, capacityLiters, prepayRate, postpayRate, isActive, createdAt, updatedAt
+  - TruckLoadTier: id, label, prepayRate, postpayRate, binEquivalent, displayOrder, isActive, createdAt, updatedAt
 - **New** Fee Management Interfaces
   - EmergencyFeeConfig: id, fee, isActive, createdAt, updatedAt
   - DeliveryFeeConfig: id, zoneId, zoneName, fee, freeDeliveryMinQuantity, isActive, createdAt, updatedAt

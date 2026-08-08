@@ -1,29 +1,73 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
 
-const customer = {
-  id: 'CUST-2025-1',
-  name: 'Sarah Johnson',
-  phone: '(555) 123-4567',
-  outstandingCount: 2,
-  totalDue: 90,
-  invoices: [
-    { id: 'INV-2026-002', description: 'Monthly Subscription', date: '2026-03-01', amount: 45, status: 'pending' },
-    { id: 'INV-2026-003', description: 'Monthly Subscription', date: '2026-02-01', amount: 45, status: 'overdue' },
-  ],
+const route = useRoute()
+const invoiceId = route.params.id as string
+const api = useApi()
+const toast = useAppToast()
+
+// ── Types ────────────────────────────────────────────────────────────────────
+
+interface InvoiceItem {
+  id: string
+  description: string
+  quantity: number
+  unitPrice: number
+  amount: number
 }
+
+interface InvoiceDetail {
+  id: string
+  invoiceNumber: string
+  customerId: string
+  type: string
+  status: string
+  issueDate: string
+  dueDate: string
+  paidAt: string | null
+  subtotal: number
+  taxRate: number
+  taxAmount: number
+  totalAmount: number
+  currency: string
+  paymentMethod: string | null
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+  items: InvoiceItem[]
+  customer?: {
+    id: string
+    name: string
+    email: string
+    address: string | null
+    phoneNumber: string
+  } | null
+}
+
+// ── State ────────────────────────────────────────────────────────────────────
+
+const invoice = ref<InvoiceDetail | null>(null)
+const pageLoading = ref(true)
+const pageError = ref<string | null>(null)
+
+// Derived convenience refs (populated once invoice is loaded)
+const customerName = computed(() => invoice.value?.customer?.name ?? 'Customer')
+const customerPhone = computed(() => invoice.value?.customer?.phoneNumber ?? '—')
+const customerId = computed(() => invoice.value?.customerId ?? '—')
+const totalDue = computed(() => invoice.value?.totalAmount ?? 0)
+const currency = computed(() => invoice.value?.currency ?? 'GHS')
+const alreadyPaid = computed(() => invoice.value?.status === 'paid')
 
 // Payment form state
 const paymentMode = ref<'cash' | 'momo'>('cash')
 const telco = ref('')
 const momoNumber = ref('')
-const customAmount = ref<string>(String(customer.totalDue))
 const paid = ref(false)
-const loading = ref(false)
+const payLoading = ref(false)
 
-// MoMo pending state
-const COUNTDOWN_SECS = 600 // 10 minutes
+// MoMo pending state (sent prompt, waiting for customer approval)
 const awaitingMomo = ref(false)
+const COUNTDOWN_SECS = 600 // 10 minutes
 const countdown = ref(COUNTDOWN_SECS)
 let countdownTimer: ReturnType<typeof setInterval> | null = null
 
@@ -42,7 +86,7 @@ function startCountdown() {
     if (countdown.value <= 0) {
       clearInterval(countdownTimer!)
       awaitingMomo.value = false
-      // timed out — back to form
+      toast.warning('Payment prompt expired. Please try again.')
     }
   }, 1000)
 }
@@ -61,38 +105,77 @@ const telcos = [
   { value: 'airteltigo', label: 'AirtelTigo', fullLabel: 'AirtelTigo Money',  color: '#0066cc', textColor: '#0066cc' },
 ]
 
-const amountValid = computed(() => {
-  const v = parseFloat(customAmount.value)
-  return !isNaN(v) && v > 0
-})
+const amountValid = computed(() => totalDue.value > 0)
 
 const momoValid = computed(() => {
   if (paymentMode.value !== 'momo') return true
   return telco.value !== '' && /^0\d{9}$/.test(momoNumber.value)
 })
 
-const canPay = computed(() => amountValid.value && momoValid.value)
+const canPay = computed(() => amountValid.value && momoValid.value && !alreadyPaid.value)
 
-function handlePayment() {
-  if (!canPay.value) return
+// ── API ───────────────────────────────────────────────────────────────────────
+
+async function fetchInvoice() {
+  pageLoading.value = true
+  pageError.value = null
+  try {
+    const data = await api.get<InvoiceDetail>(`/invoices/admin/${invoiceId}`, 'Failed to load invoice')
+    if (data) {
+      invoice.value = data
+      // Pre-fill paid state if invoice is already settled
+      if (data.status === 'paid') paid.value = true
+    } else {
+      pageError.value = 'Invoice not found.'
+    }
+  } catch {
+    pageError.value = 'Failed to load invoice. Please try again.'
+  } finally {
+    pageLoading.value = false
+  }
+}
+
+async function handlePayment() {
+  if (!canPay.value || payLoading.value) return
+
   if (paymentMode.value === 'momo') {
-    // Send prompt to phone — show waiting screen
-    awaitingMomo.value = true
-    startCountdown()
-    // Simulate approval after 5s for demo
-    setTimeout(() => {
-      if (awaitingMomo.value) {
-        clearInterval(countdownTimer!)
-        awaitingMomo.value = false
-        paid.value = true
+    // Trigger real BluPay mobile-money prompt via the API
+    payLoading.value = true
+    try {
+      const result = await api.post<{ success: boolean; message: string }>(
+        `/invoices/admin/${invoiceId}/initiate-payment`,
+        {},
+        'Failed to initiate payment'
+      )
+      if (result?.success) {
+        toast.success('Payment prompt sent', 'Check your phone and approve the prompt.')
+        awaitingMomo.value = true
+        startCountdown()
       }
-    }, 5000)
+    } catch {
+      // error handled by useErrorHandler
+    } finally {
+      payLoading.value = false
+    }
   } else {
-    loading.value = true
-    setTimeout(() => {
-      loading.value = false
-      paid.value = true
-    }, 1200)
+    // Cash payment — mark invoice as paid via status update
+    payLoading.value = true
+    try {
+      const result = await api.patch<InvoiceDetail>(
+        `/invoices/admin/${invoiceId}/status`,
+        { status: 'paid', paymentMethod: 'Cash' },
+        'Failed to record cash payment'
+      )
+      if (result) {
+        invoice.value = result
+        paid.value = true
+        toast.success('Payment recorded', 'Invoice marked as paid.')
+      }
+    } catch {
+      // error handled by useErrorHandler
+    } finally {
+      payLoading.value = false
+    }
   }
 }
 
@@ -102,12 +185,36 @@ function statusColor(s: string) {
 }
 
 const selectedTelco = computed(() => telcos.find(t => t.value === telco.value))
+
+// ── Lifecycle ────────────────────────────────────────────────────────────────
+
+onMounted(() => {
+  fetchInvoice()
+})
 </script>
 
 <template>
   <div style="min-height:100vh;background:#f8f9fa;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;font-family:'Manrope',sans-serif">
 
-    <div style="background:white;border-radius:24px;box-shadow:0 4px 24px rgba(0,0,0,0.08);width:100%;max-width:480px;overflow:hidden">
+    <!-- Page loading skeleton -->
+    <div v-if="pageLoading" style="background:white;border-radius:24px;box-shadow:0 4px 24px rgba(0,0,0,0.08);width:100%;max-width:480px;overflow:hidden;padding:40px 32px;text-align:center">
+      <UIcon name="i-lucide-loader-2" style="width:32px;height:32px;color:#ffb400;animation:spin 1s linear infinite;margin:0 auto 12px;display:block" />
+      <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">Loading invoice...</p>
+    </div>
+
+    <!-- Page error state -->
+    <div v-else-if="pageError" style="background:white;border-radius:24px;box-shadow:0 4px 24px rgba(0,0,0,0.08);width:100%;max-width:480px;overflow:hidden;padding:40px 32px;text-align:center">
+      <UIcon name="i-lucide-circle-alert" style="width:40px;height:40px;color:#ef4444;margin:0 auto 12px;display:block" />
+      <p style="font-size:16px;font-weight:700;color:#111;margin:0 0 8px">Unable to Load Invoice</p>
+      <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0 0 20px">{{ pageError }}</p>
+      <button
+        style="height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:600;color:#7a5c00;font-family:'Manrope',sans-serif;cursor:pointer"
+        @click="fetchInvoice"
+      >Try Again</button>
+    </div>
+
+    <!-- Main card -->
+    <div v-else style="background:white;border-radius:24px;box-shadow:0 4px 24px rgba(0,0,0,0.08);width:100%;max-width:480px;overflow:hidden">
 
       <!-- Header -->
       <div style="background:#ffb400;padding:28px 32px 24px">
@@ -129,58 +236,55 @@ const selectedTelco = computed(() => telcos.find(t => t.value === telco.value))
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div>
               <p style="font-size:11px;color:#6b7280;margin:0;text-transform:uppercase;letter-spacing:0.05em">Name</p>
-              <p style="font-size:14px;font-weight:600;color:#111;margin:3px 0 0">{{ customer.name }}</p>
+              <p style="font-size:14px;font-weight:600;color:#111;margin:3px 0 0">{{ customerName }}</p>
             </div>
             <div>
-              <p style="font-size:11px;color:#6b7280;margin:0;text-transform:uppercase;letter-spacing:0.05em">Customer ID</p>
-              <p style="font-size:14px;font-weight:600;color:#111;margin:3px 0 0">{{ customer.id }}</p>
+              <p style="font-size:11px;color:#6b7280;margin:0;text-transform:uppercase;letter-spacing:0.05em">Invoice</p>
+              <p style="font-size:14px;font-weight:600;color:#111;margin:3px 0 0">{{ invoice?.invoiceNumber ?? '—' }}</p>
             </div>
             <div>
               <p style="font-size:11px;color:#6b7280;margin:0;text-transform:uppercase;letter-spacing:0.05em">Phone</p>
-              <p style="font-size:14px;font-weight:600;color:#111;margin:3px 0 0">{{ customer.phone }}</p>
+              <p style="font-size:14px;font-weight:600;color:#111;margin:3px 0 0">{{ customerPhone }}</p>
             </div>
           </div>
         </div>
 
         <!-- Welcome -->
         <p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 20px">
-          Welcome, <strong>{{ customer.name.split(' ')[0] }}</strong>! Pay your outstanding bill by pressing or clicking on the <strong>"Make a Payment"</strong> button below. Thank you!
+          Welcome, <strong>{{ customerName.split(' ')[0] }}</strong>! Pay your outstanding bill by pressing or clicking on the <strong>"Make a Payment"</strong> button below. Thank you!
         </p>
 
-        <!-- Summary tiles -->
+        <!-- Summary tile: total due -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
           <div style="background:#fff9e6;border:1px solid rgba(255,180,0,0.2);border-radius:14px;padding:14px 16px;text-align:center">
-            <p style="font-size:28px;font-weight:700;color:#ffb400;margin:0;line-height:1">{{ customer.outstandingCount }}</p>
-            <p style="font-size:12px;color:#6b7280;margin:4px 0 0">Outstanding Owed</p>
+            <p style="font-size:22px;font-weight:700;color:#ffb400;margin:0;line-height:1;text-transform:capitalize">{{ invoice?.type?.replace('_', ' ') ?? '—' }}</p>
+            <p style="font-size:12px;color:#6b7280;margin:4px 0 0">Invoice Type</p>
           </div>
           <div style="background:#fef2f2;border:1px solid rgba(239,68,68,0.2);border-radius:14px;padding:14px 16px;text-align:center">
-            <p style="font-size:22px;font-weight:700;color:#ef4444;margin:0;line-height:1">GHS {{ customer.totalDue }}</p>
+            <p style="font-size:22px;font-weight:700;color:#ef4444;margin:0;line-height:1">{{ currency }} {{ totalDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</p>
             <p style="font-size:12px;color:#6b7280;margin:4px 0 0">Total Amount Due</p>
           </div>
         </div>
 
-        <!-- Invoice list -->
-        <div style="border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;margin-bottom:20px">
+        <!-- Invoice line items -->
+        <div v-if="invoice?.items?.length" style="border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;margin-bottom:20px">
           <div style="background:#f8f9fa;padding:10px 16px;border-bottom:1px solid #e5e7eb">
             <p style="font-size:13px;font-weight:600;color:#111;margin:0">Payment Details</p>
           </div>
           <div
-            v-for="(inv, i) in customer.invoices"
-            :key="inv.id"
-            :style="`padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;${i < customer.invoices.length - 1 ? 'border-bottom:1px solid #e5e7eb' : ''}`"
+            v-for="(item, i) in invoice.items"
+            :key="item.id"
+            :style="`padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;${i < invoice!.items.length - 1 ? 'border-bottom:1px solid #e5e7eb' : ''}`"
           >
             <div>
-              <p style="font-size:13px;font-weight:500;color:#111;margin:0">{{ inv.description }}</p>
-              <p style="font-size:12px;color:#6b7280;margin:2px 0 0">{{ inv.id }} · {{ inv.date }}</p>
+              <p style="font-size:13px;font-weight:500;color:#111;margin:0">{{ item.description }}</p>
+              <p style="font-size:12px;color:#6b7280;margin:2px 0 0">Qty: {{ item.quantity }}</p>
             </div>
-            <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
-              <span :style="`font-size:12px;font-weight:500;border-radius:20px;padding:2px 10px;color:${statusColor(inv.status).color};background:${statusColor(inv.status).bg};border:1px solid ${statusColor(inv.status).border}`">{{ inv.status }}</span>
-              <span style="font-size:14px;font-weight:600;color:#111">GHS {{ inv.amount }}</span>
-            </div>
+            <span style="font-size:14px;font-weight:600;color:#111;flex-shrink:0">{{ currency }} {{ item.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
           </div>
         </div>
 
-        <!-- Payment form (hidden after success) -->
+        <!-- Payment form (hidden after success or while awaiting MoMo) -->
         <template v-if="!paid && !awaitingMomo">
 
           <!-- Payment mode toggle -->
@@ -231,32 +335,23 @@ const selectedTelco = computed(() => telcos.find(t => t.value === telco.value))
             </div>
           </template>
 
-          <!-- Amount -->
-          <p style="font-size:13px;font-weight:600;color:#111;margin:0 0 8px">Amount (GHS)</p>
-          <div style="position:relative;margin-bottom:20px">
-            <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:14px;font-weight:600;color:#6b7280;pointer-events:none">GHS</span>
-            <input
-              v-model="customAmount"
-              type="number"
-              min="1"
-              :placeholder="`${customer.totalDue}`"
-              style="width:100%;height:44px;padding:0 14px 0 52px;border:1px solid #e5e7eb;border-radius:12px;font-size:15px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;background:white"
-              @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
-              @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
-            />
+          <!-- Amount display (read-only from invoice) -->
+          <div style="background:#f8f9fa;border-radius:12px;padding:14px 16px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:13px;font-weight:500;color:#6b7280">Amount to Pay</span>
+            <span style="font-size:18px;font-weight:700;color:#111">{{ currency }} {{ totalDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
           </div>
 
           <!-- CTA -->
           <button
-            :disabled="loading || !canPay"
+            :disabled="payLoading || !canPay"
             :style="`width:100%;height:48px;background:${canPay ? '#22c55e' : '#d1d5db'};border:none;border-radius:14px;font-size:15px;font-weight:600;color:white;font-family:'Manrope',sans-serif;cursor:${canPay ? 'pointer' : 'not-allowed'};display:flex;align-items:center;justify-content:center;gap:8px;transition:background 0.15s`"
             @click="handlePayment"
-            @mouseover="canPay && !loading && (($event.currentTarget as HTMLElement).style.background='#16a34a')"
+            @mouseover="canPay && !payLoading && (($event.currentTarget as HTMLElement).style.background='#16a34a')"
             @mouseleave="($event.currentTarget as HTMLElement).style.background = canPay ? '#22c55e' : '#d1d5db'"
           >
-            <UIcon v-if="!loading" name="i-lucide-credit-card" style="width:18px;height:18px;color:white" />
-            <UIcon v-else name="i-lucide-loader" style="width:18px;height:18px;color:white;animation:spin 1s linear infinite" />
-            {{ loading ? 'Processing...' : `Pay GHS ${customAmount || customer.totalDue}` }}
+            <UIcon v-if="!payLoading" name="i-lucide-credit-card" style="width:18px;height:18px;color:white" />
+            <UIcon v-else name="i-lucide-loader-2" style="width:18px;height:18px;color:white;animation:spin 1s linear infinite" />
+            {{ payLoading ? 'Processing...' : `Pay ${currency} ${totalDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }}
           </button>
 
         </template>
@@ -295,7 +390,7 @@ const selectedTelco = computed(() => telcos.find(t => t.value === telco.value))
             </div>
           </div>
 
-          <p style="font-size:12px;color:#9ca3af;margin:0 0 20px">Amount: <strong style="color:#111">GHS {{ customAmount }}</strong></p>
+          <p style="font-size:12px;color:#9ca3af;margin:0 0 20px">Amount: <strong style="color:#111">{{ currency }} {{ totalDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong></p>
 
           <button
             style="width:100%;height:44px;background:white;border:2px solid #e5e7eb;border-radius:14px;font-size:14px;font-weight:600;color:#ef4444;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"
@@ -313,7 +408,7 @@ const selectedTelco = computed(() => telcos.find(t => t.value === telco.value))
           <UIcon name="i-lucide-check-circle" style="width:40px;height:40px;color:#22c55e;margin-bottom:10px" />
           <p style="font-size:16px;font-weight:700;color:#22c55e;margin:0">Payment Successful!</p>
           <p style="font-size:13px;color:#6b7280;margin:6px 0 20px">
-            GHS {{ customAmount }} received via {{ paymentMode === 'momo' ? `${selectedTelco?.fullLabel} (${momoNumber})` : 'Cash' }}. Thank you!
+            {{ currency }} {{ totalDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }} recorded via {{ paymentMode === 'momo' ? `${selectedTelco?.fullLabel} (${momoNumber})` : 'Cash' }}. Thank you!
           </p>
           <NuxtLink to="/" style="text-decoration:none">
             <button
