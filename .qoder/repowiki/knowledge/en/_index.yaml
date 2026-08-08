@@ -3,11 +3,11 @@ schema_version: 1
 locale: en-US
 branch: main
 nodes_managed: true
-exported_at: "2026-08-02T04:00:30Z"
+exported_at: "2026-08-08T04:41:38Z"
 modules:
     "":
-        dir_name: Lacarte Atlas Console (Nuxt 4 App)
-        title: Lacarte Atlas Console (Nuxt 4 App)
+        dir_name: Lacarte Atlas Console (Nuxt App Root)
+        title: Lacarte Atlas Console (Nuxt App Root)
         scope:
             - README.md
             - .gitignore

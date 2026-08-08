@@ -42,6 +42,10 @@ interface PickupRequestDetail {
     description: string
     binCount?: number | null
   }
+  pricingMode?: 'per_bin' | 'full_truck'
+  truckLoadRateId?: string | null
+  truckLoadLabel?: string | null
+  loadAdjustedAt?: string | null
   assignment: {
     id: string
     scheduledDate: string
@@ -291,6 +295,24 @@ const activityLog = computed(() => {
 // Actions
 const showReassignModal = ref(false)
 const showCancelConfirm = ref(false)
+const showAdjustLoadModal = ref(false)
+const assignDriverModalRef = ref<{ submitting: boolean } | null>(null)
+
+const { hasPermission } = usePermissions()
+
+const canAdjustLoad = computed(() => {
+  if (!pickup.value) return false
+  if (!hasPermission('pickups.manage')) return false
+  const status = pickup.value.status.toLowerCase()
+  if (status === 'completed' || status === 'cancelled') return false
+  if (pickupData.value?.loadAdjustedAt) return false
+  return true
+})
+
+function handleAdjustLoadSuccess() {
+  fetchPickupDetails()
+  fetchActivityLog()
+}
 
 async function startTrip() {
   try {
@@ -432,6 +454,10 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
     await fetchActivityLog()
   } catch (err: any) {
     console.error('Error assigning/reassigning driver:', err)
+    // Reset submitting state so user can retry
+    if (assignDriverModalRef.value) {
+      assignDriverModalRef.value.submitting = false
+    }
   }
 }
 </script>
@@ -540,12 +566,17 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
           >Complete Trip</button>
 
           <!-- Track Driver — shown when truck_dispatched, en_route, picked_up, or assigned -->
-          <button
+          <NuxtLink
             v-if="['assigned', 'truck_dispatched', 'en_route', 'picked_up'].includes(pickup.status.toLowerCase())"
-            style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
-            @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
-            @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
-          >Track Driver</button>
+            to="/tracking"
+            style="text-decoration:none"
+          >
+            <button
+              style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
+              @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
+              @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
+            >Track Driver</button>
+          </NuxtLink>
 
           <!-- Reassign — shown when pending/assigned/truck_dispatched -->
           <button
@@ -564,6 +595,15 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
             @mouseleave="($event.currentTarget as HTMLElement).style.background='rgba(239,68,68,0.1)'"
             @click="showCancelConfirm = true"
           >Cancel</button>
+
+          <!-- Adjust Load — shown when eligible -->
+          <button
+            v-if="canAdjustLoad"
+            style="height:40px;padding:0 16px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.2);border-radius:20px;font-size:14px;font-weight:500;color:#a855f7;font-family:'Manrope',sans-serif;cursor:pointer"
+            @mouseover="($event.currentTarget as HTMLElement).style.background='rgba(168,85,247,0.18)'"
+            @mouseleave="($event.currentTarget as HTMLElement).style.background='rgba(168,85,247,0.1)'"
+            @click="showAdjustLoadModal = true"
+          >Adjust Load</button>
         </div>
       </div>
     </div>
@@ -722,6 +762,7 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
   <!-- Reassign modal (reuse AssignDriverModal) -->
   <AssignDriverModal
     v-if="showReassignModal && pickup"
+    ref="assignDriverModalRef"
     :request="{
       id: pickup.id,
       customer: pickup.customer,
@@ -765,6 +806,18 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
       </div>
     </div>
   </div>
+
+  <!-- Adjust Load modal -->
+  <AdjustLoadModal
+    v-if="showAdjustLoadModal && pickupData"
+    :pickup-id="pickupData.id"
+    :pricing-mode="pickupData.pricingMode ?? 'per_bin'"
+    :current-bins="pickupData.customer.noBins"
+    :booked-truck-load-rate-id="pickupData.truckLoadRateId ?? null"
+    :booked-truck-load-label="pickupData.truckLoadLabel ?? null"
+    @close="showAdjustLoadModal = false"
+    @success="handleAdjustLoadSuccess"
+  />
 
 </template>
 

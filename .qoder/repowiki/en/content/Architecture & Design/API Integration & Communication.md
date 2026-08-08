@@ -13,6 +13,9 @@
 - [login.vue](file://app/pages/login.vue)
 - [auth.ts](file://app/types/auth.ts)
 - [billing index.vue](file://app/pages/billing/index.vue)
+- [billing [id].vue](file://app/pages/billing/[id].vue)
+- [CreateInvoiceModal.vue](file://app/components/CreateInvoiceModal.vue)
+- [UpdateInvoiceStatusModal.vue](file://app/components/UpdateInvoiceStatusModal.vue)
 - [pickup-management.vue](file://app/pages/management/pickup-management.vue)
 </cite>
 
@@ -24,6 +27,7 @@
 - Implemented responsive design considerations across API components
 - Added performance optimization strategies including caching and efficient API calls
 - Extended coverage to billing and pickup modules with consistent patterns
+- **Updated**: Extended useApi composable with new invoice endpoints including POST requests for invoice creation and PATCH requests for status updates, maintaining consistency with existing API patterns
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -49,6 +53,7 @@ This document explains the application's enhanced API integration patterns and c
 - Consistent error processing and user feedback through useErrorHandler and the toast notification system
 - Performance optimization through caching, efficient API calls, and responsive design considerations
 - Module-specific implementations across billing and pickup modules with consistent patterns
+- **Updated**: Extended invoice management capabilities with POST endpoints for invoice creation and PATCH endpoints for status updates
 
 The goal is to provide a clear, consistent approach for all pages and components to interact with backend services while maintaining robust UX, predictable behavior, and optimal performance.
 
@@ -63,6 +68,9 @@ The enhanced API integration layer is implemented as Nuxt composables, TypeScrip
 - UI Components:
   - AppToast.vue and ToastContainer.vue: render toasts with animations and progress indicators
   - PageSkeleton.vue: standardized loading state management with skeleton loaders
+- **Updated**: Invoice Management Components:
+  - CreateInvoiceModal.vue: handles invoice creation with POST requests
+  - UpdateInvoiceStatusModal.vue: manages invoice status updates with PATCH requests
 
 ```mermaid
 graph TB
@@ -80,23 +88,27 @@ subgraph "UI Components"
 G["AppToast.vue"]
 H["ToastContainer.vue"]
 I["PageSkeleton.vue"]
+J["CreateInvoiceModal.vue"]
+K["UpdateInvoiceStatusModal.vue"]
 end
 subgraph "Modules"
-J["Billing Module"]
-K["Pickup Module"]
-L["Customer Module"]
+L["Billing Module"]
+M["Pickup Module"]
+N["Customer Module"]
 end
 A --> B
 B --> C
 C --> G
 C --> H
 A --> D
-D --> J
-D --> K
 D --> L
-I --> J
-I --> K
+D --> M
+D --> N
 I --> L
+I --> M
+I --> N
+J --> L
+K --> L
 ```
 
 **Diagram sources**
@@ -106,7 +118,10 @@ I --> L
 - [AppToast.vue](file://app/components/AppToast.vue)
 - [ToastContainer.vue](file://app/components/ToastContainer.vue)
 - [PageSkeleton.vue](file://app/components/PageSkeleton.vue)
+- [CreateInvoiceModal.vue](file://app/components/CreateInvoiceModal.vue)
+- [UpdateInvoiceStatusModal.vue](file://app/components/UpdateInvoiceStatusModal.vue)
 - [billing index.vue](file://app/pages/billing/index.vue)
+- [billing [id].vue](file://app/pages/billing/[id].vue)
 - [pickup-management.vue](file://app/pages/management/pickup-management.vue)
 
 **Section sources**
@@ -116,6 +131,8 @@ I --> L
 - [AppToast.vue](file://app/components/AppToast.vue)
 - [ToastContainer.vue](file://app/components/ToastContainer.vue)
 - [PageSkeleton.vue](file://app/components/PageSkeleton.vue)
+- [CreateInvoiceModal.vue](file://app/components/CreateInvoiceModal.vue)
+- [UpdateInvoiceStatusModal.vue](file://app/components/UpdateInvoiceStatusModal.vue)
 
 ## Core Components
 - useApi
@@ -136,12 +153,16 @@ I --> L
 - PageSkeleton Component
   - Standardized loading state management with customizable skeleton layouts
   - Improves perceived performance during API calls
+- **Updated**: Invoice Management Components
+  - CreateInvoiceModal.vue: Creates invoices via POST requests with customer selection, line items, and tax calculations
+  - UpdateInvoiceStatusModal.vue: Updates invoice status via PATCH requests with payment method validation
 
 Typical usage pattern:
 - Use api.get/post/put/patch/del with descriptive titles for error toasts
 - For custom flows, call run(() => ..., 'title') to leverage centralized error handling
 - For direct control, use api.request(path, options)
 - Integrate PageSkeleton for consistent loading states
+- **Updated**: Utilize invoice-specific modals for CRUD operations with proper validation and user feedback
 
 **Section sources**
 - [useApi.ts](file://app/composables/useApi.ts)
@@ -150,6 +171,8 @@ Typical usage pattern:
 - [AppToast.vue](file://app/components/AppToast.vue)
 - [ToastContainer.vue](file://app/components/ToastContainer.vue)
 - [PageSkeleton.vue](file://app/components/PageSkeleton.vue)
+- [CreateInvoiceModal.vue](file://app/components/CreateInvoiceModal.vue)
+- [UpdateInvoiceStatusModal.vue](file://app/components/UpdateInvoiceStatusModal.vue)
 
 ## Architecture Overview
 The enhanced API flow integrates authentication, request/response handling, user feedback, and loading states:
@@ -214,6 +237,7 @@ Usage examples across the app:
 - PATCH to update resource states
 - POST to create resources
 - Direct sign-in flow using signIn helper
+- **Updated**: Invoice-specific operations including creation and status updates
 
 **Section sources**
 - [useApi.ts](file://app/composables/useApi.ts)
@@ -436,6 +460,58 @@ Recommended enhancements:
 
 Note: These recommendations are conceptual and not tied to specific repository code.
 
+### **Updated**: Invoice Management Workflows
+
+#### POST Create Invoice
+- Uses CreateInvoiceModal component for invoice creation
+- Validates customer selection, line items, and tax rates
+- Calls api.post to '/invoices/admin/' with structured payload
+- Shows success toast with invoice number and refreshes billing data
+
+```mermaid
+sequenceDiagram
+participant Modal as "CreateInvoiceModal.vue"
+participant Api as "useApi.post"
+participant Billing as "billing/index.vue"
+participant Toast as "useAppToast"
+Modal->>Modal : Validate form (customer, items, tax)
+Modal->>Api : post("/invoices/admin/", payload, "Failed to create invoice")
+Api-->>Modal : { id, invoiceNumber }
+Modal->>Toast : success("Invoice {invoiceNumber} created")
+Modal->>Billing : emit('created')
+Billing->>Billing : Refresh invoices, KPIs, stats, revenue, aging
+```
+
+**Diagram sources**
+- [CreateInvoiceModal.vue:141-167](file://app/components/CreateInvoiceModal.vue#L141-L167)
+- [billing index.vue:76-86](file://app/pages/billing/index.vue#L76-L86)
+- [useApi.ts:77-78](file://app/composables/useApi.ts#L77-L78)
+
+#### PATCH Update Invoice Status
+- Uses UpdateInvoiceStatusModal component for status management
+- Validates payment method requirement for paid invoices
+- Calls api.patch to '/invoices/admin/{id}/status' with status and payment method
+- Updates invoice state and shows confirmation toast
+
+```mermaid
+sequenceDiagram
+participant Modal as "UpdateInvoiceStatusModal.vue"
+participant Api as "useApi.patch"
+participant Detail as "billing/[id].vue"
+participant Toast as "useAppToast"
+Modal->>Modal : Validate status and payment method
+Modal->>Api : patch("/invoices/admin/{id}/status", { status, paymentMethod }, "Failed to update invoice status")
+Api-->>Modal : updated invoice object
+Modal->>Toast : success("Invoice marked as {status}")
+Modal->>Detail : emit('updated', invoice)
+Detail->>Detail : Replace invoice with updated version
+```
+
+**Diagram sources**
+- [UpdateInvoiceStatusModal.vue:30-49](file://app/components/UpdateInvoiceStatusModal.vue#L30-L49)
+- [billing [id].vue:118-125](file://app/pages/billing/[id].vue#L118-L125)
+- [useApi.ts:81-82](file://app/composables/useApi.ts#L81-L82)
+
 ## TypeScript Interface Definitions
 
 ### Centralized Type Safety
@@ -445,6 +521,7 @@ The enhanced API integration includes comprehensive TypeScript interfaces for:
 - Error response formats
 - Pagination metadata
 - User authentication types
+- **Updated**: Invoice-specific interfaces for detailed invoice objects, line items, and customer information
 
 Benefits:
 - Compile-time type checking prevents runtime errors
@@ -457,10 +534,13 @@ Example interface patterns:
 - Typed pagination responses
 - Specific domain models for billing and pickup entities
 - Error response structures with user-friendly messages
+- **Updated**: InvoiceDetail, InvoiceItem, InvoiceCustomer interfaces for comprehensive invoice management
 
 **Section sources**
 - [auth.ts:47-51](file://app/types/auth.ts#L47-L51)
 - [billing index.vue](file://app/pages/billing/index.vue)
+- [billing [id].vue:25-45](file://app/pages/billing/[id].vue#L25-L45)
+- [CreateInvoiceModal.vue:10-21](file://app/components/CreateInvoiceModal.vue#L10-L21)
 - [pickup-management.vue](file://app/pages/management/pickup-management.vue)
 
 ## Loading State Management
@@ -471,16 +551,20 @@ The enhanced system includes standardized loading state management using PageSke
 - Customizable skeleton layouts for different content types
 - Smooth transitions between loading and loaded states
 - Performance optimization through lazy loading
+- **Updated**: Invoice-specific loading states for creation forms and status updates
 
 Implementation patterns:
 - Wrap API calls with skeleton loading states
 - Configure skeleton layouts based on content type
 - Handle loading states in composables for reusability
 - Optimize skeleton rendering for better performance
+- **Updated**: Loading states for customer selection, line item management, and invoice submission
 
 **Section sources**
 - [PageSkeleton.vue](file://app/components/PageSkeleton.vue)
 - [billing index.vue](file://app/pages/billing/index.vue)
+- [billing [id].vue:171-191](file://app/pages/billing/[id].vue#L171-L191)
+- [CreateInvoiceModal.vue:206-240](file://app/components/CreateInvoiceModal.vue#L206-L240)
 - [pickup-management.vue](file://app/pages/management/pickup-management.vue)
 
 ## Enhanced Error Handling
@@ -491,6 +575,7 @@ The enhanced error handling system provides:
 - Categorized error responses (network, server, validation)
 - Consistent error presentation across the application
 - Better debugging information for developers
+- **Updated**: Invoice-specific validation errors for customer selection, line items, and payment methods
 
 Error categories:
 - Network errors: Connection issues, timeouts, offline status
@@ -498,10 +583,13 @@ Error categories:
 - Validation errors: Input validation failures
 - Authentication errors: Session expired, unauthorized access
 - Business logic errors: Domain-specific validation failures
+- **Updated**: Invoice validation errors including required fields, numeric constraints, and business rules
 
 **Section sources**
 - [useErrorHandler.ts](file://app/composables/useErrorHandler.ts)
 - [useApi.ts](file://app/composables/useApi.ts)
+- [CreateInvoiceModal.vue:119-139](file://app/components/CreateInvoiceModal.vue#L119-L139)
+- [UpdateInvoiceStatusModal.vue:30-36](file://app/components/UpdateInvoiceStatusModal.vue#L30-L36)
 
 ## Performance Optimization
 
@@ -512,6 +600,7 @@ The enhanced system includes performance optimizations:
 - Debounced search and filter operations
 - Efficient data transformation and mapping
 - Memory management for large datasets
+- **Updated**: Optimized invoice data fetching with pagination and selective field loading
 
 Caching strategies:
 - In-memory caching for short-lived data
@@ -524,10 +613,13 @@ Efficient API call patterns:
 - Conditional fetching based on dependencies
 - Lazy loading for large datasets
 - Pagination and virtual scrolling
+- **Updated**: Efficient customer loading with pagination limits and search filtering
 
 **Section sources**
 - [useApi.ts](file://app/composables/useApi.ts)
 - [billing index.vue](file://app/pages/billing/index.vue)
+- [billing [id].vue](file://app/pages/billing/[id].vue)
+- [CreateInvoiceModal.vue:73-95](file://app/components/CreateInvoiceModal.vue#L73-L95)
 - [pickup-management.vue](file://app/pages/management/pickup-management.vue)
 
 ## Module-Specific Implementations
@@ -538,12 +630,15 @@ The billing module implements consistent API patterns:
 - Standardized loading states with skeleton loaders
 - Consistent error handling with user-friendly feedback
 - Performance optimization through caching and efficient queries
+- **Updated**: Complete invoice management workflow with creation, status updates, and detailed views
 
 Key features:
 - Invoice management with proper loading states
 - Payment processing with error handling
 - Subscription management with real-time updates
 - Reporting with optimized data fetching
+- **Updated**: Invoice creation modal with customer search, line items, and tax calculations
+- **Updated**: Status update modal with payment method validation and real-time updates
 
 ### Pickup Module
 The pickup module follows the same enhanced patterns:
@@ -560,6 +655,9 @@ Key features:
 
 **Section sources**
 - [billing index.vue](file://app/pages/billing/index.vue)
+- [billing [id].vue](file://app/pages/billing/[id].vue)
+- [CreateInvoiceModal.vue](file://app/components/CreateInvoiceModal.vue)
+- [UpdateInvoiceStatusModal.vue](file://app/components/UpdateInvoiceStatusModal.vue)
 - [pickup-management.vue](file://app/pages/management/pickup-management.vue)
 
 ## Dependency Analysis
@@ -575,7 +673,10 @@ useApi --> PageSkeleton["PageSkeleton.vue"]
 PageSkeleton --> BillingModule["Billing Module"]
 PageSkeleton --> PickupModule["Pickup Module"]
 PageSkeleton --> CustomerModule["Customer Module"]
-BillingModule --> useApi
+BillingModule --> CreateInvoiceModal["CreateInvoiceModal.vue"]
+BillingModule --> UpdateInvoiceStatusModal["UpdateInvoiceStatusModal.vue"]
+CreateInvoiceModal --> useApi
+UpdateInvoiceStatusModal --> useApi
 PickupModule --> useApi
 CustomerModule --> useApi
 ```
@@ -587,7 +688,10 @@ CustomerModule --> useApi
 - [AppToast.vue](file://app/components/AppToast.vue)
 - [ToastContainer.vue](file://app/components/ToastContainer.vue)
 - [PageSkeleton.vue](file://app/components/PageSkeleton.vue)
+- [CreateInvoiceModal.vue](file://app/components/CreateInvoiceModal.vue)
+- [UpdateInvoiceStatusModal.vue](file://app/components/UpdateInvoiceStatusModal.vue)
 - [billing index.vue](file://app/pages/billing/index.vue)
+- [billing [id].vue](file://app/pages/billing/[id].vue)
 - [pickup-management.vue](file://app/pages/management/pickup-management.vue)
 
 **Section sources**
@@ -597,7 +701,10 @@ CustomerModule --> useApi
 - [AppToast.vue](file://app/components/AppToast.vue)
 - [ToastContainer.vue](file://app/components/ToastContainer.vue)
 - [PageSkeleton.vue](file://app/components/PageSkeleton.vue)
+- [CreateInvoiceModal.vue](file://app/components/CreateInvoiceModal.vue)
+- [UpdateInvoiceStatusModal.vue](file://app/components/UpdateInvoiceStatusModal.vue)
 - [billing index.vue](file://app/pages/billing/index.vue)
+- [billing [id].vue](file://app/pages/billing/[id].vue)
 - [pickup-management.vue](file://app/pages/management/pickup-management.vue)
 
 ## Performance Considerations
@@ -610,6 +717,7 @@ Enhanced performance strategies:
 - Implement skeleton loaders for improved perceived performance
 - Use optimistic updates for better user experience
 - Monitor and optimize bundle size for API-related code
+- **Updated**: Optimize invoice data fetching with selective field loading and efficient customer search
 
 [No sources needed since this section provides general guidance]
 
@@ -630,11 +738,17 @@ Common scenarios and strategies:
   - Review caching strategies and implement appropriate cache invalidation
   - Monitor network requests and optimize payload sizes
   - Use skeleton loaders to improve perceived performance
+- **Updated**: Invoice-specific issues:
+  - Customer search performance: Ensure pagination limits are set appropriately
+  - Line item validation: Check for proper numeric input handling and validation
+  - Status update conflicts: Verify payment method requirements for paid invoices
 
 **Section sources**
 - [useApi.ts](file://app/composables/useApi.ts)
 - [useErrorHandler.ts](file://app/composables/useErrorHandler.ts)
 - [PageSkeleton.vue](file://app/components/PageSkeleton.vue)
+- [CreateInvoiceModal.vue:119-139](file://app/components/CreateInvoiceModal.vue#L119-L139)
+- [UpdateInvoiceStatusModal.vue:30-36](file://app/components/UpdateInvoiceStatusModal.vue#L30-L36)
 
 ## Conclusion
 The application employs an enhanced, centralized API integration strategy:
@@ -645,6 +759,7 @@ The application employs an enhanced, centralized API integration strategy:
 - TypeScript interfaces ensure type safety across all API interactions
 - Performance optimizations through caching and efficient API calls
 - Consistent patterns across billing and pickup modules
+- **Updated**: Extended invoice management capabilities with robust POST and PATCH operations for complete invoice lifecycle management
 
 Adopting the recommended enhancements for retries, timeouts, file uploads, and real-time features will further improve resilience and user experience.
 
@@ -660,6 +775,11 @@ Adopting the recommended enhancements for retries, timeouts, file uploads, and r
 - del~T~(path, title?): DELETE request with type-safe responses
 - signIn(email, password, rememberMe): Typed sign-in returning SignInResponse
 - request~T~(path, options): Raw fetch wrapper for advanced scenarios
+- **Updated**: Invoice-specific endpoints:
+  - POST /invoices/admin/: Create new invoice with customer, items, and tax details
+  - PATCH /invoices/admin/{id}/status: Update invoice status with optional payment method
+  - POST /invoices/admin/{id}/send: Send invoice to customer
+  - POST /invoices/admin/{id}/initiate-payment: Initiate payment collection
 
 ### TypeScript Interface Patterns
 - Generic response wrapper with data and metadata
@@ -667,9 +787,18 @@ Adopting the recommended enhancements for retries, timeouts, file uploads, and r
 - Specific domain models for billing and pickup entities
 - Error response structures with user-friendly messages
 - Authentication types and user profiles
+- **Updated**: Invoice management interfaces:
+  - InvoiceDetail: Complete invoice object with items, customer, and financial details
+  - InvoiceItem: Individual line item with description, quantity, and pricing
+  - InvoiceCustomer: Customer information for invoice billing
+  - InvoiceCreationPayload: Structured data for invoice creation
+  - InvoiceStatusUpdatePayload: Data structure for status modifications
 
 **Section sources**
 - [useApi.ts](file://app/composables/useApi.ts)
 - [auth.ts:47-51](file://app/types/auth.ts#L47-L51)
 - [billing index.vue](file://app/pages/billing/index.vue)
+- [billing [id].vue:25-45](file://app/pages/billing/[id].vue#L25-L45)
+- [CreateInvoiceModal.vue:10-21](file://app/components/CreateInvoiceModal.vue#L10-L21)
+- [UpdateInvoiceStatusModal.vue:2-9](file://app/components/UpdateInvoiceStatusModal.vue#L2-L9)
 - [pickup-management.vue](file://app/pages/management/pickup-management.vue)

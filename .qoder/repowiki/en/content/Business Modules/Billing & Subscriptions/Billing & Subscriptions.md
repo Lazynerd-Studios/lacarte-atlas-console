@@ -12,6 +12,8 @@
 - [SetShopZoneFeeModal.vue](file://app/components/SetShopZoneFeeModal.vue)
 - [EmergencyFeeCard.vue](file://app/components/EmergencyFeeCard.vue)
 - [SetEmergencyFeeModal.vue](file://app/components/SetEmergencyFeeModal.vue)
+- [CreateInvoiceModal.vue](file://app/components/CreateInvoiceModal.vue)
+- [UpdateInvoiceStatusModal.vue](file://app/components/UpdateInvoiceStatusModal.vue)
 - [useApi.ts](file://app/composables/useApi.ts)
 - [useCurrency.ts](file://app/composables/useCurrency.ts)
 - [rateValidation.ts](file://app/utils/rateValidation.ts)
@@ -20,13 +22,13 @@
 
 ## Update Summary
 **Changes Made**
-- Added comprehensive active subscription tiers display with dual pricing model support (prepaid/postpaid)
-- Implemented enhanced subscriber count tracking with real-time API integration
-- Integrated new API endpoint `/subscription/admin/plans?status=active` for fetching active plans
-- Added color-coded billing type badges and interactive table interface
-- Enhanced subscription management with improved data visualization and user experience
-- **Updated** Enhanced shop zone fee management with backend compatibility workarounds and simplified currency presentation
-- **Updated** Removed pesewas display complexity in favor of direct GHS formatting across all fee components
+- **Added** New InvoiceStats interface with comprehensive invoice statistics including totalInvoices, pendingCount, overdueCount, totalRevenue, pendingAmount, and overdueAmount
+- **Implemented** fetchInvoiceStats() function for /invoices/admin/stats endpoint integration
+- **Enhanced** billing dashboard with improved KPI displays and new invoice statistics section
+- **Updated** invoice list table with enhanced type badges for subscription, pay-as-you-go, store order, and manual invoices
+- **Improved** error handling and loading states throughout the billing workflow
+- **Enhanced** CreateInvoiceModal with customer search functionality and line item management
+- **Updated** UpdateInvoiceStatusModal with payment method selection and status validation
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -43,7 +45,7 @@
 ## Introduction
 This document provides comprehensive documentation for the Billing and Subscription management system within the application. It covers payment processing workflows, subscription plan management, rate configuration, billing cycle handling, invoice generation, payment status tracking, subscription tier management, and revenue analytics integration. The system is implemented as a Nuxt 3 frontend with Vue 3 components that interact with backend APIs via a centralized API composable.
 
-**Updated** The billing system has undergone a major enhancement including complete transition from mock data to live API integration, comprehensive TypeScript interface definitions for all data models, enhanced invoice management with PDF download and send capabilities, robust error handling, sophisticated loading state management throughout the entire billing workflow, the addition of comprehensive active subscription tiers display with dual pricing model support, and enhanced shop zone fee management with simplified currency presentation and backend compatibility workarounds.
+**Updated** The billing system has undergone significant enhancements including the addition of comprehensive invoice statistics through the new InvoiceStats interface, improved KPI displays with real-time data fetching, enhanced invoice list table with color-coded type badges, and robust error handling throughout the entire billing workflow. The system now provides detailed invoice metrics including total invoices, pending counts, overdue amounts, and revenue tracking.
 
 ## Project Structure
 The billing and subscriptions features are organized by pages and utilities:
@@ -57,8 +59,8 @@ The billing and subscriptions features are organized by pages and utilities:
 ```mermaid
 graph TB
 subgraph "Billing"
-BIndex["Billing Dashboard<br/>Real-time KPIs, Server-side Pagination, Dynamic Charts"]
-BDetail["Invoice Detail<br/>PDF Download, Send Invoice, Enhanced Actions"]
+BIndex["Billing Dashboard<br/>Real-time KPIs, Invoice Stats, Server-side Pagination"]
+BDetail["Invoice Detail<br/>PDF Download, Send Invoice, Status Updates"]
 end
 subgraph "Management"
 SubPlans["Subscription Plans<br/>CRUD, stats, toggle, Active Tiers Display"]
@@ -93,30 +95,32 @@ Fees --> Types
 ```
 
 **Diagram sources**
-- [billing/index.vue:1-599](file://app/pages/billing/index.vue#L1-L599)
-- [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
+- [billing/index.vue:1-687](file://app/pages/billing/index.vue#L1-L687)
+- [billing/[id].vue:1-379](file://app/pages/billing/[id].vue#L1-L379)
 - [management/subscriptions.vue:1-1055](file://app/pages/management/subscriptions.vue#L1-L1055)
 - [management/rates.vue:1-882](file://app/pages/management/rates.vue#L1-L882)
 - [management/fees.vue:1-259](file://app/pages/management/fees.vue#L1-L259)
-- [pay/[id].vue](file://app/pages/pay/[id].vue#L1-L353)
-- [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
+- [pay/[id].vue:1-353](file://app/pages/pay/[id].vue#L1-L353)
+- [useApi.ts:1-95](file://app/composables/useApi.ts#L1-L95)
 - [useCurrency.ts:1-12](file://app/composables/useCurrency.ts#L1-L12)
 - [rateValidation.ts:1-69](file://app/utils/rateValidation.ts#L1-L69)
 
 **Section sources**
-- [billing/index.vue:1-599](file://app/pages/billing/index.vue#L1-L599)
-- [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
+- [billing/index.vue:1-687](file://app/pages/billing/index.vue#L1-L687)
+- [billing/[id].vue:1-379](file://app/pages/billing/[id].vue#L1-L379)
 - [management/subscriptions.vue:1-1055](file://app/pages/management/subscriptions.vue#L1-L1055)
 - [management/rates.vue:1-882](file://app/pages/management/rates.vue#L1-L882)
 - [management/fees.vue:1-259](file://app/pages/management/fees.vue#L1-L259)
-- [pay/[id].vue](file://app/pages/pay/[id].vue#L1-L353)
-- [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
+- [pay/[id].vue:1-353](file://app/pages/pay/[id].vue#L1-L353)
+- [useApi.ts:1-95](file://app/composables/useApi.ts#L1-L95)
 - [useCurrency.ts:1-12](file://app/composables/useCurrency.ts#L1-L12)
 - [rateValidation.ts:1-69](file://app/utils/rateValidation.ts#L1-L69)
 
 ## Core Components
-- **Billing Dashboard**: Real-time KPI display with skeleton loading, searchable paginated invoices with server-side filtering, dynamic revenue breakdown charts, and SVG-based payment aging visualization. Features comprehensive error handling and loading states.
-- **Enhanced Invoice Detail**: Shows invoice metadata, line items, totals, and comprehensive actions including PDF download functionality, send invoice feature, and enhanced error handling with loading states.
+- **Enhanced Billing Dashboard**: Real-time KPI display with skeleton loading, comprehensive invoice statistics through InvoiceStats interface, searchable paginated invoices with server-side filtering, dynamic revenue breakdown charts, and SVG-based payment aging visualization. Features enhanced type badges for different invoice categories and robust error handling.
+- **Enhanced Invoice Detail**: Shows invoice metadata, line items, totals, and comprehensive actions including PDF download functionality, send invoice feature, status updates, and BluPay payment initiation. Includes robust error handling with loading states.
+- **Enhanced Invoice Creation Modal**: Full-featured modal for creating invoices with customer search, line item management, tax calculations, and validation. Supports multiple line items with automatic subtotal and total calculations.
+- **Enhanced Invoice Status Management**: Modal for updating invoice status with payment method selection and validation. Supports all invoice statuses and enforces payment method requirement for paid invoices.
 - **Enhanced Subscription Plan Management**: Full CRUD for prepaid/postpaid plans with billing cycles, pricing, feature counts, active toggling, statistics, and comprehensive active subscription tiers display with dual pricing model support.
 - **Enhanced Fee Management**: Manages both emergency pickup fees and shop delivery fees with simplified currency presentation, backend compatibility workarounds, and consistent user experience across both fee types.
 - Rate Management: Configures pay-as-you-go pickup rates per customer type and estimated quantity tiers with effective dates and notes.
@@ -128,16 +132,18 @@ Key shared utilities:
 - rateValidation: Validates and transforms rate form data into API payloads.
 - **Updated** Comprehensive TypeScript interfaces for Invoice, Customer, Items, and Subscription structures providing compile-time type safety.
 
-**Updated** The billing system now includes comprehensive TypeScript interfaces for all data models, enhanced invoice management with PDF download and send capabilities, sophisticated loading state management, robust error handling throughout the entire component lifecycle, the addition of comprehensive active subscription tiers display with enhanced subscriber count tracking and dual pricing model support, and enhanced shop zone fee management with simplified currency presentation and backend compatibility workarounds.
+**Updated** The billing system now includes comprehensive TypeScript interfaces for all data models, enhanced invoice management with PDF download and send capabilities, sophisticated loading state management, robust error handling throughout the entire component lifecycle, the addition of comprehensive invoice statistics through the new InvoiceStats interface, enhanced active subscription tiers display with enhanced subscriber count tracking and dual pricing model support, and enhanced shop zone fee management with simplified currency presentation and backend compatibility workarounds.
 
 **Section sources**
-- [billing/index.vue:1-599](file://app/pages/billing/index.vue#L1-L599)
-- [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
+- [billing/index.vue:1-687](file://app/pages/billing/index.vue#L1-L687)
+- [billing/[id].vue:1-379](file://app/pages/billing/[id].vue#L1-L379)
+- [CreateInvoiceModal.vue:1-372](file://app/components/CreateInvoiceModal.vue#L1-L372)
+- [UpdateInvoiceStatusModal.vue:1-112](file://app/components/UpdateInvoiceStatusModal.vue#L1-L112)
 - [management/subscriptions.vue:1-1055](file://app/pages/management/subscriptions.vue#L1-L1055)
 - [management/rates.vue:1-882](file://app/pages/management/rates.vue#L1-L882)
 - [management/fees.vue:1-259](file://app/pages/management/fees.vue#L1-L259)
-- [pay/[id].vue](file://app/pages/pay/[id].vue#L1-L353)
-- [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
+- [pay/[id].vue:1-353](file://app/pages/pay/[id].vue#L1-L353)
+- [useApi.ts:1-95](file://app/composables/useApi.ts#L1-L95)
 - [useCurrency.ts:1-12](file://app/composables/useCurrency.ts#L1-L12)
 - [rateValidation.ts:1-69](file://app/utils/rateValidation.ts#L1-L69)
 
@@ -149,6 +155,8 @@ sequenceDiagram
 participant Admin as "Admin UI"
 participant BillingPage as "Billing Dashboard"
 participant InvoiceDetail as "Invoice Detail View"
+participant InvoiceCreation as "Create Invoice Modal"
+participant StatusUpdate as "Status Update Modal"
 participant SubPlans as "Subscription Plans"
 participant FeeManagement as "Fee Management"
 participant API as "useApi Composable"
@@ -158,19 +166,37 @@ BillingPage->>API : GET /invoices/admin/billing/kpis
 API->>Backend : HTTP GET
 Backend-->>API : { totalOutstanding, subscriptionRevenue, paygRevenue, avgCollectionTimeDays }
 API-->>BillingPage : KPI data with loading states
+BillingPage->>API : GET /invoices/admin/stats
+API->>Backend : HTTP GET for invoice statistics
+Backend-->>API : { totalInvoices, pendingCount, overdueCount, totalRevenue, pendingAmount, overdueAmount }
+API-->>BillingPage : Invoice stats with separate loading state
 Admin->>InvoiceDetail : Open /billing/ : id
-InvoiceDetail->>API : GET /invoices/ : id
+InvoiceDetail->>API : GET /invoices/admin/ : id
 API->>Backend : HTTP GET with auth headers
 Backend-->>API : { invoice, customer, items[] }
 API-->>InvoiceDetail : Complete invoice data with TypeScript validation
-InvoiceDetail->>API : POST /invoices/ : id/download-pdf
+InvoiceDetail->>API : POST /invoices/admin/ : id/pdf
 API->>Backend : HTTP POST for PDF generation
 Backend-->>API : PDF binary response
 API-->>InvoiceDetail : Downloadable PDF file
-InvoiceDetail->>API : POST /invoices/ : id/send
+InvoiceDetail->>API : POST /invoices/admin/ : id/send
 API->>Backend : HTTP POST to send invoice email
 Backend-->>API : { success : true, message : "Invoice sent" }
 API-->>InvoiceDetail : Success confirmation with toast notification
+Admin->>InvoiceCreation : Open create invoice modal
+InvoiceCreation->>API : GET /customer/admin/list (search customers)
+API->>Backend : HTTP GET for customer list
+Backend-->>API : { data : Customer[], pagination }
+API-->>InvoiceCreation : Customer options with search
+InvoiceCreation->>API : POST /invoices/admin/ (create invoice)
+API->>Backend : HTTP POST with invoice data
+Backend-->>API : { id, invoiceNumber }
+API-->>InvoiceCreation : Success with invoice number
+Admin->>StatusUpdate : Open status update modal
+StatusUpdate->>API : PATCH /invoices/admin/ : id/status
+API->>Backend : HTTP PATCH with status and payment method
+Backend-->>API : { updated invoice data }
+API-->>StatusUpdate : Updated invoice with new status
 Admin->>SubPlans : Open /management/subscriptions
 SubPlans->>API : GET /subscription/admin/plans?type={prepaid|postpaid}
 API->>Backend : HTTP GET with type filter
@@ -196,28 +222,40 @@ API-->>FeeManagement : Success responses with simplified currency handling
 ```
 
 **Diagram sources**
-- [billing/index.vue:21-38](file://app/pages/billing/index.vue#L21-L38)
-- [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
+- [billing/index.vue:21-66](file://app/pages/billing/index.vue#L21-L66)
+- [billing/[id].vue:58-116](file://app/pages/billing/[id].vue#L58-L116)
+- [CreateInvoiceModal.vue:73-167](file://app/components/CreateInvoiceModal.vue#L73-L167)
+- [UpdateInvoiceStatusModal.vue:30-49](file://app/components/UpdateInvoiceStatusModal.vue#L30-L49)
 - [management/subscriptions.vue:153-285](file://app/pages/management/subscriptions.vue#L153-L285)
 - [management/fees.vue:58-107](file://app/pages/management/fees.vue#L58-L107)
-- [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
+- [useApi.ts:1-95](file://app/composables/useApi.ts#L1-L95)
 
 ## Detailed Component Analysis
 
-### Billing Dashboard
-**Updated** The billing dashboard has been completely transformed from static mock data to a fully dynamic, API-integrated system with real-time data fetching, comprehensive loading states, and robust error handling.
+### Enhanced Billing Dashboard
+**Updated** The billing dashboard has been significantly enhanced with comprehensive invoice statistics through the new InvoiceStats interface, improved KPI displays, and enhanced invoice list table with type badges.
 
-#### Real-time KPI Data Fetching
+#### New Invoice Statistics Interface
+- **InvoiceStats Interface**: Defines totalInvoices, pendingCount, overdueCount, totalRevenue, pendingAmount, and overdueAmount fields
+- **fetchInvoiceStats Function**: Implements GET request to `/invoices/admin/stats` endpoint with dedicated loading state management
+- **Separate Loading State**: Uses `statsLoading` ref to manage invoice statistics loading independently from other data
+- **Error Handling**: Comprehensive try-catch blocks with user-friendly error messages for statistics loading failures
+
+#### Enhanced KPI Data Fetching
 - **KPI Interface**: `BillingKpis` interface defines totalOutstanding, subscriptionRevenue, paygRevenue, and avgCollectionTimeDays
 - **Loading States**: Skeleton animations displayed during data fetch with kpisLoading ref
 - **Error Handling**: Comprehensive try-catch blocks with user-friendly error messages
 - **Data Transformation**: Direct mapping from API response to reactive state
 
-#### Server-side Invoice Pagination
-- **Pagination Interface**: `InvoicePagination` interface with page, limit, total, totalPages, hasNextPage, hasPreviousPage
+#### Enhanced Invoice List with Type Badges
+- **Type Badge System**: Color-coded badges for different invoice types:
+  - Subscription (blue): `rgba(59,130,246,0.1)` background with blue border
+  - Pay-as-you-go (green): `rgba(34,197,94,0.1)` background with green border  
+  - Store Order (purple): `rgba(139,92,246,0.1)` background with purple border
+  - Manual (gray): `rgba(107,114,128,0.1)` background with gray border
+- **Server-side Invoice Pagination**: `InvoicePagination` interface with page, limit, total, totalPages, hasNextPage, hasPreviousPage
 - **Search Integration**: Immediate API calls on search input changes with automatic page reset
 - **URL Parameters**: Proper URLSearchParams construction for server-side filtering
-- **State Management**: Separate loading state (invoiceLoading) for invoice operations
 
 #### Dynamic Revenue Breakdown
 - **Revenue Interface**: `RevenueBreakdown` interface with monthlySubscriptions, payAsYouGo, outstanding fields
@@ -231,31 +269,27 @@ API-->>FeeManagement : Success responses with simplified currency handling
 - **Color Coding**: Green (current), yellow (1-30 days), orange (31-60 days), red (60+ days)
 - **Responsive Design**: Adapts to zero values with empty chart state
 
-#### Enhanced Search Functionality
-- **Immediate API Calls**: Search triggers instant server requests without debounce
-- **Automatic Pagination Reset**: Search resets to page 1 automatically
-- **Client-side Fallback**: Local filtering for transfers while invoices use server-side search
-
 **New Features**:
-- **Skeleton Loading Animations**: CSS-based pulse animations for better perceived performance
+- **Invoice Statistics Section**: New grid of 4 stat cards showing total invoices, total revenue, pending amount, and overdue amount
+- **Enhanced Loading States**: Separate loading indicators for KPIs and invoice statistics
 - **TypeScript Interfaces**: Complete type safety for all API responses and local state
 - **Comprehensive Error Handling**: User-friendly error messages with toast notifications
-- **Loading State Management**: Separate loading states for different data sources
+- **Loading State Management**: Independent loading states for different data sources
 
 **Section sources**
-- [billing/index.vue:6-31](file://app/pages/billing/index.vue#L6-L31)
-- [billing/index.vue:102-179](file://app/pages/billing/index.vue#L102-L179)
-- [billing/index.vue:181-215](file://app/pages/billing/index.vue#L181-L215)
-- [billing/index.vue:217-261](file://app/pages/billing/index.vue#L217-L261)
-- [billing/index.vue:588-598](file://app/pages/billing/index.vue#L588-L598)
+- [billing/index.vue:6-66](file://app/pages/billing/index.vue#L6-L66)
+- [billing/index.vue:147-224](file://app/pages/billing/index.vue#L147-L224)
+- [billing/index.vue:226-312](file://app/pages/billing/index.vue#L226-L312)
+- [billing/index.vue:314-330](file://app/pages/billing/index.vue#L314-L330)
+- [billing/index.vue:378-398](file://app/pages/billing/index.vue#L378-L398)
 
 ### Enhanced Invoice Detail
-**Updated** The invoice detail view has been significantly enhanced with comprehensive invoice data management, PDF download functionality, send invoice feature, and robust error handling with loading states.
+**Updated** The invoice detail view has been significantly enhanced with comprehensive invoice data management, PDF download functionality, send invoice feature, status updates, and BluPay payment initiation capabilities.
 
 #### Comprehensive Invoice Data Model
-- **Invoice Interface**: Complete TypeScript definition with id, status, from, billTo, invoiceDate, dueDate, paymentMethod, items[], subtotal, tax, taxRate, total
-- **Customer Interface**: Structured customer data with name, address, email, phone, and company information
-- **Items Interface**: Detailed line item structure with description, quantity, unitPrice, and total calculations
+- **InvoiceDetail Interface**: Complete TypeScript definition with id, invoiceNumber, customerId, type, status, issueDate, dueDate, paidAt, subtotal, taxRate, taxAmount, totalAmount, currency, paymentMethod, notes, createdAt, updatedAt, items[], customer
+- **InvoiceItem Interface**: Detailed line item structure with description, quantity, unitPrice, and amount
+- **InvoiceCustomer Interface**: Structured customer data with name, email, address, phoneNumber
 - **Type Safety**: All data structures enforced through TypeScript interfaces for compile-time validation
 
 #### PDF Download Functionality
@@ -270,26 +304,104 @@ API-->>FeeManagement : Success responses with simplified currency handling
 - **User Feedback**: Toast notifications confirming successful invoice delivery
 - **Error Management**: Comprehensive error handling for email delivery failures
 
+#### Enhanced Status Management
+- **Status Update Modal**: Integrated modal for updating invoice status with payment method selection
+- **Validation**: Enforces payment method requirement when marking invoices as paid
+- **Real-time Updates**: Immediate reflection of status changes in the UI
+- **Toast Notifications**: User feedback for successful status updates
+
+#### BluPay Payment Initiation
+- **Payment Prompt**: Sends mobile money collection prompts to customers for eligible invoices
+- **Eligibility Check**: Only works for pending/overdue invoices of types: subscription, pay_as_you_go, store_order
+- **Loading States**: Visual feedback during payment prompt initiation
+- **Success Handling**: Toast notifications for successful payment prompt delivery
+
 #### Enhanced Loading States
-- **Loading Indicators**: Visual feedback during PDF generation and email sending operations
+- **Loading Indicators**: Visual feedback during PDF generation, email sending, and status update operations
 - **Button States**: Disabled states during async operations to prevent duplicate submissions
 - **Progress Feedback**: User-friendly loading messages for long-running operations
 
-#### Robust Error Handling
-- **Network Errors**: Comprehensive error handling for network connectivity issues
-- **Server Errors**: Graceful handling of backend errors with user-friendly messages
-- **Validation Errors**: Client-side validation before API calls to prevent unnecessary requests
-- **Retry Logic**: Automatic retry mechanisms for transient failures
-
 **New Capabilities**:
-- **Action Buttons**: Download PDF and Send Invoice buttons with proper loading states
+- **Action Buttons**: Download PDF, Send Invoice, Request Payment, and Update Status buttons with proper loading states
 - **Status Badges**: Visual indicators for invoice status with appropriate styling
 - **Address Display**: Formatted From/Bill To addresses with proper layout
 - **Line Item Tables**: Detailed line item display with quantities, prices, and totals
 - **Summary Calculations**: Automatic subtotal, tax, and total calculations
 
 **Section sources**
-- [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
+- [billing/[id].vue:9-45](file://app/pages/billing/[id].vue#L9-L45)
+- [billing/[id].vue:58-116](file://app/pages/billing/[id].vue#L58-L116)
+- [billing/[id].vue:118-149](file://app/pages/billing/[id].vue#L118-L149)
+- [billing/[id].vue:151-159](file://app/pages/billing/[id].vue#L151-L159)
+
+### Enhanced Invoice Creation Modal
+**Updated** The invoice creation modal provides comprehensive functionality for creating new invoices with customer search, line item management, and automatic calculations.
+
+#### Customer Search and Selection
+- **Search Functionality**: Real-time customer search by name or phone number
+- **Dropdown Interface**: Auto-complete dropdown with customer suggestions
+- **Pagination Support**: Handles large customer lists with pagination
+- **Selection Management**: Proper state management for selected customer
+
+#### Line Item Management
+- **Dynamic Items**: Ability to add and remove multiple line items
+- **Automatic Calculations**: Real-time subtotal, tax amount, and total calculations
+- **Validation**: Ensures each line item has description, valid quantity, and non-negative price
+- **Visual Feedback**: Clear indication of item count and validation errors
+
+#### Form Validation and Submission
+- **Comprehensive Validation**: Validates customer selection, tax rate range, and line item requirements
+- **Error Handling**: Displays specific error messages for validation failures
+- **Submission State**: Loading indicator during invoice creation
+- **Success Handling**: Toast notification with invoice number confirmation
+
+#### Enhanced User Experience
+- **Intuitive Layout**: Organized form sections with clear labels and help text
+- **Real-time Feedback**: Live preview of calculations as users modify inputs
+- **Accessibility**: Proper form controls with appropriate ARIA attributes
+- **Responsive Design**: Mobile-friendly layout with adaptive spacing
+
+**New Features**:
+- **Customer Search Dropdown**: Advanced search with filtering and selection
+- **Multi-line Item Support**: Add unlimited line items with individual validation
+- **Tax Rate Configuration**: Flexible tax rate input with validation
+- **Notes Field**: Optional notes field with character counter
+- **Auto-calculated Totals**: Real-time subtotal, tax, and total calculations
+
+**Section sources**
+- [CreateInvoiceModal.vue:10-95](file://app/components/CreateInvoiceModal.vue#L10-L95)
+- [CreateInvoiceModal.vue:103-167](file://app/components/CreateInvoiceModal.vue#L103-L167)
+- [CreateInvoiceModal.vue:169-180](file://app/components/CreateInvoiceModal.vue#L169-L180)
+
+### Enhanced Invoice Status Update Modal
+**Updated** The status update modal provides comprehensive functionality for managing invoice status and payment methods with proper validation.
+
+#### Status Management
+- **Status Options**: Supports all invoice statuses: draft, pending, paid, overdue, cancelled, void
+- **Current Status Display**: Shows current invoice status and number
+- **Real-time Updates**: Immediate reflection of status changes in parent component
+
+#### Payment Method Selection
+- **Method Options**: Cash, Bank Transfer, Mobile Money, USSD
+- **Validation**: Requires payment method selection when marking invoice as paid
+- **Pre-selection**: Automatically selects matching payment method if available
+- **Error Handling**: Clear error message when payment method is required but not provided
+
+#### Form Validation and Submission
+- **Conditional Validation**: Enforces payment method requirement only for paid status
+- **Submission State**: Loading indicator during status update
+- **Success Handling**: Toast notification confirming status update
+- **Data Refresh**: Updates parent component with new invoice data
+
+**New Features**:
+- **Integrated Validation**: Built-in validation for payment method requirements
+- **User-friendly Interface**: Clean modal design with clear instructions
+- **Error Messages**: Specific error messages for validation failures
+- **Accessibility**: Proper form controls with appropriate labels
+
+**Section sources**
+- [UpdateInvoiceStatusModal.vue:1-49](file://app/components/UpdateInvoiceStatusModal.vue#L1-L49)
+- [UpdateInvoiceStatusModal.vue:51-58](file://app/components/UpdateInvoiceStatusModal.vue#L51-L58)
 
 ### Enhanced Subscription Plan Management
 **Updated** The subscription plan management system has been significantly enhanced with comprehensive active subscription tiers display, dual pricing model support, and improved subscriber count tracking.
@@ -419,7 +531,7 @@ Flow:
 - Success shows confirmation and return to dashboard
 
 **Section sources**
-- [pay/[id].vue](file://app/pages/pay/[id].vue#L1-L353)
+- [pay/[id].vue:1-353](file://app/pages/pay/[id].vue#L1-L353)
 
 ## Dependency Analysis
 - Pages depend on useApi for all HTTP requests, including auth token injection and error handling.
@@ -430,6 +542,8 @@ Flow:
 - **Updated** Fee management components share common patterns for backend compatibility workarounds and simplified currency handling.
 - **New** Invoice detail view depends on comprehensive TypeScript interfaces for type-safe data handling.
 - **New** Subscription management integrates with enhanced API endpoints for active tiers display.
+- **New** Invoice creation modal depends on customer search functionality and line item management.
+- **New** Status update modal integrates with invoice status management and payment method validation.
 
 ```mermaid
 graph LR
@@ -437,6 +551,8 @@ SubPlans["subscriptions.vue"] --> Api["useApi.ts"]
 Rates["rates.vue"] --> Api
 Billing["billing/index.vue"] --> Api
 InvoiceDetail["billing/[id].vue"] --> Api
+InvoiceCreation["CreateInvoiceModal.vue"] --> Api
+StatusUpdate["UpdateInvoiceStatusModal.vue"] --> Api
 PayPortal["pay/[id].vue"] --> Api
 FeeManagement["management/fees.vue"] --> Api
 ShopZoneCard["ShopZoneFeeCard.vue"] --> Currency["useCurrency.ts"]
@@ -447,15 +563,20 @@ Rates --> Validation["rateValidation.ts"]
 SubPlans --> Currency
 Billing --> Currency
 InvoiceDetail --> Currency
+InvoiceCreation --> Currency
+StatusUpdate --> Currency
 PayPortal --> Currency
 FeeManagement --> Currency
 Billing -.-> KPIs["Billing KPIs API"]
 Billing -.-> Invoices["Invoices API"]
 Billing -.-> Revenue["Revenue Breakdown API"]
 Billing -.-> Aging["Payment Aging API"]
+Billing -.-> Stats["Invoice Stats API"]
 InvoiceDetail -.-> PDF["PDF Generation API"]
 InvoiceDetail -.-> Email["Email Service API"]
 InvoiceDetail -.-> Types["TypeScript Interfaces"]
+InvoiceCreation -.-> Customers["Customer Search API"]
+StatusUpdate -.-> StatusUpdate["Status Update API"]
 SubPlans -.-> ActiveTiers["Active Tiers API"]
 SubPlans -.-> PlanStats["Plan Statistics API"]
 SubPlans -.-> Types["Subscription Types"]
@@ -466,16 +587,18 @@ FeeManagement -.-> ShopDelivery["Shop Delivery Fee API"]
 **Diagram sources**
 - [management/subscriptions.vue:153-285](file://app/pages/management/subscriptions.vue#L153-L285)
 - [management/rates.vue:57-124](file://app/pages/management/rates.vue#L57-L124)
-- [billing/index.vue:21-38](file://app/pages/billing/index.vue#L21-L38)
-- [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
+- [billing/index.vue:21-66](file://app/pages/billing/index.vue#L21-L66)
+- [billing/[id].vue:58-116](file://app/pages/billing/[id].vue#L58-L116)
+- [CreateInvoiceModal.vue:73-167](file://app/components/CreateInvoiceModal.vue#L73-L167)
+- [UpdateInvoiceStatusModal.vue:30-49](file://app/components/UpdateInvoiceStatusModal.vue#L30-L49)
 - [management/fees.vue:58-107](file://app/pages/management/fees.vue#L58-L107)
-- [pay/[id].vue](file://app/pages/pay/[id].vue#L1-L353)
-- [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
+- [pay/[id].vue:1-353](file://app/pages/pay/[id].vue#L1-L353)
+- [useApi.ts:1-95](file://app/composables/useApi.ts#L1-L95)
 - [useCurrency.ts:1-12](file://app/composables/useCurrency.ts#L1-L12)
 - [rateValidation.ts:1-69](file://app/utils/rateValidation.ts#L1-L69)
 
 **Section sources**
-- [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
+- [useApi.ts:1-95](file://app/composables/useApi.ts#L1-L95)
 - [useCurrency.ts:1-12](file://app/composables/useCurrency.ts#L1-L12)
 - [rateValidation.ts:1-69](file://app/utils/rateValidation.ts#L1-L69)
 
@@ -491,6 +614,9 @@ FeeManagement -.-> ShopDelivery["Shop Delivery Fee API"]
 - **New** Optimized error handling reduces unnecessary re-renders during error states
 - **New** Active tiers display uses graceful degradation to avoid blocking UI on API failures
 - **New** Enhanced subscriber count tracking minimizes re-renders through computed properties
+- **New** Invoice statistics loading uses separate loading state to prevent UI blocking
+- **New** Customer search in invoice creation uses pagination to handle large customer lists efficiently
+- **New** Line item calculations are optimized with computed properties for real-time updates
 - **Updated** Simplified currency presentation reduces computational overhead in fee components
 - **Updated** Backend compatibility workarounds are handled transparently without impacting performance
 
@@ -509,6 +635,9 @@ Common issues and resolutions:
 - **New** Invoice data loading: Verify invoice ID format and ensure invoice exists in the database before attempting to load details.
 - **New** Active tiers display issues: Check console logs for API call failures and verify the `/subscription/admin/plans?status=active` endpoint is accessible.
 - **New** Subscriber count not updating: Ensure the subscription plan has valid subscriber data and check for API response format issues.
+- **New** Invoice statistics loading: Verify the `/invoices/admin/stats` endpoint is accessible and returns proper data structure.
+- **New** Invoice creation failures: Check customer search functionality and ensure customer IDs are valid.
+- **New** Status update validation: Ensure payment method is selected when marking invoice as paid.
 - **Updated** Fee management issues: Verify backend compatibility workarounds are functioning correctly and check for pesewas conversion problems.
 - **Updated** Currency display problems: Ensure useCurrency composable is properly configured and check for formatting issues in fee components.
 
@@ -522,22 +651,28 @@ Operational tips:
 - **New** Verify email service credentials and SMTP configuration for invoice sending functionality.
 - **New** Verify active tiers endpoint returns proper data structure for dual pricing model support.
 - **New** Check subscriber count data integrity in subscription plan responses.
+- **New** Test invoice statistics endpoint to ensure proper data structure and loading states.
+- **New** Verify customer search functionality handles large customer lists with pagination.
+- **New** Test invoice creation with various line item combinations and tax rates.
+- **New** Validate status update modal behavior for different invoice types and statuses.
 - **Updated** Test fee management endpoints to ensure backend compatibility workarounds are working correctly.
 - **Updated** Verify currency formatting is consistent across all fee components and check for pesewas display issues.
 
 **Section sources**
-- [useApi.ts:1-91](file://app/composables/useApi.ts#L1-L91)
+- [useApi.ts:1-95](file://app/composables/useApi.ts#L1-L95)
 - [management/subscriptions.vue:289-449](file://app/pages/management/subscriptions.vue#L289-L449)
 - [management/rates.vue:230-387](file://app/pages/management/rates.vue#L230-L387)
 - [management/fees.vue:117-207](file://app/pages/management/fees.vue#L117-L207)
-- [pay/[id].vue](file://app/pages/pay/[id].vue#L64-L97)
-- [billing/index.vue:21-31](file://app/pages/billing/index.vue#L21-L31)
-- [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
+- [pay/[id].vue:1-353](file://app/pages/pay/[id].vue#L1-L353)
+- [billing/index.vue:21-66](file://app/pages/billing/index.vue#L21-L66)
+- [billing/[id].vue:58-116](file://app/pages/billing/[id].vue#L58-L116)
+- [CreateInvoiceModal.vue:73-167](file://app/components/CreateInvoiceModal.vue#L73-L167)
+- [UpdateInvoiceStatusModal.vue:30-49](file://app/components/UpdateInvoiceStatusModal.vue#L30-L49)
 
 ## Conclusion
 The Billing & Subscriptions module provides a robust foundation for managing subscription plans, configuring pay-as-you-go rates, viewing invoices and payment statuses, and processing customer payments. The architecture leverages reusable composables for API access and currency formatting, while maintaining clear separation of concerns across pages. 
 
-**Updated** The billing system has been significantly enhanced with comprehensive TypeScript interfaces for all data models, enhanced invoice management with PDF download and send capabilities, sophisticated loading state management, robust error handling, seamless transition from mock data to live API integration, the addition of comprehensive active subscription tiers display with dual pricing model support, and enhanced shop zone fee management with simplified currency presentation and backend compatibility workarounds. The subscription management system now provides enhanced subscriber count tracking, color-coded billing type badges, and an interactive table interface for better data visualization. The fee management system offers consistent handling of both emergency and shop delivery fees with streamlined currency presentation. Future enhancements can include server-side pagination for other lists, richer analytics dashboards, deeper integrations with external payment gateways, advanced reporting capabilities, and removal of backend compatibility workarounds once backend services are updated.
+**Updated** The billing system has been significantly enhanced with comprehensive TypeScript interfaces for all data models, enhanced invoice management with PDF download and send capabilities, sophisticated loading state management, robust error handling, seamless transition from mock data to live API integration, the addition of comprehensive invoice statistics through the new InvoiceStats interface, enhanced active subscription tiers display with dual pricing model support, and enhanced shop zone fee management with simplified currency presentation and backend compatibility workarounds. The subscription management system now provides enhanced subscriber count tracking, color-coded billing type badges, and an interactive table interface for better data visualization. The fee management system offers consistent handling of both emergency and shop delivery fees with streamlined currency presentation. The invoice creation and status management modals provide comprehensive functionality for complete invoice lifecycle management. Future enhancements can include server-side pagination for other lists, richer analytics dashboards, deeper integrations with external payment gateways, advanced reporting capabilities, and removal of backend compatibility workarounds once backend services are updated.
 
 [No sources needed since this section summarizes without analyzing specific files]
 
@@ -546,12 +681,18 @@ The Billing & Subscriptions module provides a robust foundation for managing sub
 ### API Endpoints Summary
 - **Updated** Billing Dashboard Endpoints
   - GET /invoices/admin/billing/kpis - Returns real-time KPI data
+  - **New** GET /invoices/admin/stats - Returns comprehensive invoice statistics (totalInvoices, pendingCount, overdueCount, totalRevenue, pendingAmount, overdueAmount)
   - GET /invoices/admin - Returns paginated invoices with search support
   - GET /invoices/admin/billing/revenue-breakdown - Returns revenue breakdown data
   - GET /invoices/admin/billing/payment-aging - Returns payment aging analytics
-  - **New** GET /invoices/:id - Returns complete invoice data with customer and items
-  - **New** POST /invoices/:id/download-pdf - Generates and returns PDF invoice document
-  - **New** POST /invoices/:id/send - Sends invoice via email to customer
+  - **New** GET /invoices/admin/:id - Returns complete invoice data with customer and items
+  - **New** POST /invoices/admin/:id/pdf - Generates and returns PDF invoice document
+  - **New** POST /invoices/admin/:id/send - Sends invoice via email to customer
+  - **New** PATCH /invoices/admin/:id/status - Updates invoice status and payment method
+  - **New** POST /invoices/admin/:id/initiate-payment - Initiates BluPay payment prompt
+- **Updated** Invoice Creation Endpoints
+  - **New** POST /invoices/admin/ - Creates new invoice with line items
+  - **New** GET /customer/admin/list - Returns paginated customer list for search
 - **Updated** Subscription Plans
   - GET /subscription/admin/plans?type={prepaid|postpaid} - Returns plans filtered by billing type
   - **New** GET /subscription/admin/plans?status=active - Returns all active subscription tiers across both billing types
@@ -577,11 +718,13 @@ The Billing & Subscriptions module provides a robust foundation for managing sub
   - DELETE /store-orders/admin/delivery-fees/:id - Deletes shop delivery fee configuration
 
 **Section sources**
-- [billing/index.vue:21-38](file://app/pages/billing/index.vue#L21-L38)
-- [billing/index.vue:135-158](file://app/pages/billing/index.vue#L135-L158)
-- [billing/index.vue:194-204](file://app/pages/billing/index.vue#L194-204)
-- [billing/index.vue:232-242](file://app/pages/billing/index.vue#L232-242)
-- [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
+- [billing/index.vue:21-66](file://app/pages/billing/index.vue#L21-L66)
+- [billing/index.vue:180-203](file://app/pages/billing/index.vue#L180-L203)
+- [billing/index.vue:239-249](file://app/pages/billing/index.vue#L239-L249)
+- [billing/index.vue:283-293](file://app/pages/billing/index.vue#L283-L293)
+- [billing/[id].vue:58-116](file://app/pages/billing/[id].vue#L58-L116)
+- [CreateInvoiceModal.vue:73-167](file://app/components/CreateInvoiceModal.vue#L73-L167)
+- [UpdateInvoiceStatusModal.vue:30-49](file://app/components/UpdateInvoiceStatusModal.vue#L30-L49)
 - [management/subscriptions.vue:153-285](file://app/pages/management/subscriptions.vue#L153-L285)
 - [management/rates.vue:57-124](file://app/pages/management/rates.vue#L57-L124)
 - [management/fees.vue:58-107](file://app/pages/management/fees.vue#L58-L107)
@@ -589,14 +732,20 @@ The Billing & Subscriptions module provides a robust foundation for managing sub
 ### Enhanced Data Models Overview
 - **Updated** Billing Dashboard Interfaces
   - BillingKpis: totalOutstanding, subscriptionRevenue, paygRevenue, avgCollectionTimeDays
+  - **New** InvoiceStats: totalInvoices, pendingCount, overdueCount, totalRevenue, pendingAmount, overdueAmount
   - Invoice: id, invoiceNumber, customerId, customerName, type, status, issueDate, dueDate, totalAmount
   - InvoicePagination: page, limit, total, totalPages, hasNextPage, hasPreviousPage
   - RevenueBreakdown: monthlySubscriptions, payAsYouGo, outstanding
   - PaymentAging: current, days1To30, days31To60, days60Plus
 - **New** Invoice Detail Interfaces
-  - Invoice: id, status, from, billTo, invoiceDate, dueDate, paymentMethod, items[], subtotal, tax, taxRate, total
-  - Customer: name, address, email, phone, company
-  - Items: description, quantity, unitPrice, total
+  - InvoiceDetail: id, invoiceNumber, customerId, type, status, issueDate, dueDate, paidAt, subtotal, taxRate, taxAmount, totalAmount, currency, paymentMethod, notes, createdAt, updatedAt, items[], customer
+  - InvoiceItem: id, description, quantity, unitPrice, amount
+  - InvoiceCustomer: id, name, email, address, phoneNumber
+- **Updated** Invoice Creation Interfaces
+  - CustomerOption: id, name, phoneNumber, user
+  - InvoiceItemDraft: description, quantity, unitPrice
+- **Updated** Status Update Interfaces
+  - InvoiceStatusUpdate: status, paymentMethod
 - **Updated** Subscription Plan Interfaces
   - Plan (UI): id, name, description, billingType, billingCycle, pickupCount, binCount, price, color, subscriberCount, isActive
   - Plan (API): id, name, description, type, pickups, bins, billingCycle, price, badgeColor, subscriberCount, isActive, createdAt, updatedAt
@@ -611,11 +760,12 @@ The Billing & Subscriptions module provides a robust foundation for managing sub
   - **Updated** Simplified currency handling with direct GHS formatting and backend compatibility workarounds
 
 **Section sources**
-- [billing/index.vue:6-11](file://app/pages/billing/index.vue#L6-L11)
-- [billing/index.vue:102-121](file://app/pages/billing/index.vue#L102-L121)
-- [billing/index.vue:181-185](file://app/pages/billing/index.vue#L181-185)
-- [billing/index.vue:217-222](file://app/pages/billing/index.vue#L217-222)
-- [billing/[id].vue](file://app/pages/billing/[id].vue#L1-L175)
+- [billing/index.vue:6-66](file://app/pages/billing/index.vue#L6-L66)
+- [billing/index.vue:147-176](file://app/pages/billing/index.vue#L147-L176)
+- [billing/index.vue:226-273](file://app/pages/billing/index.vue#L226-L273)
+- [billing/[id].vue:9-45](file://app/pages/billing/[id].vue#L9-L45)
+- [CreateInvoiceModal.vue:10-21](file://app/components/CreateInvoiceModal.vue#L10-L21)
+- [UpdateInvoiceStatusModal.vue:2-8](file://app/components/UpdateInvoiceStatusModal.vue#L2-L8)
 - [management/subscriptions.vue:1-130](file://app/pages/management/subscriptions.vue#L1-L130)
 - [management/rates.vue:1-50](file://app/pages/management/rates.vue#L1-L50)
 - [management/fees.vue:4-44](file://app/pages/management/fees.vue#L4-L44)
