@@ -85,7 +85,7 @@ const filteredPayouts = computed(() => {
   return list
 })
 
-const totalFiltered = computed(() => filteredPayouts.value.length)
+const totalFiltered = computed(() => (filteredPayouts.value || []).length)
 
 const statusBadge = (s: string) => {
   if (s === 'paid')   return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e', label: 'Paid' }
