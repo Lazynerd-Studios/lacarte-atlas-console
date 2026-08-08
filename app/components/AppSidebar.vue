@@ -16,6 +16,7 @@ const navLinks = computed(() => [
   { label: 'Pickup Requests',    icon: 'i-lucide-package',          to: '/pickups', permission: 'pickups.view' },
   { label: 'Live Tracking',      icon: 'i-lucide-map-pin',          to: '/tracking', permission: 'tracking.view' },
   { label: 'Billing & Payments', icon: 'i-lucide-credit-card',      to: '/billing', permission: 'billing.view' },
+  { label: 'Driver Payouts',     icon: 'i-lucide-wallet-cards',     to: '/pay', permission: 'billing.view' },
   { label: 'Shop',               icon: 'i-lucide-shopping-bag',     to: '/shop', permission: 'shop.view' },
   { label: 'Inventory',          icon: 'i-lucide-boxes',            to: '/inventory', permission: 'inventory.view' },
   { label: 'Support Tickets',    icon: 'i-lucide-headphones',       to: '/support', permission: 'support.view' },

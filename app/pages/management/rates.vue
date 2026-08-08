@@ -9,6 +9,7 @@ interface CapacityTier {
   isActive: boolean
   createdAt: string
   updatedAt: string
+  note: string
 }
 
 interface TruckLoadTier {
@@ -21,6 +22,7 @@ interface TruckLoadTier {
   isActive: boolean
   createdAt: string
   updatedAt: string
+  note: string
 }
 
 const { format } = useCurrency()
@@ -41,7 +43,7 @@ async function fetchCapacityTiers() {
     'Failed to load capacity tiers'
   )
   if (response) {
-    capacityTiers.value = (response.tiers || []).sort((a, b) => a.capacityLiters - b.capacityLiters)
+    capacityTiers.value = (response.tiers || []).sort((a, b) => a.capacityLiters - b.capacityLiters).map(t => ({ ...t, note: t.note || '' }))
   }
 }
 
@@ -53,7 +55,7 @@ async function fetchTruckTiers() {
     'Failed to load truck load tiers'
   )
   if (response) {
-    truckTiers.value = (response.tiers || []).sort((a, b) => a.displayOrder - b.displayOrder)
+    truckTiers.value = (response.tiers || []).sort((a, b) => a.displayOrder - b.displayOrder).map(t => ({ ...t, note: t.note || '' }))
   }
 }
 
@@ -73,13 +75,13 @@ const totalInactive = computed(() =>
 // ── Capacity tier modal ──
 const showCapacityModal = ref(false)
 const capacityModalMode = ref<'add' | 'edit'>('add')
-const capacityForm = ref({ id: '', capacityLiters: '', prepayRate: '', postpayRate: '', isActive: true })
+const capacityForm = ref({ id: '', capacityLiters: '', prepayRate: '', postpayRate: '', isActive: true, note: '' })
 const capacityError = ref('')
 const submitting = ref(false)
 
 function openAddCapacity() {
   capacityModalMode.value = 'add'
-  capacityForm.value = { id: '', capacityLiters: '', prepayRate: '', postpayRate: '', isActive: true }
+  capacityForm.value = { id: '', capacityLiters: '', prepayRate: '', postpayRate: '', isActive: true, note: '' }
   capacityError.value = ''
   showCapacityModal.value = true
 }
@@ -92,6 +94,7 @@ function openEditCapacity(t: CapacityTier) {
     prepayRate: String(t.prepayRate),
     postpayRate: String(t.postpayRate),
     isActive: t.isActive,
+    note: t.note || '',
   }
   capacityError.value = ''
   showCapacityModal.value = true
@@ -152,12 +155,12 @@ async function handleCapacitySubmit() {
 // ── Truck load tier modal ──
 const showTruckModal = ref(false)
 const truckModalMode = ref<'add' | 'edit'>('add')
-const truckForm = ref({ id: '', label: '', prepayRate: '', postpayRate: '', binEquivalent: '', displayOrder: '0', isActive: true })
+const truckForm = ref({ id: '', label: '', prepayRate: '', postpayRate: '', binEquivalent: '', displayOrder: '0', isActive: true, note: '' })
 const truckError = ref('')
 
 function openAddTruck() {
   truckModalMode.value = 'add'
-  truckForm.value = { id: '', label: '', prepayRate: '', postpayRate: '', binEquivalent: '', displayOrder: '0', isActive: true }
+  truckForm.value = { id: '', label: '', prepayRate: '', postpayRate: '', binEquivalent: '', displayOrder: '0', isActive: true, note: '' }
   truckError.value = ''
   showTruckModal.value = true
 }
@@ -172,6 +175,7 @@ function openEditTruck(t: TruckLoadTier) {
     binEquivalent: String(t.binEquivalent),
     displayOrder: String(t.displayOrder),
     isActive: t.isActive,
+    note: t.note || '',
   }
   truckError.value = ''
   showTruckModal.value = true
@@ -404,13 +408,14 @@ onMounted(() => {
       <div v-if="activeTab === 'capacity'" style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;overflow:hidden">
         <table style="width:100%;border-collapse:collapse">
           <thead>
-            <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
-              <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Bin Capacity</th>
-              <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Prepay Rate</th>
-              <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Postpay Rate</th>
-              <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Status</th>
-              <th style="padding:14px 20px;text-align:right;font-size:13px;font-weight:600;color:#374151">Actions</th>
-            </tr>
+          <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
+            <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Bin Capacity</th>
+            <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Prepay Rate</th>
+            <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Postpay Rate</th>
+            <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Note</th>
+            <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Status</th>
+            <th style="padding:14px 20px;text-align:right;font-size:13px;font-weight:600;color:#374151">Actions</th>
+          </tr>
           </thead>
           <tbody>
             <tr v-for="t in capacityTiers" :key="t.id" style="border-bottom:1px solid #f0f0f0"
@@ -428,7 +433,10 @@ onMounted(() => {
               </td>
               <td style="padding:16px 20px">
                 <span style="font-size:15px;font-weight:700;color:#1a1a1a">{{ format(t.postpayRate) }}</span>
-                <span style="font-size:12px;color:#9ca3af;margin-left:4px">/ pickup / bin</span>
+                <span style="font-size:12px;color:#9ca3af;margin-left:4px">/ pickup / bin              </span>
+              </td>
+              <td style="padding:16px 20px">
+                <span style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">{{ t.note || '—' }}</span>
               </td>
               <td style="padding:16px 20px">
                 <span :style="`font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;background:${t.isActive ? '#dcfce7' : '#f3f4f6'};color:${t.isActive ? '#16a34a' : '#9ca3af'}`">
@@ -456,7 +464,7 @@ onMounted(() => {
               </td>
             </tr>
             <tr v-if="capacityTiers.length === 0">
-              <td colspan="5" style="padding:56px 20px;text-align:center">
+              <td colspan="6" style="padding:56px 20px;text-align:center">
                 <Icon name="lucide:layers" style="width:36px;height:36px;color:#d1d5db;margin-bottom:10px" />
                 <p style="font-size:14px;font-weight:600;color:#1a1a1a;margin:0 0 4px">No capacity tiers yet</p>
                 <p style="font-size:13px;color:#6b7280;margin:0">Add your first bin capacity tier to get started.</p>
@@ -470,15 +478,16 @@ onMounted(() => {
       <div v-if="activeTab === 'truck'" style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;overflow:hidden">
         <table style="width:100%;border-collapse:collapse">
           <thead>
-            <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
-              <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Label</th>
-              <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Prepay Rate</th>
-              <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Postpay Rate</th>
-              <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Bin Equivalent</th>
-              <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Order</th>
-              <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Status</th>
-              <th style="padding:14px 20px;text-align:right;font-size:13px;font-weight:600;color:#374151">Actions</th>
-            </tr>
+          <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
+            <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Label</th>
+            <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Prepay Rate</th>
+            <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Postpay Rate</th>
+            <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Bin Equivalent</th>
+            <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Order</th>
+            <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Note</th>
+            <th style="padding:14px 20px;text-align:left;font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Status</th>
+            <th style="padding:14px 20px;text-align:right;font-size:13px;font-weight:600;color:#374151">Actions</th>
+          </tr>
           </thead>
           <tbody>
             <tr v-for="t in truckTiers" :key="t.id" style="border-bottom:1px solid #f0f0f0"
@@ -506,6 +515,9 @@ onMounted(() => {
               </td>
               <td style="padding:16px 20px">
                 <span style="font-size:13px;color:#6b7280">{{ t.displayOrder }}</span>
+              </td>
+              <td style="padding:16px 20px">
+                <span style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">{{ t.note || '—' }}</span>
               </td>
               <td style="padding:16px 20px">
                 <span :style="`font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;background:${t.isActive ? '#dcfce7' : '#f3f4f6'};color:${t.isActive ? '#16a34a' : '#9ca3af'}`">
@@ -581,6 +593,11 @@ onMounted(() => {
               <span style="font-size:13px;font-weight:600;color:#374151">Active</span>
             </div>
 
+            <div>
+              <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Note</label>
+              <textarea v-model="capacityForm.note" rows="2" placeholder="Optional note about this tier..." style="width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;resize:vertical;box-sizing:border-box;line-height:1.5" />
+            </div>
+
             <p style="font-size:12px;color:#9ca3af;margin:0;background:#f8f9fa;border-radius:8px;padding:10px 12px">
               Only one active tier per capacity — creating a new tier for an existing capacity auto-deactivates the old one.
             </p>
@@ -646,6 +663,11 @@ onMounted(() => {
                 <span :style="`position:absolute;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;left:${truckForm.isActive ? '21px' : '3px'}`"></span>
               </button>
               <span style="font-size:13px;font-weight:600;color:#374151">Active</span>
+            </div>
+
+            <div>
+              <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Note</label>
+              <textarea v-model="truckForm.note" rows="2" placeholder="Optional note about this tier..." style="width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;resize:vertical;box-sizing:border-box;line-height:1.5" />
             </div>
           </div>
           <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px">

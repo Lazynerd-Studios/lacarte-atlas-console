@@ -192,7 +192,7 @@ function formatDateTime(dateString?: string | null): string {
 const customerSince = computed(() => formatDate(customer.value?.user.createdAt ?? customer.value?.createdAt))
 
 const activeTab = ref('Overview')
-const tabs = ['Overview', 'Pickup History', 'Billing', 'GPS Location']
+const tabs = ['Overview', 'Pickup History', 'Billing', 'GPS Location', 'Notes']
 
 const config = useRuntimeConfig()
 let gpsMap: any = null
@@ -276,6 +276,9 @@ watch(activeTab, (tab) => {
     if (pickupHistory.value.length === 0 && !pickupLoading.value) {
       fetchPickupHistory()
     }
+  }
+  if (tab === 'Notes' && customer.value) {
+    fetchNotes()
   }
 })
 
@@ -381,27 +384,61 @@ watch(() => pickupPage.value, () => {
 const billingHistory = ref<any[]>([])
 // const bins = ref<any[]>([])
 
-// Notes (disabled — no endpoint yet)
-// const customerNotes = ref<{ date: string; author: string; text: string }[]>([])
-// const staffNotes = ref<{ date: string; author: string; text: string }[]>([])
-// const newCustomerNote = ref('')
-// const newStaffNote = ref('')
+// Notes
+interface CustomerNote {
+  id: string
+  entityType: string
+  entityId: string
+  content: string
+  authorId: string
+  createdAt: string
+  updatedAt: string
+  author: { id: string; name: string; email: string }
+}
 
-// function addCustomerNote() {
-//   if (!newCustomerNote.value.trim()) return
-//   customerNotes.value.unshift({
-//     date: new Date().toISOString().slice(0, 10),
-//     author: fullName.value,
-//     text: newCustomerNote.value.trim(),
-//   })
-//   newCustomerNote.value = ''
-// }
+const notes = ref<CustomerNote[]>([])
+const notesLoading = ref(false)
+const newNote = ref('')
 
-// function addStaffNote() {
-//   if (!newStaffNote.value.trim()) return
-//   staffNotes.value.unshift({ date: new Date().toISOString().slice(0, 10), author: 'Admin', text: newStaffNote.value.trim() })
-//   newStaffNote.value = ''
-// }
+async function fetchNotes() {
+  if (!customer.value) return
+  notesLoading.value = true
+  const api = useApi()
+  try {
+    const data = await api.get<CustomerNote[]>(
+      `/customer/admin/${route.params.id}/notes`,
+      'Failed to load notes'
+    )
+    if (data) notes.value = data
+  } catch {
+    console.error('Failed to fetch notes')
+  } finally {
+    notesLoading.value = false
+  }
+}
+
+async function addNote() {
+  if (!newNote.value.trim() || !customer.value) return
+  const api = useApi()
+  const created = await api.post<CustomerNote>(
+    `/customer/admin/${route.params.id}/notes`,
+    { content: newNote.value.trim() },
+    'Failed to add note'
+  )
+  if (created) {
+    notes.value.unshift(created)
+    newNote.value = ''
+  }
+}
+
+function noteDate(dateString?: string | null): string {
+  if (!dateString) return '—'
+  try {
+    return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return dateString
+  }
+}
 </script>
 
 <template>
@@ -861,91 +898,49 @@ const billingHistory = ref<any[]>([])
           </div>
         </div>
 
-        <!-- Notes (disabled — no endpoint yet)
-        <div v-else-if="activeTab === 'Notes'" class="notes-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
-
-          <div style="display:flex;flex-direction:column;gap:16px">
-            <p style="font-size:18px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Customer Notes</p>
-            <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:-8px">Notes submitted by the customer</p>
-
-            <div style="display:flex;flex-direction:column;gap:10px">
-              <p v-if="customerNotes.length === 0" style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;text-align:center;padding:24px 0">No customer notes yet</p>
-              <div v-for="(note, i) in customerNotes" :key="i" style="background:#f8f9fa;border:1px solid #e5e7eb;border-radius:16px;padding:16px">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                  <div style="display:flex;align-items:center;gap:8px">
-                    <div style="width:28px;height:28px;border-radius:9999px;background:#3b82f6;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                      <span style="font-size:11px;font-weight:700;color:white;font-family:'Manrope',sans-serif">{{ note.author[0] }}</span>
-                    </div>
-                    <span style="font-size:13px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ note.author }}</span>
+        <!-- Notes -->
+        <div v-else-if="activeTab === 'Notes'" style="display:flex;flex-direction:column;gap:16px">
+          <div v-if="notesLoading" style="display:flex;align-items:center;justify-content:center;padding:48px">
+            <UIcon name="i-lucide-loader-2" style="width:24px;height:24px;color:#ffb400;animation:spin 1s linear infinite" />
+          </div>
+          <div v-else-if="notes.length === 0" style="text-align:center;padding:48px 24px;background:#f8f9fa;border-radius:16px">
+            <UIcon name="i-lucide-message-square" style="width:40px;height:40px;color:#d1d5db;margin-bottom:12px" />
+            <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No notes yet. Add the first note below.</p>
+          </div>
+          <div v-else style="display:flex;flex-direction:column;gap:12px">
+            <div v-for="note in notes" :key="note.id" style="background:#f8f9fa;border:1px solid #e5e7eb;border-radius:16px;padding:16px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div style="width:28px;height:28px;border-radius:9999px;background:#3b82f6;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                    <span style="font-size:11px;font-weight:700;color:white;font-family:'Manrope',sans-serif">{{ note.author.name[0] }}</span>
                   </div>
-                  <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ note.date }}</span>
+                  <span style="font-size:13px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ note.author.name }}</span>
                 </div>
-                <p style="font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;line-height:1.6;margin-left:36px">{{ note.text }}</p>
+                <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ noteDate(note.createdAt) }}</span>
               </div>
-            </div>
-
-            <div style="display:flex;flex-direction:column;gap:8px">
-              <textarea
-                v-model="newCustomerNote"
-                placeholder="Add a customer note..."
-                rows="3"
-                style="width:100%;padding:10px 12px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;resize:none;box-sizing:border-box;line-height:1.5"
-                @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
-                @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
-              />
-              <div style="display:flex;justify-content:flex-end">
-                <button
-                  style="height:36px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer"
-                  @click="addCustomerNote"
-                  @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
-                  @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
-                >Add Note</button>
-              </div>
+              <p style="font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;line-height:1.6;margin-left:36px">{{ note.content }}</p>
             </div>
           </div>
 
-          <div style="display:flex;flex-direction:column;gap:16px">
-            <p style="font-size:18px;font-weight:600;color:#111;font-family:'Manrope',sans-serif">Staff Notes</p>
-            <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:-8px">Internal notes visible to staff only</p>
-
-            <div style="display:flex;flex-direction:column;gap:10px">
-              <p v-if="staffNotes.length === 0" style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;text-align:center;padding:24px 0">No staff notes yet</p>
-              <div v-for="(note, i) in staffNotes" :key="i" style="background:#fff9e6;border:1px solid rgba(255,180,0,0.2);border-radius:16px;padding:16px">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                  <div style="display:flex;align-items:center;gap:8px">
-                    <div style="width:28px;height:28px;border-radius:9999px;background:#ffb400;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                      <span style="font-size:11px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ note.author[0] }}</span>
-                    </div>
-                    <span style="font-size:13px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ note.author }}</span>
-                  </div>
-                  <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ note.date }}</span>
-                </div>
-                <p style="font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;line-height:1.6;margin-left:36px">{{ note.text }}</p>
-              </div>
-            </div>
-
-            <div style="display:flex;flex-direction:column;gap:8px">
-              <textarea
-                v-model="newStaffNote"
-                placeholder="Add a staff note..."
-                rows="3"
-                style="width:100%;padding:10px 12px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;resize:none;box-sizing:border-box;line-height:1.5"
-                @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
-                @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
-              />
-              <div style="display:flex;justify-content:flex-end">
-                <button
-                  style="height:36px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer"
-                  @click="addStaffNote"
-                  @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
-                  @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
-                >Add Note</button>
-              </div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+            <textarea
+              v-model="newNote"
+              placeholder="Add a note..."
+              rows="3"
+              style="width:100%;padding:10px 12px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;resize:none;box-sizing:border-box;line-height:1.5"
+              @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+              @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
+            />
+            <div style="display:flex;justify-content:flex-end">
+              <button
+                style="height:36px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer"
+                @click="addNote"
+                @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
+                @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
+              >Add Note</button>
             </div>
           </div>
-
         </div>
-        -->
 
       </div>
     </div>

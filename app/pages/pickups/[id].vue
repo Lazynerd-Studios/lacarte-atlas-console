@@ -202,10 +202,19 @@ const pickup = computed(() => {
   }
 })
 
+const activeTab = ref('Details')
+const tabs = ['Details', 'Activity Log', 'Notes']
+
 // Fetch data on mount
 onMounted(() => {
   fetchPickupDetails()
   fetchActivityLog()
+})
+
+watch(activeTab, (tab) => {
+  if (tab === 'Notes' && pickupData.value) {
+    fetchNotes()
+  }
 })
 
 const statusBadge = computed(() => {
@@ -236,9 +245,6 @@ const paymentTypeLabel = computed(() => {
   if (!pickup.value) return '—'
   return pickup.value.paymentType === 'subscription' ? 'Subscription' : 'Pay as you go'
 })
-
-const activeTab = ref('Details')
-const tabs = ['Details', 'Activity Log']
 
 // Timeline steps
 const timeline = computed(() => {
@@ -291,6 +297,60 @@ const activityLog = computed(() => {
     }
   })
 })
+
+// Pickup Notes
+interface PickupNote {
+  id: string
+  entityType: string
+  entityId: string
+  content: string
+  authorId: string
+  createdAt: string
+  updatedAt: string
+  author: { id: string; name: string; email: string }
+}
+
+const notes = ref<PickupNote[]>([])
+const notesLoading = ref(false)
+const newNote = ref('')
+
+async function fetchNotes() {
+  if (!pickupData.value) return
+  notesLoading.value = true
+  try {
+    const data = await api.get<PickupNote[]>(
+      `/pickup-requests/admin/${route.params.id}/notes`,
+      'Failed to load notes'
+    )
+    if (data) notes.value = data
+  } catch {
+    console.error('Failed to fetch pickup notes')
+  } finally {
+    notesLoading.value = false
+  }
+}
+
+async function addPickupNote() {
+  if (!newNote.value.trim() || !pickupData.value) return
+  const created = await api.post<PickupNote>(
+    `/pickup-requests/admin/${route.params.id}/notes`,
+    { content: newNote.value.trim() },
+    'Failed to add note'
+  )
+  if (created) {
+    notes.value.unshift(created)
+    newNote.value = ''
+  }
+}
+
+function pickupNoteDate(dateString?: string | null): string {
+  if (!dateString) return '—'
+  try {
+    return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return dateString
+  }
+}
 
 // Actions
 const showReassignModal = ref(false)
@@ -751,6 +811,50 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
                 </tr>
               </tbody>
             </table>
+          </div>
+        </div>
+
+        <!-- Notes tab -->
+        <div v-else-if="activeTab === 'Notes'" style="display:flex;flex-direction:column;gap:16px">
+          <div v-if="notesLoading" style="display:flex;align-items:center;justify-content:center;padding:48px">
+            <UIcon name="i-lucide-loader-2" style="width:24px;height:24px;color:#ffb400;animation:spin 1s linear infinite" />
+          </div>
+          <div v-else-if="notes.length === 0" style="text-align:center;padding:48px 24px;background:#f8f9fa;border-radius:16px">
+            <UIcon name="i-lucide-message-square" style="width:40px;height:40px;color:#d1d5db;margin-bottom:12px" />
+            <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No notes yet. Add the first note below.</p>
+          </div>
+          <div v-else style="display:flex;flex-direction:column;gap:12px">
+            <div v-for="note in notes" :key="note.id" style="background:#f8f9fa;border:1px solid #e5e7eb;border-radius:16px;padding:16px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div style="width:28px;height:28px;border-radius:9999px;background:#3b82f6;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                    <span style="font-size:11px;font-weight:700;color:white;font-family:'Manrope',sans-serif">{{ note.author.name[0] }}</span>
+                  </div>
+                  <span style="font-size:13px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ note.author.name }}</span>
+                </div>
+                <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ pickupNoteDate(note.createdAt) }}</span>
+              </div>
+              <p style="font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;line-height:1.6;margin-left:36px">{{ note.content }}</p>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+            <textarea
+              v-model="newNote"
+              placeholder="Add a note..."
+              rows="3"
+              style="width:100%;padding:10px 12px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;resize:none;box-sizing:border-box;line-height:1.5"
+              @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+              @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
+            />
+            <div style="display:flex;justify-content:flex-end">
+              <button
+                style="height:36px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer"
+                @click="addPickupNote"
+                @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
+                @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
+              >Add Note</button>
+            </div>
           </div>
         </div>
 

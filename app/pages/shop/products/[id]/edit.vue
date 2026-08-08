@@ -42,81 +42,17 @@ const statuses = ['active', 'inactive', 'draft']
 const loading = ref(true)
 const submitting = ref(false)
 
-// Image upload — files are uploaded on select, previews use the returned hosted URLs
-const imagePreviews = ref<string[]>([])
-const uploading = ref(false)
-const isDragging = ref(false)
-
-function handleFileSelect(event: Event) {
-  const input = event.target as HTMLInputElement
-  console.log('[edit-product] File input changed, files:', input.files?.length)
-  if (input.files) {
-    addFiles(Array.from(input.files))
-  }
-  input.value = ''
-}
-
-function handleDrop(event: DragEvent) {
-  event.preventDefault()
-  isDragging.value = false
-  if (event.dataTransfer?.files) {
-    const files = Array.from(event.dataTransfer.files).filter(f => f.type.startsWith('image/'))
-    console.log('[edit-product] Files dropped:', files.length)
-    addFiles(files)
-  }
-}
-
-function handleDragOver(event: DragEvent) {
-  event.preventDefault()
-  isDragging.value = true
-}
-
-function handleDragLeave() {
-  isDragging.value = false
-}
-
-async function addFiles(files: File[]) {
-  console.log('[edit-product] addFiles called with', files.length, 'file(s):', files.map(f => `${f.name} (${f.type}, ${f.size} bytes)`))
-  const images = files.filter(f => f.type.startsWith('image/'))
-  if (images.length === 0) return
-  if (imagePreviews.value.length + images.length > 5) {
-    toast.error('Limit reached', 'You can upload a maximum of 5 images.')
-    return
-  }
-
-  uploading.value = true
-  try {
-    const formData = new FormData()
-    for (const file of images) formData.append('files', file)
-
-    const config = useRuntimeConfig()
-    const authStore = useAuthStore()
-    console.log('[edit-product] Uploading', images.length, 'image(s) to /store/admin/products/images')
-    const res = await fetch(`${config.public.apiBase}/store/admin/products/images`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${authStore.token}` },
-      body: formData,
-    })
-    if (!res.ok) {
-      let detail = `Upload failed (${res.status})`
-      try { detail = (await res.json()).message || detail } catch {}
-      throw new Error(detail)
-    }
-    const data = await res.json() as { urls: string[] }
-    console.log('[edit-product] Upload response:', data)
-    imagePreviews.value.push(...data.urls)
-  } catch (err: any) {
-    console.error('[edit-product] Image upload failed:', err)
-    toast.error('Upload failed', err?.message || 'Could not upload images.')
-  } finally {
-    uploading.value = false
-  }
-}
-
-function removeImage(index: number) {
-  imagePreviews.value.splice(index, 1)
-  console.log('[edit-product] Image removed at index', index, '. Total previews:', imagePreviews.value.length)
-}
+// Image upload — deduplicated via composable
+const {
+  imagePreviews,
+  uploading,
+  isDragging,
+  handleFileSelect,
+  handleDrop,
+  handleDragOver,
+  handleDragLeave,
+  removeImage,
+} = useProductImageUpload(5)
 
 function openFilePicker() {
   const input = document.getElementById('edit-product-image-input') as HTMLInputElement
