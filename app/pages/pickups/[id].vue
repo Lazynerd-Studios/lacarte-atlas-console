@@ -864,7 +864,7 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
   </div>
 
   <!-- Reassign modal (reuse AssignDriverModal) -->
-  <AssignDriverModal
+  <LazyAssignDriverModal
     v-if="showReassignModal && pickup"
     ref="assignDriverModalRef"
     :request="{

@@ -585,7 +585,7 @@ function formatRouteDuration(minutes: number) {
     @submit="handleEdit"
   />
 
-  <AssignDriverToTruckModal
+  <LazyAssignDriverToTruckModal
     v-if="showAssignDriverModal && truck"
     :truck-id="truck.truckId"
     :current-driver="truck.assignedDriver?.name"
@@ -593,14 +593,14 @@ function formatRouteDuration(minutes: number) {
     @submit="handleAssignDriver"
   />
 
-  <MaintenanceModal
+  <LazyMaintenanceModal
     v-if="showMaintenanceModal && truck"
     :truck-id="truck.truckId"
     @close="showMaintenanceModal = false"
     @submit="handleMaintenance"
   />
 
-  <EditMaintenanceModal
+  <LazyEditMaintenanceModal
     v-if="showEditMaintenanceModal && selectedMaintenance"
     ref="editMaintenanceModalRef"
     :truck-id="truck.truckId"
@@ -609,7 +609,7 @@ function formatRouteDuration(minutes: number) {
     @submit="handleUpdateMaintenance"
   />
 
-  <ConfirmDialog
+  <LazyConfirmDialog
     v-if="showDeleteConfirm"
     title="Delete Truck"
     :message="`Are you sure you want to delete truck ${truck?.truckId || 'this truck'}? This action cannot be undone.`"

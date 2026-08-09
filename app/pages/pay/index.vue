@@ -500,7 +500,7 @@ onMounted(() => {
     </div>
 
     <!-- Approve Confirm -->
-    <ConfirmDialog
+    <LazyConfirmDialog
       v-if="showApproveConfirm"
       title="Approve Payout"
       :message="'Are you sure you want to approve this payout? This will lock the payout amount for the selected period.'"
@@ -512,7 +512,7 @@ onMounted(() => {
     />
 
     <!-- Mark Paid Confirm -->
-    <ConfirmDialog
+    <LazyConfirmDialog
       v-if="showMarkPaidConfirm"
       title="Mark Payout as Paid"
       :message="'Confirm that this payout has been paid to the driver. This action cannot be undone.'"

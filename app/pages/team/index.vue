@@ -542,7 +542,7 @@ onMounted(async () => {
 
   </div>
 
-  <AddRoleModal
+  <LazyAddRoleModal
     v-if="showAddRoleModal"
     :submitting="submitting"
     @close="showAddRoleModal = false"

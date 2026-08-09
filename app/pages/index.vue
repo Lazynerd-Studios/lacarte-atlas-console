@@ -31,10 +31,11 @@ interface ShopOverviewResponse {
 }
 
 const shopOverview = ref<ShopOverviewResponse | null>(null)
+const activeDriversCount = ref(0)
 
 const stats = computed(() => [
   { label: 'Active Customers', value: analytics.value ? `${analytics.value.activeCustomersPercentage}%` : '0%', change: analytics.value ? `${analytics.value.newCustomersPercentage}% new` : '0%', positive: analytics.value && analytics.value.newCustomersPercentage > 0 ? true : null, icon: 'i-lucide-users' },
-  { label: 'Drivers on Duty',  value: '0', change: '0%', positive: null, icon: 'i-lucide-truck' },
+  { label: 'Drivers on Duty',  value: String(activeDriversCount.value), change: '0%', positive: null, icon: 'i-lucide-truck' },
   { label: "Today's Pickups",  value: analytics.value ? String(analytics.value.todayPickups.count) : '0', change: '0%', positive: null, icon: 'i-lucide-package' },
   { label: 'Outstanding Payments', value: analytics.value ? `GHS ${analytics.value.outstandingPaymentsGhs.toLocaleString()}` : 'GHS 0', change: '0%', positive: null, icon: 'i-lucide-credit-card' },
   { label: 'Revenue This Month',   value: revenueAnalytics.value ? `GHS ${revenueAnalytics.value.data.summary.totalRevenue.toLocaleString()}` : 'GHS 0', change: currentMonthGrowth.value, positive: null, icon: 'i-lucide-bar-chart-2' },
@@ -229,6 +230,23 @@ async function fetchShopOverview() {
   }
 }
 
+async function fetchActiveDriversCount() {
+  try {
+    const raw = await api.get<{ data: Array<{ status: string }> }>(
+      '/drivers/admin/?limit=1000',
+      'Failed to load driver stats'
+    )
+    if (raw?.data) {
+      const onDuty = raw.data.filter(d =>
+        d.status === 'active' || d.status === 'online' || d.status === 'on-route'
+      )
+      activeDriversCount.value = onDuty.length
+    }
+  } catch {
+    console.error('Error fetching driver count')
+  }
+}
+
 const initialLoading = ref(true)
 
 onMounted(async () => {
@@ -239,6 +257,7 @@ onMounted(async () => {
     fetchPendingPickups(),
     fetchActiveTrucks(),
     fetchShopOverview(),
+    fetchActiveDriversCount(),
   ])
   initialLoading.value = false
 })

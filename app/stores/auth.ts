@@ -1,4 +1,4 @@
-import type { AuthUser, AuthTeamMember, ProfileResponse, SessionResponse } from '~/types/auth'
+import type { AuthUser, AuthRole, AuthTeamMember, ProfileResponse, SessionResponse } from '~/types/auth'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<AuthUser | null>(null)
@@ -48,21 +48,28 @@ export const useAuthStore = defineStore('auth', () => {
 
   function getSessionDurationMs(): number {
     const config = useRuntimeConfig()
-    return (config.public.sessionDurationMinutes ?? 30) * 60 * 1000
+    const minutes = (config.public as any).sessionDurationMinutes
+    return (minutes ?? 30) * 60 * 1000
   }
 
   function getSessionWarningSecs(): number {
     const config = useRuntimeConfig()
-    return config.public.sessionWarningSeconds ?? 120
+    const secs = (config.public as any).sessionWarningSeconds
+    return secs ?? 120
   }
 
   function getSessionCheckIntervalMs(): number {
     const config = useRuntimeConfig()
-    return (config.public.sessionCheckIntervalMinutes ?? 5) * 60 * 1000
+    const minutes = (config.public as any).sessionCheckIntervalMinutes
+    return (minutes ?? 5) * 60 * 1000
   }
 
   async function setAuth(userData: AuthUser, authToken: string) {
+    // Normalize role to string immediately so all consumers get a consistent type
     user.value = userData
+    if (user.value.role && typeof user.value.role !== 'string') {
+      user.value.role = (user.value.role as AuthRole).name ?? ''
+    }
     token.value = authToken
 
     // Set session expiry from runtime config

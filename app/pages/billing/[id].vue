@@ -350,7 +350,7 @@ function statusBadge(s: string) {
     </div>
 
     <!-- Update status modal -->
-    <UpdateInvoiceStatusModal
+    <LazyUpdateInvoiceStatusModal
       v-if="showStatusModal && invoice"
       :invoice="invoice"
       @close="showStatusModal = false"

@@ -345,7 +345,7 @@ async function toggleActive(z: Zone) {
     <AddZoneModal v-if="showAddModal" ref="addModalRef" @close="showAddModal = false" @submit="handleAdd" />
 
     <!-- ── EDIT MODAL ── -->
-    <EditZoneModal v-if="showEditModal && editTarget" ref="editModalRef" :zone="editTarget" @close="showEditModal = false" @submit="handleEdit" />
+    <LazyEditZoneModal v-if="showEditModal && editTarget" ref="editModalRef" :zone="editTarget" @close="showEditModal = false" @submit="handleEdit" />
 
     <!-- ── DELETE MODAL ── -->
     <DeleteZoneModal

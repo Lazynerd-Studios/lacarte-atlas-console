@@ -651,14 +651,14 @@ const donutSlices = computed(() => {
   </div>
 
   <!-- Pending Bank Transfers modals — disabled along with the section above
-  <ApproveTransferModal
+  <LazyApproveTransferModal
     v-if="showApproveModal && selectedTransfer"
     :transfer="selectedTransfer"
     @close="showApproveModal = false"
     @approve="handleApprove"
   />
 
-  <DeclineTransferModal
+  <LazyDeclineTransferModal
     v-if="showDeclineModal && selectedDeclineTransfer"
     :transfer="selectedDeclineTransfer"
     @close="showDeclineModal = false"

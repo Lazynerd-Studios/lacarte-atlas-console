@@ -395,7 +395,7 @@ async function handleDelete(id: string) {
     @submit="handleAddCategory"
   />
 
-  <DeleteProductModal
+  <LazyDeleteProductModal
     v-if="showDeleteModal && selectedProduct"
     :product-name="selectedProduct.name"
     :product-id="selectedProduct.id"

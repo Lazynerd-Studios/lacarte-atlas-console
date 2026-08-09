@@ -586,7 +586,7 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
 
   </div>
 
-  <AssignDriverModal
+  <LazyAssignDriverModal
     v-if="showAssignDriverModal && selectedRequest"
     :request="{
       id: selectedRequest.id,
@@ -605,7 +605,7 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
   />
 
   <!-- Create Pickup Modal -->
-  <CreatePickupModal
+  <LazyCreatePickupModal
     v-if="showCreatePickupModal"
     @close="showCreatePickupModal = false"
     @created="() => { showCreatePickupModal = false; fetchStats(); fetchRequests() }"

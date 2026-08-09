@@ -936,7 +936,7 @@ function stopBadge(status: string) {
     @submit="handleEditDriver"
   />
 
-  <ConfirmDialog
+  <LazyConfirmDialog
     v-if="showDeleteConfirm"
     title="Delete Driver"
     :message="`Are you sure you want to delete ${driver?.name || driver?.user?.name || 'this driver'}? This action cannot be undone.`"

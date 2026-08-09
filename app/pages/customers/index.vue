@@ -336,10 +336,10 @@ function statusBadge(status: string) {
   </div>
 
   <!-- Add Customer Modal -->
-  <CustomerModal v-if="showModal" @close="showModal = false" @success="handleCustomerCreated" />
+  <LazyCustomerModal v-if="showModal" @close="showModal = false" @success="handleCustomerCreated" />
 
   <!-- Suspend Modal -->
-  <SuspendModal
+  <LazySuspendModal
     v-if="showSuspendModal && selectedCustomer"
     :customer-name="selectedCustomer.user?.name ?? 'Customer'"
     :loading="suspending"
@@ -348,7 +348,7 @@ function statusBadge(status: string) {
   />
 
   <!-- Unsuspend Confirm Dialog -->
-  <ConfirmDialog
+  <LazyConfirmDialog
     v-if="showUnsuspendConfirm && selectedCustomer"
     title="Unsuspend Account"
     :message="`Are you sure you want to reactivate ${selectedCustomer.user?.name ?? 'Customer'}'s account?`"

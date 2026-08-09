@@ -399,7 +399,7 @@ async function handleDeleteQuantity() {
     <!-- Modals for Disposable Types -->
     <AddDisposableTypeModal v-if="showAddDisposableModal" ref="addDisposableModalRef" @close="showAddDisposableModal = false" @submit="handleAddDisposable" />
     <EditDisposableTypeModal v-if="showEditDisposableModal && editDisposableTarget" ref="editDisposableModalRef" :item="editDisposableTarget" @close="showEditDisposableModal = false" @submit="handleEditDisposable" />
-    <DeleteConfirmModal 
+    <LazyDeleteConfirmModal 
       v-if="showDeleteDisposableModal && deleteDisposableTarget"
       :title="`Delete ${deleteDisposableTarget.name}?`"
       message="This action cannot be undone. Are you sure you want to delete this disposable type?"
@@ -410,7 +410,7 @@ async function handleDeleteQuantity() {
     <!-- Modals for Estimated Quantities -->
     <AddEstimatedQuantityModal v-if="showAddQuantityModal" ref="addQuantityModalRef" @close="showAddQuantityModal = false" @submit="handleAddQuantity" />
     <EditEstimatedQuantityModal v-if="showEditQuantityModal && editQuantityTarget" ref="editQuantityModalRef" :item="editQuantityTarget" @close="showEditQuantityModal = false" @submit="handleEditQuantity" />
-    <DeleteConfirmModal 
+    <LazyDeleteConfirmModal 
       v-if="showDeleteQuantityModal && deleteQuantityTarget"
       :title="`Delete ${deleteQuantityTarget.label}?`"
       message="This action cannot be undone. Are you sure you want to delete this estimated quantity?"

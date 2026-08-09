@@ -948,7 +948,7 @@ function noteDate(dateString?: string | null): string {
   </div>
 
   <!-- Suspend Account Modal -->
-  <SuspendModal
+  <LazySuspendModal
     v-if="showSuspendModal && customer"
     :customer-name="fullName"
     :loading="suspending"
@@ -957,7 +957,7 @@ function noteDate(dateString?: string | null): string {
   />
 
   <!-- Unsuspend Account Confirm Dialog -->
-  <ConfirmDialog
+  <LazyConfirmDialog
     v-if="showUnsuspendConfirm && customer"
     title="Unsuspend Account"
     :message="`Are you sure you want to reactivate ${fullName}'s account?`"
@@ -969,7 +969,7 @@ function noteDate(dateString?: string | null): string {
   />
 
   <!-- Edit Customer Modal -->
-  <EditCustomerModal
+  <LazyEditCustomerModal
     v-if="showEditModal && customer"
     :customer="customer"
     :saving="saving"

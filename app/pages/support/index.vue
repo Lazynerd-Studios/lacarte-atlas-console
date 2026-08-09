@@ -430,7 +430,7 @@ async function handleTicketCreated() {
 
   </div>
 
-  <SupportTicketModal
+  <LazySupportTicketModal
     v-if="showTicketModal && selectedTicket"
     :ticket="selectedTicket"
     @close="showTicketModal = false"
