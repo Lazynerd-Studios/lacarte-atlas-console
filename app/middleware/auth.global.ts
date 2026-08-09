@@ -4,9 +4,10 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
   // Define public routes that don't require authentication
   const publicRoutes = ['/login', '/forgot-password', '/unauthorized']
   
-  // Check if the route is public or starts with /pay (payment pages)
-  const isPublicRoute = publicRoutes.includes(to.path) || to.path.startsWith('/pay')
-  
+  // Check if the route is public (e.g., invoice payment page /pay/:id)
+  const isPaymentInvoiceRoute = to.path.startsWith('/pay/') && Boolean(to.params.id)
+  const isPublicRoute = publicRoutes.includes(to.path) || isPaymentInvoiceRoute
+
   // Allow access to public routes
   if (isPublicRoute) {
     return

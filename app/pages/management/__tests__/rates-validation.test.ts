@@ -5,6 +5,7 @@ import { validateForm, formToApiPayload } from '~/utils/rateValidation'
 
 interface AddFormData {
   customerTypeId: string
+  estimatedQuantityId: string
   pickupRate: string
   effectiveDate: string
   note: string
@@ -14,6 +15,7 @@ interface AddFormData {
 // Arbitraries for generating test data
 const positiveIntArb = fc.integer({ min: 1, max: 1000 })
 const customerTypeIdArb = positiveIntArb.map(n => String(n))
+const estimatedQuantityIdArb = positiveIntArb.map(n => String(n))
 const pickupRateArb = fc.integer({ min: 1, max: 10000 }).map(n => String(n))
 const isoDateArb = fc.integer({ min: 1577836800000, max: 1924905600000 })
   .map(timestamp => new Date(timestamp).toISOString().split('T')[0]!)
@@ -23,6 +25,7 @@ const booleanArb = fc.boolean()
 // Valid form data generator
 const validFormArb = fc.record({
   customerTypeId: customerTypeIdArb,
+  estimatedQuantityId: estimatedQuantityIdArb,
   pickupRate: pickupRateArb,
   effectiveDate: isoDateArb,
   note: noteArb,
@@ -34,6 +37,7 @@ describe('Property 12: Form Validation Completeness', () => {
   it('should validate that customer type is selected for add operations', () => {
     const formDataArb = fc.record({
       customerTypeId: fc.string(),
+      estimatedQuantityId: estimatedQuantityIdArb,
       pickupRate: pickupRateArb,
       effectiveDate: isoDateArb,
       note: noteArb,
@@ -55,6 +59,7 @@ describe('Property 12: Form Validation Completeness', () => {
   it('should not require customer type for edit operations', () => {
     const formDataArb = fc.record({
       customerTypeId: fc.constant(''),
+      estimatedQuantityId: estimatedQuantityIdArb,
       pickupRate: pickupRateArb,
       effectiveDate: isoDateArb,
       note: noteArb,
@@ -75,6 +80,7 @@ describe('Property 12: Form Validation Completeness', () => {
   it('should validate that pickup rate is a positive number', () => {
     const formDataArb = fc.record({
       customerTypeId: customerTypeIdArb,
+      estimatedQuantityId: estimatedQuantityIdArb,
       pickupRate: fc.oneof(
         fc.string(),
         fc.integer().map(n => String(n)),
@@ -104,6 +110,7 @@ describe('Property 12: Form Validation Completeness', () => {
   it('should validate that effective date is provided', () => {
     const formDataArb = fc.record({
       customerTypeId: customerTypeIdArb,
+      estimatedQuantityId: estimatedQuantityIdArb,
       pickupRate: pickupRateArb,
       effectiveDate: fc.oneof(
         isoDateArb,
@@ -126,9 +133,10 @@ describe('Property 12: Form Validation Completeness', () => {
     )
   })
 
-  it('should validate all three fields for any form submission', () => {
+  it('should validate all fields for any form submission', () => {
     const formDataArb = fc.record({
       customerTypeId: fc.string(),
+      estimatedQuantityId: fc.string(),
       pickupRate: fc.oneof(
         fc.string(),
         fc.integer().map(n => String(n))
@@ -150,6 +158,11 @@ describe('Property 12: Form Validation Completeness', () => {
           expect(errors.some(e => e.includes('Customer type'))).toBe(true)
         }
         
+        // Check estimated quantity validation
+        if (!formData.estimatedQuantityId) {
+          expect(errors.some(e => e.includes('Estimated quantity'))).toBe(true)
+        }
+
         // Check pickup rate validation
         const pickupRate = Number(formData.pickupRate)
         if (!formData.pickupRate || isNaN(pickupRate) || pickupRate <= 0) {
@@ -162,7 +175,8 @@ describe('Property 12: Form Validation Completeness', () => {
         }
         
         // If all validations pass, errors should be empty
-        if (formData.customerTypeId && 
+        if (formData.customerTypeId &&
+            formData.estimatedQuantityId &&
             formData.pickupRate && !isNaN(pickupRate) && pickupRate > 0 &&
             formData.effectiveDate) {
           expect(errors.length).toBe(0)
@@ -197,6 +211,16 @@ describe('Property 13: Validation Failure Handling', () => {
       // Invalid customer type
       fc.record({
         customerTypeId: fc.constant(''),
+        estimatedQuantityId: estimatedQuantityIdArb,
+        pickupRate: pickupRateArb,
+        effectiveDate: isoDateArb,
+        note: noteArb,
+        isActive: booleanArb,
+      }),
+      // Invalid estimated quantity
+      fc.record({
+        customerTypeId: customerTypeIdArb,
+        estimatedQuantityId: fc.constant(''),
         pickupRate: pickupRateArb,
         effectiveDate: isoDateArb,
         note: noteArb,
@@ -205,6 +229,7 @@ describe('Property 13: Validation Failure Handling', () => {
       // Invalid pickup rate
       fc.record({
         customerTypeId: customerTypeIdArb,
+        estimatedQuantityId: estimatedQuantityIdArb,
         pickupRate: fc.constantFrom('', '0', '-1', 'abc'),
         effectiveDate: isoDateArb,
         note: noteArb,
@@ -213,6 +238,7 @@ describe('Property 13: Validation Failure Handling', () => {
       // Invalid effective date
       fc.record({
         customerTypeId: customerTypeIdArb,
+        estimatedQuantityId: estimatedQuantityIdArb,
         pickupRate: pickupRateArb,
         effectiveDate: fc.constant(''),
         note: noteArb,
@@ -239,6 +265,7 @@ describe('Property 13: Validation Failure Handling', () => {
     const invalidFormArb = fc.oneof(
       fc.record({
         customerTypeId: fc.constant(''),
+        estimatedQuantityId: estimatedQuantityIdArb,
         pickupRate: pickupRateArb,
         effectiveDate: isoDateArb,
         note: noteArb,
@@ -246,6 +273,15 @@ describe('Property 13: Validation Failure Handling', () => {
       }),
       fc.record({
         customerTypeId: customerTypeIdArb,
+        estimatedQuantityId: fc.constant(''),
+        pickupRate: pickupRateArb,
+        effectiveDate: isoDateArb,
+        note: noteArb,
+        isActive: booleanArb,
+      }),
+      fc.record({
+        customerTypeId: customerTypeIdArb,
+        estimatedQuantityId: estimatedQuantityIdArb,
         pickupRate: fc.constant('0'),
         effectiveDate: isoDateArb,
         note: noteArb,
@@ -253,6 +289,7 @@ describe('Property 13: Validation Failure Handling', () => {
       }),
       fc.record({
         customerTypeId: customerTypeIdArb,
+        estimatedQuantityId: estimatedQuantityIdArb,
         pickupRate: pickupRateArb,
         effectiveDate: fc.constant(''),
         note: noteArb,
@@ -270,6 +307,7 @@ describe('Property 13: Validation Failure Handling', () => {
         // Error message should be one of the expected validation messages
         const validErrorMessages = [
           'Customer type is required.',
+          'Estimated quantity is required.',
           'Valid pickup rate is required.',
           'Effective date is required.'
         ]
@@ -282,6 +320,7 @@ describe('Property 13: Validation Failure Handling', () => {
   it('should return first validation error when multiple errors exist', () => {
     const multipleErrorsFormArb = fc.record({
       customerTypeId: fc.constant(''),
+      estimatedQuantityId: fc.constant(''),
       pickupRate: fc.constant(''),
       effectiveDate: fc.constant(''),
       note: noteArb,
@@ -351,6 +390,7 @@ describe('Property 14: Validation Success Handling', () => {
   it('should proceed regardless of note content when other fields are valid', () => {
     const validFormWithAnyNoteArb = fc.record({
       customerTypeId: customerTypeIdArb,
+      estimatedQuantityId: estimatedQuantityIdArb,
       pickupRate: pickupRateArb,
       effectiveDate: isoDateArb,
       note: fc.string({ maxLength: 1000 }), // Any note including empty
@@ -372,6 +412,7 @@ describe('Property 14: Validation Success Handling', () => {
   it('should proceed with edit operation when customer type is empty but other fields are valid', () => {
     const validEditFormArb = fc.record({
       customerTypeId: fc.constant(''),
+      estimatedQuantityId: estimatedQuantityIdArb,
       pickupRate: pickupRateArb,
       effectiveDate: isoDateArb,
       note: noteArb,
@@ -400,21 +441,24 @@ describe('Property 14: Validation Success Handling', () => {
           
           // Verify all required fields are present
           expect(payload).toHaveProperty('customerTypeId')
-          expect(payload).toHaveProperty('pickupRate')
+          expect(payload).toHaveProperty('estimatedQuantityId')
+          expect(payload).toHaveProperty('rate')
           expect(payload).toHaveProperty('effectiveDate')
           expect(payload).toHaveProperty('note')
           expect(payload).toHaveProperty('isActive')
           
           // Verify data types are correct
-          expect(typeof payload.customerTypeId).toBe('number')
-          expect(typeof payload.pickupRate).toBe('number')
+          expect(typeof payload.customerTypeId).toBe('string')
+          expect(typeof payload.estimatedQuantityId).toBe('string')
+          expect(typeof payload.rate).toBe('number')
           expect(typeof payload.effectiveDate).toBe('string')
           expect(typeof payload.note).toBe('string')
           expect(typeof payload.isActive).toBe('boolean')
           
           // Verify values are transformed correctly
-          expect(payload.customerTypeId).toBe(Number(formData.customerTypeId))
-          expect(payload.pickupRate).toBe(Number(formData.pickupRate))
+          expect(payload.customerTypeId).toBe(formData.customerTypeId)
+          expect(payload.estimatedQuantityId).toBe(formData.estimatedQuantityId)
+          expect(payload.rate).toBe(Number(formData.pickupRate))
           expect(payload.effectiveDate).toBe(formData.effectiveDate)
           expect(payload.note).toBe(formData.note.trim())
           expect(payload.isActive).toBe(formData.isActive)
