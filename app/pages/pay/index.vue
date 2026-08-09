@@ -74,8 +74,6 @@ const generateMonth = ref(new Date().toISOString().slice(0, 7))
 const generating = ref(false)
 
 // Modals
-const showDetailModal = ref(false)
-const selectedPayout = ref<Payout | null>(null)
 const showApproveConfirm = ref(false)
 const showMarkPaidConfirm = ref(false)
 const approvingId = ref<string | null>(null)
@@ -189,9 +187,6 @@ async function approvePayout() {
     if (result?.success) {
       toast.success('Payout approved')
       await fetchPayouts()
-      if (selectedPayout.value?.id === payoutId) {
-        showDetailModal.value = false
-      }
     }
   } finally {
     approving.value = false
@@ -213,9 +208,6 @@ async function markPayoutPaid() {
     if (result?.success) {
       toast.success('Payout marked as paid')
       await fetchPayouts()
-      if (selectedPayout.value?.id === payoutId) {
-        showDetailModal.value = false
-      }
     }
   } finally {
     markingPaid.value = false
@@ -230,11 +222,6 @@ function onSearchInput() {
     currentPage.value = 1
     fetchPayouts()
   }, 350)
-}
-
-function openDetail(payout: Payout) {
-  selectedPayout.value = payout
-  showDetailModal.value = true
 }
 
 function canApprove(status: string) {
@@ -321,14 +308,12 @@ onMounted(() => {
             <th style="padding:14px 16px;text-align:left;font-size:13px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Period</th>
             <th style="padding:14px 16px;text-align:right;font-size:13px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Total Payout</th>
             <th style="padding:14px 16px;text-align:center;font-size:13px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Status</th>
-            <th style="padding:14px 16px;text-align:left;font-size:13px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Approved At</th>
-            <th style="padding:14px 16px;text-align:left;font-size:13px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Paid At</th>
             <th style="padding:14px 16px;text-align:right;font-size:13px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="loading && payouts.length === 0">
-            <td colspan="7" style="padding:48px;text-align:center">
+            <td colspan="5" style="padding:48px;text-align:center">
               <UIcon name="i-lucide-loader-2" style="width:24px;height:24px;color:#ffb400;animation:spin 1s linear infinite;margin:0 auto 12px;display:block" />
               <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Loading payouts...</p>
             </td>
@@ -355,15 +340,7 @@ onMounted(() => {
                 {{ statusBadge(p.status).label }}
               </span>
             </td>
-            <td style="padding:16px;font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;white-space:nowrap">{{ formatDate(p.approvedAt) }}</td>
-            <td style="padding:16px;font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;white-space:nowrap">{{ formatDate(p.paidAt) }}</td>
             <td style="padding:16px;text-align:right;white-space:nowrap">
-              <button
-                style="height:32px;padding:0 14px;background:#ececec;border:none;border-radius:20px;font-size:13px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer;margin-right:6px"
-                @click="openDetail(p)"
-                @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
-                @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
-              >View</button>
               <button
                 v-if="canApprove(p.status)"
                 :disabled="approving"
@@ -379,7 +356,7 @@ onMounted(() => {
             </td>
           </tr>
           <tr v-if="!loading && payouts.length === 0">
-            <td colspan="7" style="padding:48px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No payouts found</td>
+            <td colspan="5" style="padding:48px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No payouts found</td>
           </tr>
         </tbody>
       </table>
@@ -393,110 +370,6 @@ onMounted(() => {
         :per-page="perPage"
         @update:page="currentPage = $event"
       />
-    </div>
-
-    <!-- Detail Modal -->
-    <div
-      v-if="showDetailModal && selectedPayout"
-      style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:50;display:flex;align-items:center;justify-content:center;padding:24px"
-      @click.self="showDetailModal = false"
-    >
-      <div style="background:white;border:1px solid #e5e7eb;border-radius:16px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;box-shadow:0 10px 15px rgba(0,0,0,0.1);position:relative">
-        <button
-          style="position:absolute;top:16px;right:16px;width:28px;height:28px;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px;opacity:0.7;z-index:1"
-          @click="showDetailModal = false"
-          @mouseover="($event.currentTarget as HTMLElement).style.background='#f3f4f6'"
-          @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
-        >
-          <UIcon name="i-lucide-x" style="width:16px;height:16px;color:#111" />
-        </button>
-
-        <div style="padding:24px 24px 16px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between">
-          <div>
-            <p style="font-size:20px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0">Payout Details</p>
-            <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin:4px 0 0">{{ selectedPayout.driverName }} · {{ formatMonth(selectedPayout.periodMonth) }}</p>
-          </div>
-          <span :style="`font-size:12px;font-weight:600;border-radius:20px;padding:3px 12px;color:${statusBadge(selectedPayout.status).color};background:${statusBadge(selectedPayout.status).bg};border:1px solid ${statusBadge(selectedPayout.status).border}`">
-            {{ statusBadge(selectedPayout.status).label }}
-          </span>
-        </div>
-
-        <div style="padding:24px;display:flex;flex-direction:column;gap:20px">
-          <!-- Earnings breakdown -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-            <div style="background:#f8f9fa;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:4px">
-              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">Monthly Salary</p>
-              <p style="font-size:16px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0">{{ formatCurrencyAmount(selectedPayout.monthlySalary, selectedPayout.currency) }}</p>
-            </div>
-            <div style="background:#f8f9fa;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:4px">
-              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">Performance Deduction</p>
-              <p :style="`font-size:16px;font-weight:700;font-family:'Manrope',sans-serif;margin:0;color:${Number(selectedPayout.performanceDeduction) > 0 ? '#ef4444' : '#1a1a1a'}`">{{ formatCurrencyAmount(selectedPayout.performanceDeduction ?? 0, selectedPayout.currency) }}</p>
-            </div>
-            <div style="background:#f8f9fa;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:4px">
-              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">Manual Bonuses</p>
-              <p :style="`font-size:16px;font-weight:700;font-family:'Manrope',sans-serif;margin:0;color:${Number(selectedPayout.manualBonuses) > 0 ? '#22c55e' : '#1a1a1a'}`">{{ formatCurrencyAmount(selectedPayout.manualBonuses ?? 0, selectedPayout.currency) }}</p>
-            </div>
-            <div style="background:#f8f9fa;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:4px">
-              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">Manual Deductions</p>
-              <p :style="`font-size:16px;font-weight:700;font-family:'Manrope',sans-serif;margin:0;color:${Number(selectedPayout.manualDeductions) > 0 ? '#ef4444' : '#1a1a1a'}`">{{ formatCurrencyAmount(selectedPayout.manualDeductions ?? 0, selectedPayout.currency) }}</p>
-            </div>
-          </div>
-
-          <!-- Bins / trips -->
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
-            <div style="background:#f8f9fa;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:4px">
-              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">Bins Completed</p>
-              <p style="font-size:16px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0">{{ selectedPayout.binsCompleted ?? '—' }} / {{ selectedPayout.binsAssigned ?? '—' }}</p>
-            </div>
-            <div style="background:#f8f9fa;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:4px">
-              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">Trips Completed</p>
-              <p style="font-size:16px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0">{{ selectedPayout.tripsCompleted ?? '—' }}</p>
-            </div>
-            <div style="background:#f8f9fa;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:4px">
-              <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">Payment Schedule</p>
-              <p style="font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0;text-transform:capitalize">{{ selectedPayout.paymentSchedule ?? '—' }}</p>
-            </div>
-          </div>
-
-          <!-- Total -->
-          <div style="border-top:1px solid #e5e7eb;padding-top:16px;display:flex;align-items:center;justify-content:space-between">
-            <span style="font-size:16px;font-weight:600;color:#6b7280;font-family:'Manrope',sans-serif">Total Payout</span>
-            <span style="font-size:24px;font-weight:700;color:#111;font-family:'Manrope',sans-serif">{{ formatCurrencyAmount(selectedPayout.totalPayout, selectedPayout.currency) }}</span>
-          </div>
-
-          <!-- Notes -->
-          <div v-if="selectedPayout.notes" style="background:#f8f9fa;border-radius:12px;padding:14px 16px">
-            <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0 0 6px;font-weight:500">Notes</p>
-            <p style="font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0;line-height:1.6">{{ selectedPayout.notes }}</p>
-          </div>
-
-          <!-- Timestamps -->
-          <div style="display:flex;gap:24px;font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">
-            <span>Approved: {{ formatDate(selectedPayout.approvedAt) }}</span>
-            <span>Paid: {{ formatDate(selectedPayout.paidAt) }}</span>
-          </div>
-        </div>
-
-        <!-- Footer actions -->
-        <div style="padding:16px 24px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:8px">
-          <button
-            style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
-            @click="showDetailModal = false"
-          >Close</button>
-          <button
-            v-if="canApprove(selectedPayout.status)"
-            :disabled="approving"
-            :style="`height:40px;padding:0 20px;background:${approving ? '#93c5fd' : '#3b82f6'};border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:${approving ? 'not-allowed' : 'pointer'};opacity:${approving ? '0.8' : '1'}`"
-            @click="approvingId = selectedPayout.id; showApproveConfirm = true"
-          >Approve Payout</button>
-          <button
-            v-if="canMarkPaid(selectedPayout.status)"
-            :disabled="markingPaid"
-            :style="`height:40px;padding:0 20px;background:${markingPaid ? '#86efac' : '#22c55e'};border:none;border-radius:20px;font-size:14px;font-weight:500;color:white;font-family:'Manrope',sans-serif;cursor:${markingPaid ? 'not-allowed' : 'pointer'};opacity:${markingPaid ? '0.8' : '1'}`"
-            @click="markingPaidId = selectedPayout.id; showMarkPaidConfirm = true"
-          >Mark as Paid</button>
-        </div>
-      </div>
     </div>
 
     <!-- Approve Confirm -->
