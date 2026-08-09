@@ -46,12 +46,27 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  function getSessionDurationMs(): number {
+    const config = useRuntimeConfig()
+    return (config.public.sessionDurationMinutes ?? 30) * 60 * 1000
+  }
+
+  function getSessionWarningSecs(): number {
+    const config = useRuntimeConfig()
+    return config.public.sessionWarningSeconds ?? 120
+  }
+
+  function getSessionCheckIntervalMs(): number {
+    const config = useRuntimeConfig()
+    return (config.public.sessionCheckIntervalMinutes ?? 5) * 60 * 1000
+  }
+
   async function setAuth(userData: AuthUser, authToken: string) {
     user.value = userData
     token.value = authToken
 
-    // Set session expiry (30 minutes from now)
-    sessionExpiresAt.value = Date.now() + (30 * 60 * 1000)
+    // Set session expiry from runtime config
+    sessionExpiresAt.value = Date.now() + getSessionDurationMs()
 
     // Fetch team member profile to get role and permissions
     await fetchTeamMemberProfile()
@@ -69,7 +84,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       if (isValid) {
         // Reset session expiry
-        sessionExpiresAt.value = Date.now() + (30 * 60 * 1000)
+        sessionExpiresAt.value = Date.now() + getSessionDurationMs()
         showSessionWarning.value = false
         console.log('[auth] Session refreshed successfully')
         return true
@@ -109,7 +124,7 @@ export const useAuthStore = defineStore('auth', () => {
         // Refresh team member profile
         await fetchTeamMemberProfile()
         // Update session expiry
-        sessionExpiresAt.value = Date.now() + (30 * 60 * 1000)
+        sessionExpiresAt.value = Date.now() + getSessionDurationMs()
         return true
       } else {
         console.log('[auth] Session expired or invalid')
@@ -134,9 +149,10 @@ export const useAuthStore = defineStore('auth', () => {
       if (!sessionExpiresAt.value) return
 
       const timeRemaining = Math.floor((sessionExpiresAt.value - Date.now()) / 1000)
+      const warningSecs = getSessionWarningSecs()
 
-      // Show warning 2 minutes before expiry
-      if (timeRemaining <= 120 && timeRemaining > 0) {
+      // Show warning before expiry
+      if (timeRemaining <= warningSecs && timeRemaining > 0) {
         showSessionWarning.value = true
         sessionWarningTime.value = timeRemaining
       } else if (timeRemaining <= 0) {
@@ -160,14 +176,14 @@ export const useAuthStore = defineStore('auth', () => {
       clearInterval(sessionCheckInterval)
     }
 
-    // Check session every 5 minutes
+    // Periodic session check based on runtime config
     sessionCheckInterval = setInterval(async () => {
       console.log('[auth] Periodic session check')
       const isValid = await checkSession()
       if (!isValid) {
         // logout() inside checkSession already redirects to /login
       }
-    }, 5 * 60 * 1000) // 5 minutes
+    }, getSessionCheckIntervalMs())
   }
 
   function stopSessionCheck() {

@@ -58,7 +58,7 @@ const nameArb = fc.string({ minLength: 1, maxLength: 100 }).filter(s => s.trim()
 const descriptionArb = fc.string({ maxLength: 500 })
 const positiveIntArb = fc.integer({ min: 0, max: 1000 })
 const colorArb = fc.constantFrom('#6b7280', '#3b82f6', '#8b5cf6', '#f97316', '#22c55e', '#ef4444')
-const isoDateArb = fc.date({ min: new Date('2020-01-01T00:00:00.000Z'), max: new Date('2030-12-31T23:59:59.999Z') }).map(d => d.toISOString())
+const isoDateArb = fc.integer({ min: 1577836800000, max: 1924905600000 }).map(timestamp => new Date(timestamp).toISOString())
 
 const apiPlanArb = fc.record({
   id: uuidArb,

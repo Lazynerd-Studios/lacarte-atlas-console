@@ -365,10 +365,6 @@ function statusBadge(s: string) {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
 .skeleton {
   background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
   background-size: 200% 100%;

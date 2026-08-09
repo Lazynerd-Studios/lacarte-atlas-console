@@ -9,6 +9,13 @@ const chevronBg = "url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+interface PayoutEarningItem {
+  id: string
+  amount: number | string
+  description?: string | null
+  type?: string | null
+}
+
 interface Payout {
   id: string
   driverId: string
@@ -36,7 +43,7 @@ interface Payout {
   performanceDeduction?: number | string
   manualBonuses?: number | string
   manualDeductions?: number | string
-  earnings?: any[]
+  earnings?: PayoutEarningItem[]
 }
 
 interface PayoutListResponse {
@@ -121,7 +128,7 @@ async function fetchPayouts() {
     // Both status and search are sent to the server simultaneously
     if (statusFilter.value) params.set('status', statusFilter.value)
     if (debouncedSearch.value.trim()) params.set('search', debouncedSearch.value.trim())
-    const raw = await api.get<any>(`/driver-earning/admin/payouts?${params.toString()}`, 'Failed to load payouts')
+    const raw = await api.get<PayoutListResponse>(`/driver-earning/admin/payouts?${params.toString()}`, 'Failed to load payouts')
     if (!raw) {
       payouts.value = []
       totalItems.value = 0
@@ -518,10 +525,3 @@ onMounted(() => {
 
   </div>
 </template>
-
-<style scoped>
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-</style>

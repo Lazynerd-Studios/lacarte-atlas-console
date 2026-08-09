@@ -47,12 +47,17 @@ export function useApi() {
       throw new Error('Session expired. Please log in again.')
     }
 
+    // Read response body once
+    const text = await res.text()
+
     // Treat 200, 201, and 204 as success responses
     const isSuccess = res.status === 200 || res.status === 201 || res.status === 204
 
     if (!isSuccess) {
       let detail: string | undefined
-      try { detail = (await res.clone().json()).message } catch {}
+      if (text) {
+        try { detail = JSON.parse(text)?.message } catch {}
+      }
       console.error('[useApi] Request failed', {
         path,
         status: res.status,
@@ -61,7 +66,6 @@ export function useApi() {
       throw new Error(detail ?? `Request failed (${res.status})`)
     }
 
-    const text = await res.text()
     const result = text ? JSON.parse(text) : (null as unknown as T)
     console.log('[useApi] Request successful', {
       path,

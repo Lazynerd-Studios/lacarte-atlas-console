@@ -437,7 +437,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-@keyframes spin { to { transform: rotate(360deg); } }
 @keyframes pulse {
   0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34,197,94,0.3); }
   50% { transform: scale(1.06); box-shadow: 0 0 0 10px rgba(34,197,94,0); }

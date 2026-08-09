@@ -537,14 +537,3 @@ function onBlur(e: Event, field: string) {
     </div>
   </div>
 </template>
-
-<style scoped>
-@keyframes spin {
-  from { transform: translateY(-50%) rotate(0deg); }
-  to { transform: translateY(-50%) rotate(360deg); }
-}
-@keyframes spinPlain {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-</style>

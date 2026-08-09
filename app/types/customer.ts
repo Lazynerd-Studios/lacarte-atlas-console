@@ -39,6 +39,7 @@ export interface Customer {
   zoneId: string
   phoneNumber: string
   noBins: number
+  balance?: number
   capacityRateId?: string | null
   status: string
   createdVia?: string | null
@@ -56,6 +57,11 @@ export interface Customer {
   user: CustomerUser
   customerType: CustomerType | null
   zone: CustomerZone | null
+}
+
+/** Customer item returned in list views (includes optional lastPickupDate) */
+export interface CustomerListItem extends Customer {
+  lastPickupDate?: string | null
 }
 
 /** Disposable item type attached to a customer pickup history entry */
