@@ -233,7 +233,7 @@ async function fetchShopOverview() {
 async function fetchActiveDriversCount() {
   try {
     const raw = await api.get<{ data: Array<{ status: string }> }>(
-      '/drivers/admin/?limit=1000',
+      '/drivers/admin/?limit=100',
       'Failed to load driver stats'
     )
     if (raw?.data) {
