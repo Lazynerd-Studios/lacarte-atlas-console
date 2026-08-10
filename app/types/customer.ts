@@ -1,5 +1,7 @@
 // Customer type definitions
 
+import type { PaginatedDataResponse } from './api'
+
 /** User account attached to a customer (Better Auth shape) */
 export interface CustomerUser {
   id: string
@@ -99,14 +101,4 @@ export interface CustomerPickupHistoryEntry {
 }
 
 /** Paginated response envelope for customer pickup history */
-export interface CustomerPickupHistoryResponse {
-  data: CustomerPickupHistoryEntry[]
-  pagination: {
-    page: number
-    limit: number
-    total: number
-    totalPages: number
-    hasNextPage: boolean
-    hasPreviousPage: boolean
-  }
-}
+export type CustomerPickupHistoryResponse = PaginatedDataResponse<CustomerPickupHistoryEntry>

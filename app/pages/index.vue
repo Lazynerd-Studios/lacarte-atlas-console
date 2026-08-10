@@ -250,16 +250,21 @@ async function fetchActiveDriversCount() {
 const initialLoading = ref(true)
 
 onMounted(async () => {
+  // Wave 1: critical dashboard data (stats + charts)
   await Promise.allSettled([
     fetchAnalytics(),
     fetchRevenue(),
     fetchRevenueChart(),
+  ])
+  initialLoading.value = false
+
+  // Wave 2: secondary data (lists shown below the fold)
+  Promise.allSettled([
     fetchPendingPickups(),
     fetchActiveTrucks(),
     fetchShopOverview(),
     fetchActiveDriversCount(),
   ])
-  initialLoading.value = false
 })
 
 // Chart helpers

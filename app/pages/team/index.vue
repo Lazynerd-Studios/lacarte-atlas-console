@@ -1,6 +1,18 @@
 <script setup lang="ts">
 import type { TeamMember, CreateRolePayload } from '~/types/team'
 
+/** Shape of a single admin record returned by GET /team/ */
+interface TeamAdminRecord {
+  id: string
+  user?: { name?: string; email?: string }
+  phoneNumber?: string
+  role?: { id: string; name: string; displayName?: string }
+  status: 'active' | 'inactive'
+  lastLoginAt?: string
+  createdAt: string
+  updatedAt?: string
+}
+
 interface TeamStats {
   totalMembers: number
   activeMembers: number
@@ -146,14 +158,15 @@ async function handleDelete() {
     showDeleteModal.value = false
     memberToDelete.value = null
     await Promise.all([fetchMembers(), fetchStats()]) // Refresh member list and stats
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[Team Management] Member deletion failed', { error: err })
     // 404 not found
-    if (err?.message?.toLowerCase().includes('not found')) {
+    const message = err instanceof Error ? err.message : String(err ?? '')
+    if (message.toLowerCase().includes('not found')) {
       toast.error('Member not found', 'The requested team member could not be found')
     } else {
       // Other errors (403, 500, network) show as toast
-      const errorMessage = err?.message || 'Failed to delete team member'
+      const errorMessage = message || 'Failed to delete team member'
       toast.error('Failed to delete team member', errorMessage)
     }
   } finally {
@@ -175,7 +188,7 @@ async function fetchMembers() {
   const api = useApi()
   
   console.log('[Team Management] Sending GET request to /team/')
-  const response = await api.get<{ data: any[] }>('/team/')
+  const response = await api.get<{ data: TeamAdminRecord[] }>('/team/')
   if (response && response.data) {
     console.log('[Team Management] Members fetched successfully', { 
       count: response.data.length,
@@ -185,7 +198,7 @@ async function fetchMembers() {
     })
     
     // Transform backend response to match our TeamMember interface
-    members.value = response.data.map((item: any) => ({
+    members.value = response.data.map((item: TeamAdminRecord) => ({
       id: item.id,
       firstName: item.user?.name?.split(' ')[0] || '',
       lastName: item.user?.name?.split(' ').slice(1).join(' ') || '',

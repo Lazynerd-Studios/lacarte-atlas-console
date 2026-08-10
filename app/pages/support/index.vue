@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SupportTicket, SupportTicketStatus, SupportTicketPriority, SupportTicketCategory, TicketStats, TicketListResponse, Pagination } from '~/types/support'
+import type { SupportTicket, SupportTicketStatus, SupportTicketPriority, SupportTicketCategory, TicketStats, TicketListResponse, PaginationMeta } from '~/types/support'
 
 definePageMeta({ layout: 'dashboard' })
 
@@ -40,7 +40,7 @@ const categoryOptions: { label: string; value: 'all' | SupportTicketCategory }[]
 
 // ── Data ──
 const tickets = ref<SupportTicket[]>([])
-const pagination = ref<Pagination>({
+const pagination = ref<PaginationMeta>({
   page: 1,
   limit: 20,
   total: 0,

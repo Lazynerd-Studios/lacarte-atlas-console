@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { PaginatedDataResponse } from '~/types/api'
+
 definePageMeta({ layout: 'dashboard' })
 
 const api = useApi()
@@ -46,10 +48,8 @@ interface Payout {
   earnings?: PayoutEarningItem[]
 }
 
-interface PayoutListResponse {
+interface PayoutListResponse extends PaginatedDataResponse<Payout> {
   success: boolean
-  data: Payout[]
-  pagination: { page: number; limit: number; total: number; totalPages: number; hasNextPage: boolean; hasPreviousPage: boolean }
 }
 
 interface GenerateResponse {
@@ -177,7 +177,7 @@ async function approvePayout() {
   const payoutId = approvingId.value
   approving.value = true
   try {
-    const result = await api.patch<{ success: boolean; data: any }>(
+    const result = await api.patch<{ success: boolean; data: Payout }>(
       `/driver-earning/admin/payouts/${payoutId}/approve`,
       {},
       'Failed to approve payout'
@@ -198,7 +198,7 @@ async function markPayoutPaid() {
   const payoutId = markingPaidId.value
   markingPaid.value = true
   try {
-    const result = await api.patch<{ success: boolean; data: any }>(
+    const result = await api.patch<{ success: boolean; data: Payout }>(
       `/driver-earning/admin/payouts/${payoutId}/mark-paid`,
       {},
       'Failed to mark payout as paid'

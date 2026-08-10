@@ -7,8 +7,9 @@ export const useAuthStore = defineStore('auth', () => {
   const sessionExpiresAt = ref<number | null>(null)
   const showSessionWarning = ref(false)
   const sessionWarningTime = ref(0)
-  let sessionCheckInterval: ReturnType<typeof setInterval> | null = null
-  let sessionWarningInterval: ReturnType<typeof setInterval> | null = null
+  let sessionWarningTimer: ReturnType<typeof setTimeout> | null = null
+  let sessionExpiryTimer: ReturnType<typeof setTimeout> | null = null
+  let sessionCheckTimer: ReturnType<typeof setTimeout> | null = null
 
   const publicRoutes = ['/login', '/forgot-password', '/unauthorized']
   const isPublicRoute = (path: string) =>
@@ -48,20 +49,17 @@ export const useAuthStore = defineStore('auth', () => {
 
   function getSessionDurationMs(): number {
     const config = useRuntimeConfig()
-    const minutes = (config.public as any).sessionDurationMinutes
-    return (minutes ?? 30) * 60 * 1000
+    return (config.public.sessionDurationMinutes ?? 30) * 60 * 1000
   }
 
   function getSessionWarningSecs(): number {
     const config = useRuntimeConfig()
-    const secs = (config.public as any).sessionWarningSeconds
-    return secs ?? 120
+    return config.public.sessionWarningSeconds ?? 120
   }
 
   function getSessionCheckIntervalMs(): number {
     const config = useRuntimeConfig()
-    const minutes = (config.public as any).sessionCheckIntervalMinutes
-    return (minutes ?? 5) * 60 * 1000
+    return (config.public.sessionCheckIntervalMinutes ?? 5) * 60 * 1000
   }
 
   async function setAuth(userData: AuthUser, authToken: string) {
@@ -106,7 +104,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function extendSession() {
-    refreshSession()
+    void refreshSession()
   }
 
   function dismissSessionWarning() {
@@ -146,24 +144,41 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function startSessionWarningCheck() {
-    // Clear any existing interval
-    if (sessionWarningInterval) {
-      clearInterval(sessionWarningInterval)
+    // Clear any existing timers
+    scheduleSessionWarning()
+  }
+
+  /** Schedules a single setTimeout for the warning and another for expiry. */
+  function scheduleSessionWarning() {
+    if (sessionWarningTimer) clearTimeout(sessionWarningTimer)
+    if (sessionExpiryTimer) clearTimeout(sessionExpiryTimer)
+
+    if (!sessionExpiresAt.value) return
+
+    const now = Date.now()
+    const timeUntilExpiry = sessionExpiresAt.value - now
+    const warningSecs = getSessionWarningSecs()
+
+    if (timeUntilExpiry <= 0) {
+      // Already expired
+      showSessionWarning.value = false
+      logout()
+      if (import.meta.client) {
+        const router = useRouter()
+        const current = router.currentRoute.value.path
+        if (!isPublicRoute(current)) router.push('/login')
+      }
+      return
     }
 
-    // Check every second if we should show warning
-    sessionWarningInterval = setInterval(() => {
-      if (!sessionExpiresAt.value) return
+    // Show warning `warningSecs` before expiry
+    const timeUntilWarning = timeUntilExpiry - warningSecs * 1000
 
-      const timeRemaining = Math.floor((sessionExpiresAt.value - Date.now()) / 1000)
-      const warningSecs = getSessionWarningSecs()
-
-      // Show warning before expiry
-      if (timeRemaining <= warningSecs && timeRemaining > 0) {
-        showSessionWarning.value = true
-        sessionWarningTime.value = timeRemaining
-      } else if (timeRemaining <= 0) {
-        // Session expired
+    if (timeUntilWarning <= 0) {
+      // Already within warning window — show immediately and set expiry timer
+      showSessionWarning.value = true
+      sessionWarningTime.value = Math.floor(timeUntilExpiry / 1000)
+      sessionExpiryTimer = setTimeout(() => {
         showSessionWarning.value = false
         logout()
         if (import.meta.client) {
@@ -171,36 +186,61 @@ export const useAuthStore = defineStore('auth', () => {
           const current = router.currentRoute.value.path
           if (!isPublicRoute(current)) router.push('/login')
         }
-      } else {
-        showSessionWarning.value = false
-      }
-    }, 1000)
+      }, timeUntilExpiry)
+    } else {
+      // Schedule warning to appear later
+      sessionWarningTimer = setTimeout(() => {
+        showSessionWarning.value = true
+        sessionWarningTime.value = warningSecs
+        // Once warning appears, schedule expiry
+        sessionExpiryTimer = setTimeout(() => {
+          showSessionWarning.value = false
+          logout()
+          if (import.meta.client) {
+            const router = useRouter()
+            const current = router.currentRoute.value.path
+            if (!isPublicRoute(current)) router.push('/login')
+          }
+        }, warningSecs * 1000)
+      }, timeUntilWarning)
+    }
   }
 
   function startSessionCheck() {
-    // Clear any existing interval
-    if (sessionCheckInterval) {
-      clearInterval(sessionCheckInterval)
+    // Clear any existing timer
+    if (sessionCheckTimer) {
+      clearTimeout(sessionCheckTimer)
+      sessionCheckTimer = null
     }
 
-    // Periodic session check based on runtime config
-    sessionCheckInterval = setInterval(async () => {
+    schedulePeriodicSessionCheck()
+  }
+
+  function schedulePeriodicSessionCheck() {
+    // Use the first check to schedule the next one — avoids persistent interval
+    const interval = getSessionCheckIntervalMs()
+    sessionCheckTimer = setTimeout(function check() {
       console.log('[auth] Periodic session check')
-      const isValid = await checkSession()
-      if (!isValid) {
-        // logout() inside checkSession already redirects to /login
-      }
-    }, getSessionCheckIntervalMs())
+      checkSession().finally(() => {
+        if (token.value) {
+          sessionCheckTimer = setTimeout(check, interval)
+        }
+      })
+    }, interval)
   }
 
   function stopSessionCheck() {
-    if (sessionCheckInterval) {
-      clearInterval(sessionCheckInterval)
-      sessionCheckInterval = null
+    if (sessionCheckTimer) {
+      clearTimeout(sessionCheckTimer)
+      sessionCheckTimer = null
     }
-    if (sessionWarningInterval) {
-      clearInterval(sessionWarningInterval)
-      sessionWarningInterval = null
+    if (sessionWarningTimer) {
+      clearTimeout(sessionWarningTimer)
+      sessionWarningTimer = null
+    }
+    if (sessionExpiryTimer) {
+      clearTimeout(sessionExpiryTimer)
+      sessionExpiryTimer = null
     }
   }
 
@@ -262,5 +302,7 @@ export const useAuthStore = defineStore('auth', () => {
     fetchTeamMemberProfile,
   }
 }, {
-  persist: true,
+  persist: {
+    storage: sessionStorage,
+  },
 })

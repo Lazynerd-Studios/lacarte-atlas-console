@@ -90,7 +90,11 @@ function submit() {
     payload.actualTruckLoadRateId = actualTruckLoadRateId.value
   }
 
-  api.patch(`/pickup-requests/admin/${props.pickupId}/actual-load`, payload, 'Failed to adjust load')
+  api.patch<{ deltaAmount: number; settlement: string }>(
+    `/pickup-requests/admin/${props.pickupId}/actual-load`,
+    payload,
+    'Failed to adjust load'
+  )
     .then((result) => {
       if (result) {
         const deltaAmount = result.deltaAmount ?? 0
@@ -104,8 +108,9 @@ function submit() {
         emit('close')
       }
     })
-    .catch((err: any) => {
-      error.value = err?.message || 'Failed to adjust load.'
+    .catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err ?? '')
+      error.value = message || 'Failed to adjust load.'
       console.error('[AdjustLoadModal] Error:', err)
     })
     .finally(() => {

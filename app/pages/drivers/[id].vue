@@ -1,16 +1,60 @@
 <script setup lang="ts">
+import type { Driver } from '~/types/driver'
+import type { PaginationMeta } from '~/types/api'
+
 definePageMeta({ layout: 'dashboard' })
 
 const route = useRoute()
-const driver = ref<any>(null)
+const driver = ref<Driver | null>(null)
 const loading = ref(true)
 const notFound = ref(false)
 const toast = useAppToast()
 
 const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
-const todayPickups = ref<any[]>([])
+
+/** A single stop on a driver's route */
+interface RouteStop {
+  id: string
+  order: number
+  status: string
+  timeSlot?: string
+  priorityLevel?: string
+  customer?: { name?: string; phoneNumber?: string; address?: string; placeName?: string }
+  pickupRequest?: { status: string }
+  disposableItemType?: { name?: string }
+  estimatedQuantity?: { label?: string }
+  scheduledDate?: string
+}
+
+/** Route data returned by /drivers/admin/:id/route */
+interface DriverRoute {
+  stops: RouteStop[]
+  progress: { completed: number; inProgress: number; pending: number; total: number; percentage: number }
+  estimatedCompletion: string
+}
+
+/** Payout calculation result */
+interface PayoutResult {
+  currentEarnings?: number
+  totalPayout?: number | string
+  status: string
+  currency?: string
+  periodMonth: string
+  monthlySalary?: number | string
+  binsAssigned?: number
+  binsCompleted?: number
+  performanceDeduction?: number
+  manualDeductions?: number
+  manualBonuses?: number
+  paymentSchedule?: string
+  monthlyBinTarget?: number
+  minimumBinThreshold?: number
+  minimumFillRate?: number
+}
+
+const todayPickups = ref<RouteStop[]>([])
 const loadingPickups = ref(false)
-const pickupHistory = ref<any[]>([])
+const pickupHistory = ref<RouteStop[]>([])
 const loadingHistory = ref(false)
 const routeProgress = ref({ completed: 0, inProgress: 0, pending: 0, total: 0, percentage: 0 })
 const estimatedCompletion = ref('N/A')
@@ -40,7 +84,7 @@ async function fetchTodayPickups() {
   const api = useApi()
   
   console.log('[driver-detail] Fetching current route for driver:', route.params.id)
-  const data = await api.get<any>(`/drivers/admin/${route.params.id}/route`)
+  const data = await api.get<DriverRoute>(`/drivers/admin/${route.params.id}/route`)
   
   if (data) {
     console.log('[driver-detail] Current route response:', data)
@@ -63,7 +107,9 @@ async function fetchPickupHistory() {
   const api = useApi()
   
   console.log('[driver-detail] Fetching pickup history for driver:', route.params.id)
-  const response = await api.get<{ data: any[], pagination: any }>(`/drivers/admin/${route.params.id}/pickups/history`)
+  const response = await api.get<{ data: RouteStop[]; pagination: PaginationMeta }>(
+    `/drivers/admin/${route.params.id}/pickups/history`
+  )
   
   if (response && response.data) {
     console.log('[driver-detail] Pickup history response:', response)
@@ -77,7 +123,7 @@ async function fetchPickupHistory() {
   loadingHistory.value = false
 }
 
-function formatDate(dateString: string): string {
+function formatDate(dateString: string | undefined): string {
   if (!dateString) return 'N/A'
   try {
     const date = new Date(dateString)
@@ -87,7 +133,7 @@ function formatDate(dateString: string): string {
   }
 }
 
-function getStatusBadgeStyle(status: string) {
+function getStatusBadgeStyle(status: string | undefined) {
   if (status === 'completed') return { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#22c55e' }
   if (status === 'cancelled') return { bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)', color: '#ef4444' }
   if (status === 'in_progress' || status === 'in-progress') return { bg: 'rgba(255,180,0,0.1)', border: 'rgba(255,180,0,0.2)', color: '#d49a00' }
@@ -148,7 +194,7 @@ const progressPct = computed(() => {
   return routeProgress.value.percentage || 0
 })
 
-function getPickupStatus(stop: any): string {
+function getPickupStatus(stop: RouteStop): string {
   const status = stop.status
   if (status === 'completed') return 'completed'
   if (status === 'in_progress' || status === 'in-progress') return 'in-progress'
@@ -247,7 +293,7 @@ function linePoints(data: { month: string; value: number }[], totalW: number) {
 }
 
 // Current pay period from payout calculation API
-const payout = ref<any>(null)
+const payout = ref<PayoutResult | null>(null)
 const loadingPayout = ref(false)
 
 async function fetchCurrentPayout() {
@@ -255,7 +301,7 @@ async function fetchCurrentPayout() {
   try {
     const api = useApi()
     const month = new Date().toISOString().slice(0, 7)
-    const data = await api.get<{ success: boolean; data: any }>(
+    const data = await api.get<{ success: boolean; data: PayoutResult }>(
       `/driver-earning/admin/payouts/calculate?driverId=${route.params.id}&periodMonth=${month}`,
       'Failed to load current pay period'
     )
@@ -929,7 +975,7 @@ function stopBadge(status: string) {
     </template><!-- end v-else -->
 
   <EditDriverModal
-    v-if="showEditModal"
+    v-if="showEditModal && driver"
     ref="editDriverModalRef"
     :driver="driver"
     @close="showEditModal = false"

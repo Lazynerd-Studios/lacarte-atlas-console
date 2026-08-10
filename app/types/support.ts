@@ -1,5 +1,7 @@
 // Support / Ticket Type Definitions
 
+import type { PaginationMeta } from './api'
+
 /** Customer information attached to a support ticket */
 export interface SupportTicketCustomer {
   id: string
@@ -47,15 +49,8 @@ export interface TicketStats {
   avgResponseHours: number
 }
 
-/** Pagination metadata returned by list endpoints */
-export interface Pagination {
-  page: number
-  limit: number
-  total: number
-  totalPages: number
-  hasNextPage: boolean
-  hasPreviousPage: boolean
-}
+/** Pagination metadata returned by list endpoints — re-exported from shared api types */
+export type { PaginationMeta } from './api'
 
 /** Message within a support ticket conversation */
 export interface SupportTicketMessage {
@@ -74,7 +69,4 @@ export interface SupportTicketDetail extends SupportTicket {
 }
 
 /** Paginated list response for /support/admin/tickets */
-export interface TicketListResponse {
-  data: SupportTicket[]
-  pagination: Pagination
-}
+export type TicketListResponse = import('./api').PaginatedDataResponse<SupportTicket>

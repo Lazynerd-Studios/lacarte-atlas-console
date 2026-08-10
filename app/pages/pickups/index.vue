@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { PaginationMeta, PaginatedDataResponse } from '~/types/api'
+
 definePageMeta({ layout: 'dashboard' })
 
 interface PickupRequest {
@@ -32,17 +34,8 @@ interface PickupRequest {
   }
 }
 
-interface Pagination {
-  page: number
-  limit: number
-  total: number
-  totalPages: number
-  hasNextPage: boolean
-  hasPreviousPage: boolean
-}
-
 const requests = ref<PickupRequest[]>([])
-const pagination = ref<Pagination>({
+const pagination = ref<PaginationMeta>({
   page: 1,
   limit: 20,
   total: 0,
@@ -143,7 +136,7 @@ async function fetchRequests() {
     params.append('sortBy', sortBy.value)
     params.append('sortOrder', sortOrder.value)
     
-    const data = await api.get<{ data: PickupRequest[]; pagination: Pagination }>(
+    const data = await api.get<PaginatedDataResponse<PickupRequest>>(
       `/pickup-requests/admin/list?${params.toString()}`,
       'Failed to load pickup requests'
     )
