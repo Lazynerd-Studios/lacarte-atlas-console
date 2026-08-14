@@ -146,7 +146,7 @@ function openDeleteDisposable(item: DisposableType) {
   showDeleteDisposableModal.value = true
 }
 
-async function confirmDeleteDisposable() {
+async function handleDeleteDisposable() {
   if (!deleteDisposableTarget.value) return
   const ok = await api.del(
     `/disposable-types/admin/types/${deleteDisposableTarget.value.id}`,
@@ -215,7 +215,7 @@ function openDeleteQuantity(item: EstimatedQuantity) {
   showDeleteQuantityModal.value = true
 }
 
-async function confirmDeleteQuantity() {
+async function handleDeleteQuantity() {
   if (!deleteQuantityTarget.value) return
   const ok = await api.del(
     `/disposable-types/admin/quantities/${deleteQuantityTarget.value.id}`,
