@@ -67,7 +67,7 @@ function selectStyle() {
           <p style="font-size:13px;color:#6b7280;margin:4px 0 0">{{ invoice.invoiceNumber }}</p>
         </div>
         <button @click="emit('close')" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px;display:flex;align-items:center">
-          <Icon name="lucide:x" style="width:20px;height:20px" />
+          <UIcon name="i-lucide-x" style="width:20px;height:20px" />
         </button>
       </div>
 
@@ -95,7 +95,7 @@ function selectStyle() {
         <button @click="emit('close')" :disabled="submitting" style="background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Cancel</button>
         <button @click="submit" :disabled="submitting"
           :style="`background:${submitting ? '#ffd966' : '#ffb400'};color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px;opacity:${submitting ? '0.7' : '1'}`">
-          <Icon v-if="submitting" name="lucide:loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
+          <UIcon v-if="submitting" name="i-lucide-loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
           {{ submitting ? 'Updating...' : 'Update Status' }}
         </button>
       </div>

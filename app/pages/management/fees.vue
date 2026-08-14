@@ -217,7 +217,7 @@ async function handleShopZoneDelete(configId: string) {
       </div>
       <button @click="refresh" :disabled="loading"
         :style="`display:flex;align-items:center;gap:8px;background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${loading ? 'not-allowed' : 'pointer'};opacity:${loading ? '0.5' : '1'}`">
-        <Icon :name="loading ? 'lucide:loader-2' : 'lucide:rotate-cw'" :style="`width:16px;height:16px;${loading ? 'animation:spin 1s linear infinite' : ''}`" />
+        <UIcon :name="loading ? 'i-lucide-loader-2' : 'i-lucide-rotate-cw'" :style="`width:16px;height:16px;${loading ? 'animation:spin 1s linear infinite' : ''}`" />
         {{ loading ? 'Loading...' : 'Refresh' }}
       </button>
     </div>

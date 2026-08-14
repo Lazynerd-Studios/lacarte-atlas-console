@@ -50,7 +50,7 @@ function submit() {
       <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0;position:sticky;top:0;background:#fff;z-index:1">
         <h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0">Edit Zone</h2>
         <button @click="emit('close')" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px;display:flex;align-items:center">
-          <Icon name="lucide:x" style="width:20px;height:20px" />
+          <UIcon name="i-lucide-x" style="width:20px;height:20px" />
         </button>
       </div>
 
@@ -95,7 +95,7 @@ function submit() {
         <button @click="emit('close')" :disabled="submitting" style="background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Cancel</button>
         <button @click="submit" :disabled="submitting"
           :style="`background:${submitting ? '#ffd966' : '#ffb400'};color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px;opacity:${submitting ? '0.7' : '1'}`">
-          <Icon v-if="submitting" name="lucide:loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
+          <UIcon v-if="submitting" name="i-lucide-loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
           {{ submitting ? 'Saving...' : 'Save Changes' }}
         </button>
       </div>

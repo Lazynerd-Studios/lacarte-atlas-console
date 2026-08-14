@@ -80,6 +80,20 @@ export const useAuthStore = defineStore('auth', () => {
     startSessionWarningCheck()
   }
 
+  function updateToken(newToken: string, updatedUser?: AuthUser) {
+    token.value = newToken
+    if (updatedUser) {
+      user.value = updatedUser
+      if (user.value.role && typeof user.value.role !== 'string') {
+        user.value.role = (user.value.role as AuthRole).name ?? ''
+      }
+    }
+    sessionExpiresAt.value = Date.now() + getSessionDurationMs()
+    showSessionWarning.value = false
+    startSessionCheck()
+    startSessionWarningCheck()
+  }
+
   async function refreshSession() {
     if (!token.value) return false
 
@@ -294,6 +308,7 @@ export const useAuthStore = defineStore('auth', () => {
     sessionWarningTime,
     isAuthenticated,
     setAuth,
+    updateToken,
     checkSession,
     refreshSession,
     extendSession,

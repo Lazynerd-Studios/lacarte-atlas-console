@@ -69,20 +69,12 @@ function sortIcon(field: string) {
   return sortOrder.value === 'asc' ? 'i-lucide-arrow-up' : 'i-lucide-arrow-down'
 }
 
-const filtered = computed(() => {
-  let result = requests.value
-  
-  if (activeFilter.value !== 'All') {
-    result = result.filter(r => r.status.toLowerCase() === activeFilter.value.toLowerCase())
-  }
-  
-  if (activePaymentStatus.value !== 'All') {
-    const val = activePaymentStatus.value.toLowerCase().replace(/\s+/g, '-')
-    result = result.filter(r => r.paymentStatus.toLowerCase().replace(/_/g, '-') === val)
-  }
-  
-  return result
-})
+const filtered = computed(() => requests.value)
+
+function handlePageChange(newPage: number) {
+  pagination.value.page = newPage
+  fetchRequests()
+}
 
 watch([activeFilter, activePaymentStatus], () => { 
   pagination.value.page = 1
@@ -571,10 +563,10 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
 
     <!-- Pagination -->
     <AppPagination
-      :page="currentPage"
+      :page="pagination.page"
       :total="pagination.total"
       :per-page="pagination.limit"
-      @update:page="currentPage = $event"
+      @update:page="handlePageChange"
     />
 
   </div>

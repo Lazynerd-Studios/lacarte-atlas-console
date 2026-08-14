@@ -89,10 +89,10 @@ async function changePassword() {
       revokeOtherSessions: false,
     }, 'Failed to change password')
     if (result) {
-      // Update token if new one is returned
+      // Update token and reset session timers if new one is returned
       if (result.token) {
         const authStore = useAuthStore()
-        authStore.token = result.token
+        authStore.updateToken(result.token, result.user)
       }
       // Clear form
       security.currentPassword = ''
@@ -123,29 +123,21 @@ interface ActivityLog {
   createdAt: string
 }
 
-interface ActivityLogsPagination {
-  page: number
-  limit: number
-  total: number
-  totalPages: number
-  hasNextPage: boolean
-  hasPreviousPage: boolean
-}
-
 const activityLogs = ref<ActivityLog[]>([])
-const activityPagination = ref<ActivityLogsPagination>({
+const activityLoading = ref(false)
+const activitySearch = ref('')
+const activityActionFilter = ref('')
+const activityModuleFilter = ref('')
+const activityEntityTypeFilter = ref('')
+
+const activityPagination = ref({
   page: 1,
   limit: 20,
   total: 0,
   totalPages: 0,
   hasNextPage: false,
-  hasPreviousPage: false
+  hasPreviousPage: false,
 })
-const activitySearch = ref('')
-const activityActionFilter = ref<string>('')
-const activityModuleFilter = ref<string>('')
-const activityEntityTypeFilter = ref<string>('')
-const activityLoading = ref(false)
 
 async function fetchActivityLogs() {
   activityLoading.value = true
@@ -153,7 +145,6 @@ async function fetchActivityLogs() {
     const params = new URLSearchParams({
       page: activityPagination.value.page.toString(),
       limit: activityPagination.value.limit.toString(),
-      actorType: 'admin',
     })
     
     if (activitySearch.value) params.append('search', activitySearch.value)
@@ -206,15 +197,15 @@ function formatTimestamp(timestamp: string) {
 }
 
 function getActivityIcon(action: string) {
-  if (action.includes('create')) return 'lucide:plus-circle'
-  if (action.includes('update') || action.includes('edit')) return 'lucide:edit'
-  if (action.includes('delete')) return 'lucide:trash-2'
-  if (action.includes('login')) return 'lucide:log-in'
-  if (action.includes('logout')) return 'lucide:log-out'
-  if (action.includes('assign')) return 'lucide:user-check'
-  if (action.includes('approve')) return 'lucide:check-circle'
-  if (action.includes('reject') || action.includes('decline')) return 'lucide:x-circle'
-  return 'lucide:activity'
+  if (action.includes('create')) return 'i-lucide-plus-circle'
+  if (action.includes('update') || action.includes('edit')) return 'i-lucide-edit'
+  if (action.includes('delete')) return 'i-lucide-trash-2'
+  if (action.includes('login')) return 'i-lucide-log-in'
+  if (action.includes('logout')) return 'i-lucide-log-out'
+  if (action.includes('assign')) return 'i-lucide-user-check'
+  if (action.includes('approve')) return 'i-lucide-check-circle'
+  if (action.includes('reject') || action.includes('decline')) return 'i-lucide-x-circle'
+  return 'i-lucide-activity'
 }
 
 function getActivityColor(action: string) {
@@ -531,7 +522,7 @@ watch(activeTab, (newTab) => {
             <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
               <!-- Search -->
               <div style="position:relative">
-                <Icon name="lucide:search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:#9ca3af;pointer-events:none" />
+                <UIcon name="i-lucide-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:#9ca3af;pointer-events:none" />
                 <input 
                   v-model="activitySearch" 
                   placeholder="Search logs..." 
@@ -554,7 +545,7 @@ watch(activeTab, (newTab) => {
                   <option value="inventory">Inventory</option>
                   <option value="team">Team</option>
                 </select>
-                <Icon name="lucide:chevron-down" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#6b7280;pointer-events:none" />
+                <UIcon name="i-lucide-chevron-down" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#6b7280;pointer-events:none" />
               </div>
               
               <!-- Entity Type Filter -->
@@ -572,14 +563,14 @@ watch(activeTab, (newTab) => {
                   <option value="zone">Zone</option>
                   <option value="admin">Admin</option>
                 </select>
-                <Icon name="lucide:chevron-down" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#6b7280;pointer-events:none" />
+                <UIcon name="i-lucide-chevron-down" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#6b7280;pointer-events:none" />
               </div>
             </div>
           </div>
 
           <!-- Loading state -->
           <div v-if="activityLoading" style="padding:60px 24px;text-align:center">
-            <Icon name="lucide:loader-2" style="width:40px;height:40px;color:#ffb400;margin-bottom:12px;animation:spin 1s linear infinite" />
+            <UIcon name="i-lucide-loader-2" style="width:40px;height:40px;color:#ffb400;margin-bottom:12px;animation:spin 1s linear infinite" />
             <p style="font-size:15px;font-weight:600;color:#1a1a1a;margin:0">Loading activity logs...</p>
           </div>
 
@@ -592,7 +583,7 @@ watch(activeTab, (newTab) => {
             >
               <!-- Icon -->
               <div :style="`width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:${getActivityColor(log.action)}15;flex-shrink:0`">
-                <Icon :name="getActivityIcon(log.action)" :style="`width:18px;height:18px;color:${getActivityColor(log.action)}`" />
+                <UIcon :name="getActivityIcon(log.action)" :style="`width:18px;height:18px;color:${getActivityColor(log.action)}`" />
               </div>
               
               <!-- Content -->
@@ -609,7 +600,7 @@ watch(activeTab, (newTab) => {
                 </div>
                 <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">{{ log.description }}</p>
                 <div v-if="log.ipAddress" style="display:flex;align-items:center;gap:6px;margin-top:6px">
-                  <Icon name="lucide:map-pin" style="width:12px;height:12px;color:#9ca3af" />
+                  <UIcon name="i-lucide-map-pin" style="width:12px;height:12px;color:#9ca3af" />
                   <span style="font-size:12px;color:#9ca3af;font-family:'Manrope',sans-serif">{{ log.ipAddress }}</span>
                 </div>
               </div>
@@ -617,7 +608,7 @@ watch(activeTab, (newTab) => {
             
             <!-- Empty state -->
             <div v-if="activityLogs.length === 0" style="padding:60px 24px;text-align:center">
-              <Icon name="lucide:activity" style="width:40px;height:40px;color:#d1d5db;margin-bottom:12px" />
+              <UIcon name="i-lucide-activity" style="width:40px;height:40px;color:#d1d5db;margin-bottom:12px" />
               <p style="font-size:15px;font-weight:600;color:#1a1a1a;margin:0 0 6px">No activity logs found</p>
               <p style="font-size:13px;color:#6b7280;margin:0">Try adjusting your search or filter criteria.</p>
             </div>

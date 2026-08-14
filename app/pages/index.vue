@@ -73,7 +73,8 @@ const pickupData = computed(() => {
   if (analytics.value?.pickupVolume?.length) {
     return analytics.value.pickupVolume.map(item => {
       const date = new Date(item.date)
-      return { day: dayNames[date.getDay()], value: item.pickupCount }
+      const day = isNaN(date.getTime()) ? '—' : (dayNames[date.getDay()] ?? '—')
+      return { day, value: item.pickupCount || 0 }
     })
   }
   return [

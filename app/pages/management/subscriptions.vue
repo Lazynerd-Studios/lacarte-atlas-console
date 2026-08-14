@@ -667,7 +667,7 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
           <p style="font-size:14px;color:#6b7280;margin:6px 0 0">Manage subscription tiers and pricing</p>
         </div>
         <button @click="openAdd" style="display:flex;align-items:center;gap:8px;background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">
-          <Icon name="lucide:plus" style="width:16px;height:16px" />
+          <UIcon name="i-lucide-plus" style="width:16px;height:16px" />
           Add Plan
         </button>
       </div>
@@ -722,7 +722,7 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
         <!-- Left: icon + info -->
         <div style="display:flex;align-items:flex-start;gap:16px;flex:1;min-width:220px">
           <div :style="`width:48px;height:48px;border-radius:14px;background:${plan.color}22;display:flex;align-items:center;justify-content:center;flex-shrink:0`">
-            <Icon name="lucide:layers" :style="`width:20px;height:20px;color:${plan.color}`" />
+            <UIcon name="i-lucide-layers" :style="`width:20px;height:20px;color:${plan.color}`" />
           </div>
           <div style="flex:1">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;flex-wrap:wrap">
@@ -736,12 +736,12 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
             <!-- Predefined feature pills -->
             <div style="display:flex;flex-wrap:wrap;gap:8px">
               <div style="display:flex;align-items:center;gap:6px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:6px 12px">
-                <Icon name="lucide:truck" style="width:13px;height:13px;color:#16a34a;flex-shrink:0" />
+                <UIcon name="i-lucide-truck" style="width:13px;height:13px;color:#16a34a;flex-shrink:0" />
                 <span style="font-size:12px;font-weight:600;color:#15803d">Pickups</span>
                 <span style="font-size:12px;font-weight:700;color:#1a1a1a;margin-left:2px">{{ plan.pickupCount }}</span>
               </div>
               <div style="display:flex;align-items:center;gap:6px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:6px 12px">
-                <Icon name="lucide:package" style="width:13px;height:13px;color:#2563eb;flex-shrink:0" />
+                <UIcon name="i-lucide-package" style="width:13px;height:13px;color:#2563eb;flex-shrink:0" />
                 <span style="font-size:12px;font-weight:600;color:#1d4ed8">BINs</span>
                 <span style="font-size:12px;font-weight:700;color:#1a1a1a;margin-left:2px">{{ plan.binCount }}</span>
               </div>
@@ -760,17 +760,17 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
         <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
           <button @click="toggleActive(plan)" :disabled="toggling === plan.id"
             :style="`display:flex;align-items:center;gap:6px;background:${plan.isActive ? '#fef2f2' : '#dcfce7'};color:${plan.isActive ? '#ef4444' : '#16a34a'};border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${toggling === plan.id ? 'not-allowed' : 'pointer'};opacity:${toggling === plan.id ? '0.6' : '1'}`">
-            <Icon v-if="toggling === plan.id" name="lucide:loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
-            <Icon v-else :name="plan.isActive ? 'lucide:pause-circle' : 'lucide:play-circle'" style="width:14px;height:14px" />
+            <UIcon v-if="toggling === plan.id" name="i-lucide-loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
+            <UIcon v-else :name="plan.isActive ? 'i-lucide-pause-circle' : 'i-lucide-play-circle'" style="width:14px;height:14px" />
             {{ toggling === plan.id ? 'Processing...' : (plan.isActive ? 'Deactivate' : 'Activate') }}
           </button>
           <button @click="openEdit(plan)" style="display:flex;align-items:center;gap:6px;background:#ececec;color:#1a1a1a;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">
-            <Icon name="lucide:pencil" style="width:14px;height:14px" />
+            <UIcon name="i-lucide-pencil" style="width:14px;height:14px" />
             Edit
           </button>
           <button @click="openDelete(plan)" :disabled="plan.subscriberCount > 0"
             :style="`display:flex;align-items:center;gap:6px;background:${plan.subscriberCount > 0 ? '#f5f5f5' : '#fef2f2'};color:${plan.subscriberCount > 0 ? '#9ca3af' : '#ef4444'};border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${plan.subscriberCount > 0 ? 'not-allowed' : 'pointer'}`">
-            <Icon name="lucide:trash-2" style="width:14px;height:14px" />
+            <UIcon name="i-lucide-trash-2" style="width:14px;height:14px" />
             Delete
           </button>
         </div>
@@ -779,7 +779,7 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
 
     <!-- Empty state -->
     <div v-if="visiblePlans.length === 0" style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;padding:60px 24px;text-align:center">
-      <Icon name="lucide:layers" style="width:40px;height:40px;color:#d1d5db;margin-bottom:12px" />
+      <UIcon name="i-lucide-layers" style="width:40px;height:40px;color:#d1d5db;margin-bottom:12px" />
       <p style="font-size:15px;font-weight:600;color:#1a1a1a;margin:0 0 6px">No {{ activeTab }} plans yet</p>
       <p style="font-size:13px;color:#6b7280;margin:0 0 20px">Create your first {{ activeTab }} plan to get started.</p>
       <button @click="openAdd" style="background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Add Plan</button>
@@ -832,7 +832,7 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
             <!-- Subscriber count -->
             <td style="padding:14px 24px">
               <span style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#1a1a1a">
-                <Icon name="lucide:users" style="width:14px;height:14px;color:#6b7280" />
+                <UIcon name="i-lucide-users" style="width:14px;height:14px;color:#6b7280" />
                 {{ tier.subscriberCount }}
               </span>
             </td>
@@ -841,7 +841,7 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
       </table>
 
       <div v-else style="padding:40px 24px;text-align:center">
-        <Icon name="lucide:repeat" style="width:32px;height:32px;color:#d1d5db;margin-bottom:10px" />
+        <UIcon name="i-lucide-repeat" style="width:32px;height:32px;color:#d1d5db;margin-bottom:10px" />
         <p style="font-size:14px;font-weight:600;color:#1a1a1a;margin:0 0 4px">No active subscriptions</p>
         <p style="font-size:13px;color:#6b7280;margin:0">Active subscription tiers will appear here.</p>
       </div>
@@ -856,7 +856,7 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
             <p style="font-size:12px;color:#6b7280;margin:4px 0 0;text-transform:capitalize">{{ activeTab }} billing</p>
           </div>
           <button @click="showAddModal=false" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px">
-            <Icon name="lucide:x" style="width:20px;height:20px" />
+            <UIcon name="i-lucide-x" style="width:20px;height:20px" />
           </button>
         </div>
         <div style="padding:24px;display:flex;flex-direction:column;gap:16px">
@@ -882,14 +882,14 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
               <div>
                 <label style="font-size:12px;font-weight:600;color:#374151;display:flex;align-items:center;gap:6px;margin-bottom:6px">
-                  <Icon name="lucide:truck" style="width:13px;height:13px;color:#16a34a" />
+                  <UIcon name="i-lucide-truck" style="width:13px;height:13px;color:#16a34a" />
                   Pickups <span style="color:#ef4444">*</span>
                 </label>
                 <input v-model="addForm.pickupCount" type="number" min="0" placeholder="e.g. 8" style="width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;background:#fff" />
               </div>
               <div>
                 <label style="font-size:12px;font-weight:600;color:#374151;display:flex;align-items:center;gap:6px;margin-bottom:6px">
-                  <Icon name="lucide:package" style="width:13px;height:13px;color:#2563eb" />
+                  <UIcon name="i-lucide-package" style="width:13px;height:13px;color:#2563eb" />
                   BINs <span style="color:#ef4444">*</span>
                 </label>
                 <input v-model="addForm.binCount" type="number" min="0" placeholder="e.g. 1" style="width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;background:#fff" />
@@ -926,7 +926,7 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
         <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px;position:sticky;bottom:0;background:#fff">
           <button @click="showAddModal=false" :disabled="submitting" :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.6' : '1'}`">Cancel</button>
           <button @click="handleAdd" :disabled="submitting" :style="`display:flex;align-items:center;gap:8px;background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.8' : '1'}`">
-            <Icon v-if="submitting" name="lucide:loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
+            <UIcon v-if="submitting" name="i-lucide-loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
             {{ submitting ? 'Creating...' : 'Add Plan' }}
           </button>
         </div>
@@ -942,7 +942,7 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
             <p style="font-size:12px;color:#6b7280;margin:4px 0 0;text-transform:capitalize">{{ editForm.billingType }} billing</p>
           </div>
           <button @click="showEditModal=false" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px">
-            <Icon name="lucide:x" style="width:20px;height:20px" />
+            <UIcon name="i-lucide-x" style="width:20px;height:20px" />
           </button>
         </div>
         <div style="padding:24px;display:flex;flex-direction:column;gap:16px">
@@ -968,14 +968,14 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
               <div>
                 <label style="font-size:12px;font-weight:600;color:#374151;display:flex;align-items:center;gap:6px;margin-bottom:6px">
-                  <Icon name="lucide:truck" style="width:13px;height:13px;color:#16a34a" />
+                  <UIcon name="i-lucide-truck" style="width:13px;height:13px;color:#16a34a" />
                   Pickups <span style="color:#ef4444">*</span>
                 </label>
                 <input v-model="editForm.pickupStr" type="number" min="0" style="width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;background:#fff" />
               </div>
               <div>
                 <label style="font-size:12px;font-weight:600;color:#374151;display:flex;align-items:center;gap:6px;margin-bottom:6px">
-                  <Icon name="lucide:package" style="width:13px;height:13px;color:#2563eb" />
+                  <UIcon name="i-lucide-package" style="width:13px;height:13px;color:#2563eb" />
                   BINs <span style="color:#ef4444">*</span>
                 </label>
                 <input v-model="editForm.binStr" type="number" min="0" style="width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;background:#fff" />
@@ -1012,7 +1012,7 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
         <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px;position:sticky;bottom:0;background:#fff">
           <button @click="showEditModal=false" :disabled="submitting" :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.6' : '1'}`">Cancel</button>
           <button @click="handleEdit" :disabled="submitting" :style="`display:flex;align-items:center;gap:8px;background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.8' : '1'}`">
-            <Icon v-if="submitting" name="lucide:loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
+            <UIcon v-if="submitting" name="i-lucide-loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
             {{ submitting ? 'Saving...' : 'Save Changes' }}
           </button>
         </div>
@@ -1025,12 +1025,12 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
         <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0">
           <h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0">Delete Plan</h2>
           <button @click="showDeleteModal=false" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px">
-            <Icon name="lucide:x" style="width:20px;height:20px" />
+            <UIcon name="i-lucide-x" style="width:20px;height:20px" />
           </button>
         </div>
         <div style="padding:28px 24px;text-align:center">
           <div style="width:56px;height:56px;border-radius:50%;background:#fef2f2;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
-            <Icon name="lucide:trash-2" style="width:24px;height:24px;color:#ef4444" />
+            <UIcon name="i-lucide-trash-2" style="width:24px;height:24px;color:#ef4444" />
           </div>
           <p style="font-size:15px;font-weight:600;color:#1a1a1a;margin:0 0 8px">Delete "{{ deleteTarget?.name }}"?</p>
           <p style="font-size:13px;color:#6b7280;margin:0">This action cannot be undone. The plan will be permanently removed.</p>
@@ -1038,7 +1038,7 @@ const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444
         <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px">
           <button @click="showDeleteModal=false" :disabled="deleting" :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${deleting ? 'not-allowed' : 'pointer'};opacity:${deleting ? '0.6' : '1'}`">Cancel</button>
           <button @click="handleDelete" :disabled="deleting" :style="`display:flex;align-items:center;gap:8px;background:#ef4444;color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${deleting ? 'not-allowed' : 'pointer'};opacity:${deleting ? '0.8' : '1'}`">
-            <Icon v-if="deleting" name="lucide:loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
+            <UIcon v-if="deleting" name="i-lucide-loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
             {{ deleting ? 'Deleting...' : 'Delete' }}
           </button>
         </div>

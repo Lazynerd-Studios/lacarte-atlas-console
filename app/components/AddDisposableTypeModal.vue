@@ -9,7 +9,7 @@ const submitting = ref(false)
 const form = reactive({
   name: '',
   description: '',
-  icon: 'lucide:trash-2',
+  icon: 'i-lucide-trash-2',
   isActive: true,
   displayOrder: 0
 })
@@ -23,17 +23,24 @@ const errors = reactive({
 
 // Common waste icons
 const iconOptions = [
-  { value: 'lucide:trash-2', label: 'Trash' },
-  { value: 'lucide:recycle', label: 'Recycle' },
-  { value: 'lucide:package', label: 'Package' },
-  { value: 'lucide:bottle', label: 'Bottle' },
-  { value: 'lucide:leaf', label: 'Organic' },
-  { value: 'lucide:zap', label: 'Hazardous' },
-  { value: 'lucide:box', label: 'Box' },
-  { value: 'lucide:droplet', label: 'Liquid' },
-  { value: 'lucide:cpu', label: 'Electronic' },
-  { value: 'lucide:shopping-bag', label: 'Plastic Bag' },
+  { value: 'i-lucide-trash-2', label: 'Trash' },
+  { value: 'i-lucide-recycle', label: 'Recycle' },
+  { value: 'i-lucide-package', label: 'Package' },
+  { value: 'i-lucide-flask-conical', label: 'Bottle' },
+  { value: 'i-lucide-leaf', label: 'Organic' },
+  { value: 'i-lucide-zap', label: 'Hazardous' },
+  { value: 'i-lucide-box', label: 'Box' },
+  { value: 'i-lucide-droplet', label: 'Liquid' },
+  { value: 'i-lucide-cpu', label: 'Electronic' },
+  { value: 'i-lucide-shopping-bag', label: 'Plastic Bag' },
 ]
+
+function normalizeIcon(iconName: string) {
+  if (!iconName) return 'i-lucide-trash-2'
+  if (iconName.startsWith('i-lucide-')) return iconName
+  if (iconName.startsWith('lucide:')) return 'i-' + iconName
+  return `i-lucide-${iconName}`
+}
 
 function validate() {
   errors.name = ''
@@ -83,7 +90,7 @@ async function handleSubmit() {
       <div style="padding:24px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between">
         <h2 style="font-size:20px;font-weight:700;color:#1a1a1a;margin:0">Add Disposable Type</h2>
         <button @click="emit('close')" style="width:32px;height:32px;border-radius:8px;border:none;background:#f5f5f5;cursor:pointer;display:flex;align-items:center;justify-content:center">
-          <Icon name="lucide:x" style="width:16px;height:16px;color:#6b7280" />
+          <UIcon name="i-lucide-x" style="width:16px;height:16px;color:#6b7280" />
         </button>
       </div>
 
@@ -114,7 +121,7 @@ async function handleSubmit() {
               type="button"
               @click="form.icon = option.value"
               :style="`display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 8px;border:2px solid ${form.icon === option.value ? '#ffb400' : '#e5e7eb'};border-radius:10px;background:${form.icon === option.value ? '#fff9e6' : '#fff'};cursor:pointer;transition:all 0.15s`">
-              <Icon :name="option.value" style="width:20px;height:20px;color:#1a1a1a" />
+              <UIcon :name="normalizeIcon(option.value)" style="width:20px;height:20px;color:#1a1a1a" />
               <span style="font-size:10px;color:#6b7280;text-align:center">{{ option.label }}</span>
             </button>
           </div>
@@ -143,7 +150,7 @@ async function handleSubmit() {
           Cancel
         </button>
         <button @click="handleSubmit" :disabled="submitting" :style="`padding:10px 20px;border-radius:10px;border:none;background:${submitting ? '#f3f4f6' : '#ffb400'};font-size:14px;font-weight:600;color:${submitting ? '#9ca3af' : '#1a1a1a'};font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px`">
-          <Icon v-if="submitting" name="lucide:loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
+          <UIcon v-if="submitting" name="i-lucide-loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
           {{ submitting ? 'Creating...' : 'Create' }}
         </button>
       </div>

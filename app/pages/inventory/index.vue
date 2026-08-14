@@ -52,7 +52,10 @@ async function fetchInventory() {
   inventoryLoading.value = false
 }
 
-const categories = computed(() => ['All Categories', ...new Set(inventory.value.map(i => i.category.name))])
+const categories = computed(() => [
+  'All Categories',
+  ...new Set(inventory.value.map(i => i.category?.name).filter((name): name is string => Boolean(name)))
+])
 const statuses = ['All Status', 'ok', 'low', 'critical']
 
 const categoryFilter = ref('All Categories')
@@ -60,10 +63,13 @@ const statusFilter = ref('All Status')
 const searchQuery = ref('')
 
 const filtered = computed(() => {
+  const q = searchQuery.value?.toLowerCase().trim() || ''
   return inventory.value.filter(item => {
-    const matchCat = categoryFilter.value === 'All Categories' || item.category.name === categoryFilter.value
+    const matchCat = categoryFilter.value === 'All Categories' || item.category?.name === categoryFilter.value
     const matchStatus = statusFilter.value === 'All Status' || item.stockStatus === statusFilter.value
-    const matchSearch = !searchQuery.value || item.name.toLowerCase().includes(searchQuery.value.toLowerCase()) || item.sku.toLowerCase().includes(searchQuery.value.toLowerCase())
+    const matchSearch = !q ||
+      (item.name?.toLowerCase().includes(q) ?? false) ||
+      (item.sku?.toLowerCase().includes(q) ?? false)
     return matchCat && matchStatus && matchSearch
   })
 })

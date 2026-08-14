@@ -329,7 +329,7 @@ onMounted(() => {
       </div>
       <button @click="openAdd" :disabled="submitting || deleting" 
         :style="`display:flex;align-items:center;gap:8px;background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting || deleting ? 'not-allowed' : 'pointer'};opacity:${submitting || deleting ? '0.5' : '1'}`">
-        <Icon name="lucide:plus" style="width:16px;height:16px" />
+        <UIcon name="i-lucide-plus" style="width:16px;height:16px" />
         Add Customer Type
       </button>
     </div>
@@ -399,12 +399,12 @@ onMounted(() => {
               <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end">
                 <button @click="openEdit(ct)" :disabled="submitting || deleting"
                   :style="`display:flex;align-items:center;gap:6px;background:#ececec;color:#1a1a1a;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting || deleting ? 'not-allowed' : 'pointer'};opacity:${submitting || deleting ? '0.5' : '1'}`">
-                  <Icon name="lucide:pencil" style="width:14px;height:14px" />
+                  <UIcon name="i-lucide-pencil" style="width:14px;height:14px" />
                   Edit
                 </button>
                 <button @click="openDelete(ct)" :disabled="ct.customerCount > 0 || submitting || deleting"
                   :style="`display:flex;align-items:center;gap:6px;background:${ct.customerCount > 0 || submitting || deleting ? '#f5f5f5' : '#fef2f2'};color:${ct.customerCount > 0 || submitting || deleting ? '#9ca3af' : '#ef4444'};border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${ct.customerCount > 0 || submitting || deleting ? 'not-allowed' : 'pointer'}`">
-                  <Icon name="lucide:trash-2" style="width:14px;height:14px" />
+                  <UIcon name="i-lucide-trash-2" style="width:14px;height:14px" />
                   Delete
                 </button>
               </div>
@@ -416,7 +416,7 @@ onMounted(() => {
 
     <!-- Empty state -->
     <div v-if="customerTypes.length === 0" style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;padding:60px 24px;text-align:center">
-      <Icon name="lucide:tag" style="width:40px;height:40px;color:#d1d5db;margin-bottom:12px" />
+      <UIcon name="i-lucide-tag" style="width:40px;height:40px;color:#d1d5db;margin-bottom:12px" />
       <p style="font-size:15px;font-weight:600;color:#1a1a1a;margin:0 0 6px">No customer types yet</p>
       <p style="font-size:13px;color:#6b7280;margin:0 0 20px">Add your first customer type to get started.</p>
       <button @click="openAdd" style="background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Add Customer Type</button>
@@ -428,7 +428,7 @@ onMounted(() => {
         <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0">
           <h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0">Add Customer Type</h2>
           <button @click="showAddModal=false" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px">
-            <Icon name="lucide:x" style="width:20px;height:20px" />
+            <UIcon name="i-lucide-x" style="width:20px;height:20px" />
           </button>
         </div>
         <div style="padding:24px;display:flex;flex-direction:column;gap:16px">
@@ -479,7 +479,7 @@ onMounted(() => {
             :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.5' : '1'}`">Cancel</button>
           <button @click="handleAdd" :disabled="submitting" 
             :style="`background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px;opacity:${submitting ? '0.8' : '1'}`">
-            <Icon v-if="submitting" name="lucide:loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
+            <UIcon v-if="submitting" name="i-lucide-loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
             {{ submitting ? 'Creating...' : 'Add Type' }}
           </button>
         </div>
@@ -492,7 +492,7 @@ onMounted(() => {
         <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0">
           <h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0">Edit Customer Type</h2>
           <button @click="showEditModal=false" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px">
-            <Icon name="lucide:x" style="width:20px;height:20px" />
+            <UIcon name="i-lucide-x" style="width:20px;height:20px" />
           </button>
         </div>
         <div style="padding:24px;display:flex;flex-direction:column;gap:16px">
@@ -543,7 +543,7 @@ onMounted(() => {
             :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.5' : '1'}`">Cancel</button>
           <button @click="handleEdit" :disabled="submitting" 
             :style="`background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px;opacity:${submitting ? '0.8' : '1'}`">
-            <Icon v-if="submitting" name="lucide:loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
+            <UIcon v-if="submitting" name="i-lucide-loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
             {{ submitting ? 'Saving...' : 'Save Changes' }}
           </button>
         </div>
@@ -556,12 +556,12 @@ onMounted(() => {
         <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0">
           <h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0">Delete Customer Type</h2>
           <button @click="showDeleteModal=false" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px">
-            <Icon name="lucide:x" style="width:20px;height:20px" />
+            <UIcon name="i-lucide-x" style="width:20px;height:20px" />
           </button>
         </div>
         <div style="padding:28px 24px;text-align:center">
           <div style="width:56px;height:56px;border-radius:50%;background:#fef2f2;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
-            <Icon name="lucide:trash-2" style="width:24px;height:24px;color:#ef4444" />
+            <UIcon name="i-lucide-trash-2" style="width:24px;height:24px;color:#ef4444" />
           </div>
           <p style="font-size:15px;font-weight:600;color:#1a1a1a;margin:0 0 8px">Delete "{{ deleteTarget?.name }}"?</p>
           <p style="font-size:13px;color:#6b7280;margin:0">This action cannot be undone. All configuration for this type will be permanently removed.</p>
@@ -571,7 +571,7 @@ onMounted(() => {
             :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${deleting ? 'not-allowed' : 'pointer'};opacity:${deleting ? '0.5' : '1'}`">Cancel</button>
           <button @click="handleDelete" :disabled="deleting" 
             :style="`background:#ef4444;color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${deleting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px;opacity:${deleting ? '0.8' : '1'}`">
-            <Icon v-if="deleting" name="lucide:loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
+            <UIcon v-if="deleting" name="i-lucide-loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
             {{ deleting ? 'Deleting...' : 'Delete' }}
           </button>
         </div>

@@ -59,12 +59,12 @@ async function fetchProducts() {
 }
 
 const filtered = computed(() => {
-  const q = search.value.toLowerCase()
+  const q = search.value?.toLowerCase().trim() || ''
   if (!q) return products.value
   return products.value.filter(p =>
-    p.name.toLowerCase().includes(q) ||
-    p.sku.toLowerCase().includes(q) ||
-    p.category.name.toLowerCase().includes(q)
+    (p.name?.toLowerCase().includes(q) ?? false) ||
+    (p.sku?.toLowerCase().includes(q) ?? false) ||
+    (p.category?.name?.toLowerCase().includes(q) ?? false)
   )
 })
 

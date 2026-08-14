@@ -52,13 +52,13 @@ async function fetchOrders() {
 }
 
 const filtered = computed(() => {
-  const q = search.value.toLowerCase()
+  const q = search.value?.toLowerCase().trim() || ''
   if (!q) return orders.value
   return orders.value.filter(o =>
-    o.customerName.toLowerCase().includes(q) ||
-    o.orderNumber.toLowerCase().includes(q) ||
-    o.deliveryStatus.toLowerCase().includes(q) ||
-    o.paymentStatus.toLowerCase().includes(q)
+    (o.customerName?.toLowerCase().includes(q) ?? false) ||
+    (o.orderNumber?.toLowerCase().includes(q) ?? false) ||
+    (o.deliveryStatus?.toLowerCase().includes(q) ?? false) ||
+    (o.paymentStatus?.toLowerCase().includes(q) ?? false)
   )
 })
 
