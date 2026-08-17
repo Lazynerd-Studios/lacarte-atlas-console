@@ -205,6 +205,14 @@ function getActivityIcon(action: string) {
   if (action.includes('assign')) return 'i-lucide-user-check'
   if (action.includes('approve')) return 'i-lucide-check-circle'
   if (action.includes('reject') || action.includes('decline')) return 'i-lucide-x-circle'
+  // Subscription & payment lifecycle actions
+  if (action.includes('collection_alert')) return 'i-lucide-alert-triangle'
+  if (action.includes('balance_waived')) return 'i-lucide-eraser'
+  if (action.includes('payment_failed')) return 'i-lucide-x-circle'
+  if (action.includes('payment_paid') || action.includes('payment_confirmed')) return 'i-lucide-check-circle'
+  if (action.includes('reactivated')) return 'i-lucide-play-circle'
+  if (action.includes('renewed')) return 'i-lucide-refresh-cw'
+  if (action.includes('cycle_billed')) return 'i-lucide-receipt'
   return 'i-lucide-activity'
 }
 
@@ -217,7 +225,32 @@ function getActivityColor(action: string) {
   if (action.includes('assign')) return '#f59e0b'
   if (action.includes('approve')) return '#10b981'
   if (action.includes('reject') || action.includes('decline')) return '#ef4444'
+  // Subscription & payment lifecycle actions
+  if (action.includes('collection_alert')) return '#f59e0b'
+  if (action.includes('balance_waived')) return '#d49a00'
+  if (action.includes('payment_failed')) return '#ef4444'
+  if (action.includes('payment_paid') || action.includes('payment_confirmed')) return '#22c55e'
+  if (action.includes('reactivated')) return '#8b5cf6'
+  if (action.includes('renewed')) return '#3b82f6'
+  if (action.includes('cycle_billed')) return '#8b5cf6'
   return '#6b7280'
+}
+
+/** Human-readable labels for known activity actions (falls back to the raw action) */
+const ACTION_LABELS: Record<string, string> = {
+  'pickup_request.collection_alert': 'Pickup completed with unpaid charge',
+  'subscription.reactivated': 'Subscription reactivated',
+  'subscription.balance_waived': 'Subscription balance waived',
+  'pickup_request.payment_paid': 'Pickup payment settled',
+  'pickup_request.payment_failed': 'Pickup payment failed',
+  'subscription.payment_failed': 'Subscription payment failed',
+  'subscription.payment_confirmed': 'Subscription payment confirmed',
+  'subscription.renewed': 'Subscription renewed',
+  'subscription.cycle_billed': 'Subscription cycle billed',
+}
+
+function getActivityLabel(action: string) {
+  return ACTION_LABELS[action] ?? action
 }
 
 onMounted(() => {
@@ -542,6 +575,7 @@ watch(activeTab, (newTab) => {
                   <option value="driver">Driver</option>
                   <option value="pickup">Pickup</option>
                   <option value="billing">Billing</option>
+                  <option value="subscription">Subscription</option>
                   <option value="inventory">Inventory</option>
                   <option value="team">Team</option>
                 </select>
@@ -561,6 +595,7 @@ watch(activeTab, (newTab) => {
                   <option value="truck">Truck</option>
                   <option value="rate">Rate</option>
                   <option value="zone">Zone</option>
+                  <option value="subscription">Subscription</option>
                   <option value="admin">Admin</option>
                 </select>
                 <UIcon name="i-lucide-chevron-down" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#6b7280;pointer-events:none" />
@@ -590,7 +625,7 @@ watch(activeTab, (newTab) => {
               <div style="flex:1;min-width:0">
                 <div style="display:flex;align-items:start;justify-content:space-between;gap:12px;margin-bottom:4px">
                   <div>
-                    <p style="font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0">{{ log.action }}</p>
+                    <p style="font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0">{{ getActivityLabel(log.action) }}</p>
                     <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
                       <span style="font-size:11px;font-weight:500;font-family:'Manrope',sans-serif;padding:2px 8px;border-radius:10px;background:#f3f4f6;color:#6b7280">{{ log.module }}</span>
                       <span v-if="log.entityType" style="font-size:11px;font-weight:500;font-family:'Manrope',sans-serif;padding:2px 8px;border-radius:10px;background:#f3f4f6;color:#6b7280">{{ log.entityType }}</span>

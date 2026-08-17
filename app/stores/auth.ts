@@ -10,6 +10,9 @@ export const useAuthStore = defineStore('auth', () => {
   let sessionWarningTimer: ReturnType<typeof setTimeout> | null = null
   let sessionExpiryTimer: ReturnType<typeof setTimeout> | null = null
   let sessionCheckTimer: ReturnType<typeof setTimeout> | null = null
+  // Ticks once per second ONLY while the warning banner is visible (bounded
+  // to the warning window) so the countdown stays live without always-on polling
+  let sessionWarningTicker: ReturnType<typeof setInterval> | null = null
 
   const publicRoutes = ['/login', '/forgot-password', '/unauthorized']
   const isPublicRoute = (path: string) =>
@@ -102,10 +105,12 @@ export const useAuthStore = defineStore('auth', () => {
       const isValid = await checkSession()
 
       if (isValid) {
-        // Reset session expiry
+        // Reset session expiry and reschedule the warning/expiry timers so a
+        // stale timer from the previous expiry never logs the user out early
         sessionExpiresAt.value = Date.now() + getSessionDurationMs()
         showSessionWarning.value = false
-        console.log('[auth] Session refreshed successfully')
+        stopWarningTicker()
+        scheduleSessionWarning()
         return true
       } else {
         console.log('[auth] Session refresh failed')
@@ -142,8 +147,9 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = data.user
         // Refresh team member profile
         await fetchTeamMemberProfile()
-        // Update session expiry
+        // Update session expiry and reschedule timers against the new expiry
         sessionExpiresAt.value = Date.now() + getSessionDurationMs()
+        scheduleSessionWarning()
         return true
       } else {
         console.log('[auth] Session expired or invalid')
@@ -158,14 +164,57 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function startSessionWarningCheck() {
-    // Clear any existing timers
     scheduleSessionWarning()
+  }
+
+  function stopWarningTicker() {
+    if (sessionWarningTicker) {
+      clearInterval(sessionWarningTicker)
+      sessionWarningTicker = null
+    }
+  }
+
+  /** Live countdown while the warning banner is visible. */
+  function startWarningTicker() {
+    stopWarningTicker()
+    sessionWarningTicker = setInterval(() => {
+      if (!sessionExpiresAt.value) {
+        stopWarningTicker()
+        return
+      }
+      const remaining = Math.floor((sessionExpiresAt.value - Date.now()) / 1000)
+      if (remaining <= 0) {
+        // sessionExpiryTimer performs the actual logout; just stop ticking
+        stopWarningTicker()
+        return
+      }
+      sessionWarningTime.value = remaining
+    }, 1000)
+  }
+
+  /** Shared expiry handler: log out and redirect unless on a public route. */
+  function handleSessionExpiry() {
+    stopWarningTicker()
+    showSessionWarning.value = false
+    void logout()
+    if (import.meta.client) {
+      const router = useRouter()
+      const current = router.currentRoute.value.path
+      if (!isPublicRoute(current)) router.push('/login')
+    }
   }
 
   /** Schedules a single setTimeout for the warning and another for expiry. */
   function scheduleSessionWarning() {
-    if (sessionWarningTimer) clearTimeout(sessionWarningTimer)
-    if (sessionExpiryTimer) clearTimeout(sessionExpiryTimer)
+    if (sessionWarningTimer) {
+      clearTimeout(sessionWarningTimer)
+      sessionWarningTimer = null
+    }
+    if (sessionExpiryTimer) {
+      clearTimeout(sessionExpiryTimer)
+      sessionExpiryTimer = null
+    }
+    stopWarningTicker()
 
     if (!sessionExpiresAt.value) return
 
@@ -175,13 +224,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     if (timeUntilExpiry <= 0) {
       // Already expired
-      showSessionWarning.value = false
-      logout()
-      if (import.meta.client) {
-        const router = useRouter()
-        const current = router.currentRoute.value.path
-        if (!isPublicRoute(current)) router.push('/login')
-      }
+      handleSessionExpiry()
       return
     }
 
@@ -192,30 +235,16 @@ export const useAuthStore = defineStore('auth', () => {
       // Already within warning window — show immediately and set expiry timer
       showSessionWarning.value = true
       sessionWarningTime.value = Math.floor(timeUntilExpiry / 1000)
-      sessionExpiryTimer = setTimeout(() => {
-        showSessionWarning.value = false
-        logout()
-        if (import.meta.client) {
-          const router = useRouter()
-          const current = router.currentRoute.value.path
-          if (!isPublicRoute(current)) router.push('/login')
-        }
-      }, timeUntilExpiry)
+      startWarningTicker()
+      sessionExpiryTimer = setTimeout(handleSessionExpiry, timeUntilExpiry)
     } else {
       // Schedule warning to appear later
       sessionWarningTimer = setTimeout(() => {
         showSessionWarning.value = true
         sessionWarningTime.value = warningSecs
+        startWarningTicker()
         // Once warning appears, schedule expiry
-        sessionExpiryTimer = setTimeout(() => {
-          showSessionWarning.value = false
-          logout()
-          if (import.meta.client) {
-            const router = useRouter()
-            const current = router.currentRoute.value.path
-            if (!isPublicRoute(current)) router.push('/login')
-          }
-        }, warningSecs * 1000)
+        sessionExpiryTimer = setTimeout(handleSessionExpiry, warningSecs * 1000)
       }, timeUntilWarning)
     }
   }
@@ -256,6 +285,7 @@ export const useAuthStore = defineStore('auth', () => {
       clearTimeout(sessionExpiryTimer)
       sessionExpiryTimer = null
     }
+    stopWarningTicker()
   }
 
   async function logout() {
@@ -318,6 +348,8 @@ export const useAuthStore = defineStore('auth', () => {
   }
 }, {
   persist: {
-    storage: sessionStorage,
+    // sessionStorage keeps the token out of long-lived localStorage (XSS surface)
+    // and the guard keeps SSR safe where sessionStorage does not exist
+    storage: typeof sessionStorage !== 'undefined' ? sessionStorage : undefined,
   },
 })

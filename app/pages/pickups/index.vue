@@ -170,6 +170,9 @@ const currentPage = computed({
 
 function paymentStatusBadge(s: string) {
   if (s === 'active-plan' || s === 'paid') return { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#22c55e', label: s === 'paid' ? 'Paid' : 'Active Plan' }
+  // "failed" appears when a pickup is cancelled and its outstanding charges are
+  // invalidated so they can never be collected — render as muted "Payment invalidated"
+  if (s === 'failed') return { bg: '#f3f4f6', border: '#e5e7eb', color: '#9ca3af', label: 'Payment invalidated' }
   return { bg: 'white', border: '#ececec', color: '#1a1a1a', label: 'Unpaid' }
 }
 
@@ -441,6 +444,7 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
           <option value="Paid">Paid</option>
           <option value="Unpaid">Unpaid</option>
           <option value="Active Plan">Active Plan</option>
+          <option value="Failed">Payment invalidated</option>
         </select>
         <UIcon name="i-lucide-chevron-down" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:#6b7280;pointer-events:none" />
       </div>

@@ -57,6 +57,10 @@ const form = reactive({
   isEmergency: false,
 })
 const errors = reactive<Record<string, string>>({})
+// Server-side rejection shown inline: 'balance' renders as a warning (402
+// outstanding balance), anything else as a validation error (400 etc.)
+const submitError = ref('')
+const submitErrorKind = ref<'error' | 'balance'>('error')
 
 const customerSearch = ref('')
 const customerDropdownOpen = ref(false)
@@ -213,6 +217,7 @@ async function submit() {
   if (submitting.value) return
   if (!validate()) return
   submitting.value = true
+  submitError.value = ''
   // paymentType is intentionally omitted — the server auto-resolves it from the
   // customer's subscription state. truckLoadRateId is only valid for full_truck
   // customers (the server rejects it for per_bin).
@@ -227,15 +232,29 @@ async function submit() {
   if (isFullTruck.value) {
     payload.truckLoadRateId = form.truckLoadRateId
   }
-  const result = await api.post<any>(
-    '/pickup-requests/admin/',
-    payload,
-    'Failed to create pickup request'
-  )
-  submitting.value = false
-  if (result) {
+  try {
+    // Raw request so server rejections (400 no eligible subscription,
+    // 402 outstanding balance) can be shown inline in the form
+    await api.request<unknown>('/pickup-requests/admin/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
     toast.success(form.isEmergency ? 'Emergency pickup request created' : 'Pickup request created')
     emit('created')
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err ?? '')
+    // 402 → subscription has an outstanding balance; render as a balance warning
+    if (message.includes('(402)') || /balance/i.test(message)) {
+      submitErrorKind.value = 'balance'
+      submitError.value = message.includes('(402)')
+        ? 'This customer has an outstanding subscription balance. Collect or waive the balance before booking a pickup.'
+        : message
+    } else {
+      submitErrorKind.value = 'error'
+      submitError.value = message || 'Failed to create pickup request'
+    }
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -268,6 +287,16 @@ function inputStyle(field: string) {
 
       <!-- Body -->
       <div style="flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:16px">
+
+        <!-- Server-side rejection (400 validation / 402 outstanding balance) -->
+        <div
+          v-if="submitError"
+          role="alert"
+          :style="`display:flex;align-items:flex-start;gap:10px;border-radius:12px;padding:12px 14px;font-size:13px;font-family:'Manrope',sans-serif;line-height:1.5;${submitErrorKind === 'balance' ? 'background:#fffbeb;border:1px solid #fde68a;color:#92400e' : 'background:#fef2f2;border:1px solid #fecaca;color:#ef4444'}`"
+        >
+          <UIcon :name="submitErrorKind === 'balance' ? 'i-lucide-alert-circle' : 'i-lucide-x-circle'" style="width:16px;height:16px;flex-shrink:0;margin-top:1px" />
+          <span>{{ submitError }}</span>
+        </div>
 
         <div v-if="loadingOptions" style="display:flex;align-items:center;justify-content:center;padding:40px 0">
           <UIcon name="i-lucide-loader-2" style="width:22px;height:22px;color:#ffb400;animation:spin 1s linear infinite" />

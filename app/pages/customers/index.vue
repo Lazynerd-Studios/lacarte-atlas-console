@@ -40,10 +40,12 @@ async function handleSuspend(reason: string) {
   suspending.value = false
 
   if (result) {
-    updateCustomerStatus(selectedCustomer.value.id, 'inactive')
     toast.success(result.message || 'Account suspended successfully')
     showSuspendModal.value = false
     selectedCustomer.value = null
+    // Suspension cascades: subscriptions are cancelled and non-final pickups
+    // are cancelled server-side — refetch the list to reflect the new state
+    await fetchCustomers()
   }
 }
 
