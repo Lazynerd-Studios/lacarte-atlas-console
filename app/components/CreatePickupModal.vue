@@ -33,6 +33,8 @@ interface TruckLoadTier {
   prepayRate: number
   postpayRate: number
   binEquivalent: number
+  displayOrder?: number
+  isActive?: boolean
 }
 type PricingMode = 'per_bin' | 'full_truck'
 
@@ -119,11 +121,18 @@ async function fetchCustomerTypePricingModes() {
   }
 }
 
-// Truck load tiers for the full_truck dropdown (public endpoint)
+// Truck load tiers for the full_truck dropdown (admin endpoint; only active
+// tiers are bookable). Response shape: { tiers: TruckLoadTier[], total }
 async function fetchTruckTiers() {
-  const res = await api.get<{ data?: TruckLoadTier[] } | TruckLoadTier[]>('/rates/truck-loads', 'Failed to load truck load tiers')
+  const res = await api.get<{ tiers?: TruckLoadTier[]; data?: TruckLoadTier[] } | TruckLoadTier[]>(
+    '/rates/admin/truck-loads',
+    'Failed to load truck load tiers'
+  )
   if (res) {
-    truckTiers.value = Array.isArray(res) ? res : (res.data ?? [])
+    const list = Array.isArray(res) ? res : (res.tiers ?? res.data ?? [])
+    truckTiers.value = list
+      .filter(t => t.isActive !== false)
+      .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
   }
 }
 

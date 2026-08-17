@@ -5,6 +5,8 @@ interface TruckLoadTier {
   prepayRate: number
   postpayRate: number
   binEquivalent: number
+  displayOrder?: number
+  isActive?: boolean
 }
 
 const props = defineProps<{
@@ -50,9 +52,16 @@ const deltaPreview = computed(() => {
 
 async function fetchTruckTiers() {
   loadingTiers.value = true
-  const res = await api.get<{ data?: TruckLoadTier[] } | TruckLoadTier[]>('/rates/truck-loads', 'Failed to load truck load tiers')
+  // Admin endpoint; response shape: { tiers: TruckLoadTier[], total }
+  const res = await api.get<{ tiers?: TruckLoadTier[]; data?: TruckLoadTier[] } | TruckLoadTier[]>(
+    '/rates/admin/truck-loads',
+    'Failed to load truck load tiers'
+  )
   if (res) {
-    truckTiers.value = Array.isArray(res) ? res : (res.data ?? [])
+    const list = Array.isArray(res) ? res : (res.tiers ?? res.data ?? [])
+    truckTiers.value = list
+      .filter(t => t.isActive !== false)
+      .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
   }
   loadingTiers.value = false
 }
