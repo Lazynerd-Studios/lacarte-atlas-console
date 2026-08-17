@@ -28,7 +28,7 @@ const statusColor = computed(() => props.config?.isActive ? '#22c55e' : '#9ca3af
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:16px">
         <div style="width:48px;height:48px;border-radius:14px;background:#fef3c7;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <Icon name="lucide:alert-circle" style="width:22px;height:22px;color:#f59e0b" />
+          <UIcon name="i-lucide-alert-circle" style="width:22px;height:22px;color:#f59e0b" />
         </div>
         <div>
           <h2 style="font-size:16px;font-weight:700;color:#1a1a1a;margin:0 0 4px">Emergency Pickup Fee</h2>
@@ -37,7 +37,7 @@ const statusColor = computed(() => props.config?.isActive ? '#22c55e' : '#9ca3af
       </div>
       <button @click="emit('edit')" :disabled="loading"
         :style="`display:flex;align-items:center;gap:6px;background:#ffb400;color:#1a1a1a;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${loading ? 'not-allowed' : 'pointer'};opacity:${loading ? '0.5' : '1'}`">
-        <Icon name="lucide:pencil" style="width:14px;height:14px" />
+        <UIcon name="i-lucide-pencil" style="width:14px;height:14px" />
         Edit Fee
       </button>
     </div>

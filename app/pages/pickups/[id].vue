@@ -228,6 +228,7 @@ const statusBadge = computed(() => {
   if (status === 'picked_up')         return { bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)', color: '#3b82f6',  label: 'Picked Up' }
   if (status === 'completed')         return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e',  label: 'Completed' }
   if (status === 'cancelled')         return { bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.2)',  color: '#ef4444',  label: 'Cancelled' }
+  if (status === 'expired')           return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: 'Expired' }
   return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: pickup.value.status }
 })
 
@@ -237,6 +238,8 @@ const paymentStatusBadge = computed(() => {
   const status = pickup.value.paymentStatus.toLowerCase()
   if (status === 'active-plan' || status === 'active_plan') return { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#22c55e', label: 'Active Plan' }
   if (status === 'paid')        return { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#22c55e', label: 'Paid' }
+  // Charges invalidated by cancellation — can never be collected
+  if (status === 'failed')      return { bg: '#f3f4f6', border: '#e5e7eb', color: '#9ca3af', label: 'Payment invalidated' }
   if (status === 'unpaid')      return { bg: 'white', border: '#ececec', color: '#1a1a1a', label: 'Unpaid' }
   return { bg: 'white', border: '#ececec', color: '#1a1a1a', label: pickup.value.paymentStatus }
 })
@@ -364,7 +367,8 @@ const canAdjustLoad = computed(() => {
   if (!pickup.value) return false
   if (!hasPermission('pickups.manage')) return false
   const status = pickup.value.status.toLowerCase()
-  if (status === 'completed' || status === 'cancelled') return false
+  // Terminal states (incl. expired) — nothing left to adjust
+  if (status === 'completed' || status === 'cancelled' || status === 'expired') return false
   if (pickupData.value?.loadAdjustedAt) return false
   return true
 })
@@ -647,9 +651,9 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
             @click="showReassignModal = true"
           >{{ pickup.status.toLowerCase() === 'pending' ? 'Assign Driver' : 'Reassign' }}</button>
 
-          <!-- Cancel — shown when not completed/cancelled -->
+          <!-- Cancel — hidden for terminal statuses (completed/cancelled/expired) -->
           <button
-            v-if="!['completed','cancelled'].includes(pickup.status.toLowerCase())"
+            v-if="!['completed','cancelled','expired'].includes(pickup.status.toLowerCase())"
             style="height:40px;padding:0 16px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);border-radius:20px;font-size:14px;font-weight:500;color:#ef4444;font-family:'Manrope',sans-serif;cursor:pointer"
             @mouseover="($event.currentTarget as HTMLElement).style.background='rgba(239,68,68,0.18)'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background='rgba(239,68,68,0.1)'"

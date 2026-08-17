@@ -51,6 +51,10 @@ export interface Driver {
   total?: number
   stats?: {
     periodEarnings?: DriverPeriodEarnings
+    todayPickups?: number
+    thisWeekPickups?: number
+    completionRate?: number | string
+    avgTimePerStop?: number | string
   }
 }
 

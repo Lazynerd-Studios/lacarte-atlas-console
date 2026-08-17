@@ -363,7 +363,7 @@ onMounted(() => {
         </div>
         <button @click="openAddTier" :disabled="submitting || deleting"
           :style="`display:flex;align-items:center;gap:8px;background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting || deleting ? 'not-allowed' : 'pointer'};opacity:${submitting || deleting ? '0.5' : '1'}`">
-          <Icon name="lucide:plus" style="width:16px;height:16px" />
+          <UIcon name="i-lucide-plus" style="width:16px;height:16px" />
           Add Tier
         </button>
       </div>
@@ -419,7 +419,7 @@ onMounted(() => {
               @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'">
               <td style="padding:16px 20px">
                 <span style="display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:700;color:#1a1a1a">
-                  <Icon name="lucide:trash-2" style="width:15px;height:15px;color:#6b7280" />
+                  <UIcon name="i-lucide-trash-2" style="width:15px;height:15px;color:#6b7280" />
                   {{ t.capacityLiters }}L
                 </span>
               </td>
@@ -443,17 +443,17 @@ onMounted(() => {
                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px">
                   <button @click="openEditCapacity(t)" :disabled="submitting || deleting"
                     :style="`display:flex;align-items:center;gap:5px;background:#ececec;color:#1a1a1a;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting || deleting ? 'not-allowed' : 'pointer'};opacity:${submitting || deleting ? '0.5' : '1'}`">
-                    <Icon name="lucide:pencil" style="width:13px;height:13px" />
+                    <UIcon name="i-lucide-pencil" style="width:13px;height:13px" />
                     Edit
                   </button>
                   <button @click="toggleActive(t)" :disabled="submitting || deleting"
                     :style="`display:flex;align-items:center;gap:5px;background:${t.isActive ? '#fef9c3' : '#dcfce7'};color:${t.isActive ? '#ca8a04' : '#16a34a'};border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting || deleting ? 'not-allowed' : 'pointer'};opacity:${submitting || deleting ? '0.5' : '1'}`">
-                    <Icon :name="t.isActive ? 'lucide:power-off' : 'lucide:power'" style="width:13px;height:13px" />
+                    <UIcon :name="t.isActive ? 'i-lucide-power-off' : 'i-lucide-power'" style="width:13px;height:13px" />
                     {{ t.isActive ? 'Deactivate' : 'Activate' }}
                   </button>
                   <button @click="openDelete(t)" :disabled="submitting || deleting"
                     :style="`display:flex;align-items:center;gap:5px;background:#fef2f2;color:#ef4444;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting || deleting ? 'not-allowed' : 'pointer'};opacity:${submitting || deleting ? '0.5' : '1'}`">
-                    <Icon name="lucide:trash-2" style="width:13px;height:13px" />
+                    <UIcon name="i-lucide-trash-2" style="width:13px;height:13px" />
                     Delete
                   </button>
                 </div>
@@ -461,7 +461,7 @@ onMounted(() => {
             </tr>
             <tr v-if="capacityTiers.length === 0">
               <td colspan="6" style="padding:56px 20px;text-align:center">
-                <Icon name="lucide:layers" style="width:36px;height:36px;color:#d1d5db;margin-bottom:10px" />
+                <UIcon name="i-lucide-layers" style="width:36px;height:36px;color:#d1d5db;margin-bottom:10px" />
                 <p style="font-size:14px;font-weight:600;color:#1a1a1a;margin:0 0 4px">No capacity tiers yet</p>
                 <p style="font-size:13px;color:#6b7280;margin:0">Add your first bin capacity tier to get started.</p>
               </td>
@@ -491,7 +491,7 @@ onMounted(() => {
               @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'">
               <td style="padding:16px 20px">
                 <span style="display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:700;color:#1a1a1a">
-                  <Icon name="lucide:truck" style="width:15px;height:15px;color:#6b7280" />
+                  <UIcon name="i-lucide-truck" style="width:15px;height:15px;color:#6b7280" />
                   {{ t.label }}
                 </span>
               </td>
@@ -524,17 +524,17 @@ onMounted(() => {
                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px">
                   <button @click="openEditTruck(t)" :disabled="submitting || deleting"
                     :style="`display:flex;align-items:center;gap:5px;background:#ececec;color:#1a1a1a;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting || deleting ? 'not-allowed' : 'pointer'};opacity:${submitting || deleting ? '0.5' : '1'}`">
-                    <Icon name="lucide:pencil" style="width:13px;height:13px" />
+                    <UIcon name="i-lucide-pencil" style="width:13px;height:13px" />
                     Edit
                   </button>
                   <button @click="toggleActive(t)" :disabled="submitting || deleting"
                     :style="`display:flex;align-items:center;gap:5px;background:${t.isActive ? '#fef9c3' : '#dcfce7'};color:${t.isActive ? '#ca8a04' : '#16a34a'};border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting || deleting ? 'not-allowed' : 'pointer'};opacity:${submitting || deleting ? '0.5' : '1'}`">
-                    <Icon :name="t.isActive ? 'lucide:power-off' : 'lucide:power'" style="width:13px;height:13px" />
+                    <UIcon :name="t.isActive ? 'i-lucide-power-off' : 'i-lucide-power'" style="width:13px;height:13px" />
                     {{ t.isActive ? 'Deactivate' : 'Activate' }}
                   </button>
                   <button @click="openDelete(t)" :disabled="submitting || deleting"
                     :style="`display:flex;align-items:center;gap:5px;background:#fef2f2;color:#ef4444;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting || deleting ? 'not-allowed' : 'pointer'};opacity:${submitting || deleting ? '0.5' : '1'}`">
-                    <Icon name="lucide:trash-2" style="width:13px;height:13px" />
+                    <UIcon name="i-lucide-trash-2" style="width:13px;height:13px" />
                     Delete
                   </button>
                 </div>
@@ -542,7 +542,7 @@ onMounted(() => {
             </tr>
             <tr v-if="truckTiers.length === 0">
               <td colspan="7" style="padding:56px 20px;text-align:center">
-                <Icon name="lucide:truck" style="width:36px;height:36px;color:#d1d5db;margin-bottom:10px" />
+                <UIcon name="i-lucide-truck" style="width:36px;height:36px;color:#d1d5db;margin-bottom:10px" />
                 <p style="font-size:14px;font-weight:600;color:#1a1a1a;margin:0 0 4px">No truck load tiers yet</p>
                 <p style="font-size:13px;color:#6b7280;margin:0">Add your first truck load tier to get started.</p>
               </td>
@@ -557,7 +557,7 @@ onMounted(() => {
           <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0">
             <h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0">{{ capacityModalMode === 'add' ? 'Add Capacity Tier' : 'Edit Capacity Tier' }}</h2>
             <button @click="showCapacityModal=false" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px">
-              <Icon name="lucide:x" style="width:20px;height:20px" />
+              <UIcon name="i-lucide-x" style="width:20px;height:20px" />
             </button>
           </div>
           <div style="padding:24px;display:flex;flex-direction:column;gap:16px">
@@ -603,7 +603,7 @@ onMounted(() => {
               :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.5' : '1'}`">Cancel</button>
             <button @click="handleCapacitySubmit" :disabled="submitting"
               :style="`background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px;opacity:${submitting ? '0.8' : '1'}`">
-              <Icon v-if="submitting" name="lucide:loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
+              <UIcon v-if="submitting" name="i-lucide-loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
               {{ submitting ? 'Saving...' : (capacityModalMode === 'add' ? 'Add Tier' : 'Save Changes') }}
             </button>
           </div>
@@ -616,7 +616,7 @@ onMounted(() => {
           <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0">
             <h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0">{{ truckModalMode === 'add' ? 'Add Truck Load Tier' : 'Edit Truck Load Tier' }}</h2>
             <button @click="showTruckModal=false" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px">
-              <Icon name="lucide:x" style="width:20px;height:20px" />
+              <UIcon name="i-lucide-x" style="width:20px;height:20px" />
             </button>
           </div>
           <div style="padding:24px;display:flex;flex-direction:column;gap:16px">
@@ -671,7 +671,7 @@ onMounted(() => {
               :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.5' : '1'}`">Cancel</button>
             <button @click="handleTruckSubmit" :disabled="submitting"
               :style="`background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px;opacity:${submitting ? '0.8' : '1'}`">
-              <Icon v-if="submitting" name="lucide:loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
+              <UIcon v-if="submitting" name="i-lucide-loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
               {{ submitting ? 'Saving...' : (truckModalMode === 'add' ? 'Add Tier' : 'Save Changes') }}
             </button>
           </div>
@@ -684,12 +684,12 @@ onMounted(() => {
           <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0">
             <h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0">Delete Tier</h2>
             <button @click="showDeleteModal=false" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px">
-              <Icon name="lucide:x" style="width:20px;height:20px" />
+              <UIcon name="i-lucide-x" style="width:20px;height:20px" />
             </button>
           </div>
           <div style="padding:28px 24px;text-align:center">
             <div style="width:56px;height:56px;border-radius:50%;background:#fef2f2;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
-              <Icon name="lucide:trash-2" style="width:24px;height:24px;color:#ef4444" />
+              <UIcon name="i-lucide-trash-2" style="width:24px;height:24px;color:#ef4444" />
             </div>
             <p style="font-size:15px;font-weight:600;color:#1a1a1a;margin:0 0 8px">Delete {{ deleteTargetLabel() }}?</p>
             <p style="font-size:13px;color:#6b7280;margin:0">This action cannot be undone. If customers or pickup requests reference this tier, deletion will be blocked.</p>
@@ -699,7 +699,7 @@ onMounted(() => {
               :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${deleting ? 'not-allowed' : 'pointer'};opacity:${deleting ? '0.5' : '1'}`">Cancel</button>
             <button @click="handleDelete" :disabled="deleting"
               :style="`background:#ef4444;color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${deleting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px;opacity:${deleting ? '0.8' : '1'}`">
-              <Icon v-if="deleting" name="lucide:loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
+              <UIcon v-if="deleting" name="i-lucide-loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
               {{ deleting ? 'Deleting...' : 'Delete' }}
             </button>
           </div>

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { PaginationMeta, PaginatedDataResponse } from '~/types/api'
+
 definePageMeta({ layout: 'dashboard' })
 
 interface PickupRequest {
@@ -32,17 +34,8 @@ interface PickupRequest {
   }
 }
 
-interface Pagination {
-  page: number
-  limit: number
-  total: number
-  totalPages: number
-  hasNextPage: boolean
-  hasPreviousPage: boolean
-}
-
 const requests = ref<PickupRequest[]>([])
-const pagination = ref<Pagination>({
+const pagination = ref<PaginationMeta>({
   page: 1,
   limit: 20,
   total: 0,
@@ -76,20 +69,12 @@ function sortIcon(field: string) {
   return sortOrder.value === 'asc' ? 'i-lucide-arrow-up' : 'i-lucide-arrow-down'
 }
 
-const filtered = computed(() => {
-  let result = requests.value
-  
-  if (activeFilter.value !== 'All') {
-    result = result.filter(r => r.status.toLowerCase() === activeFilter.value.toLowerCase())
-  }
-  
-  if (activePaymentStatus.value !== 'All') {
-    const val = activePaymentStatus.value.toLowerCase().replace(/\s+/g, '-')
-    result = result.filter(r => r.paymentStatus.toLowerCase().replace(/_/g, '-') === val)
-  }
-  
-  return result
-})
+const filtered = computed(() => requests.value)
+
+function handlePageChange(newPage: number) {
+  pagination.value.page = newPage
+  fetchRequests()
+}
 
 watch([activeFilter, activePaymentStatus], () => { 
   pagination.value.page = 1
@@ -143,7 +128,7 @@ async function fetchRequests() {
     params.append('sortBy', sortBy.value)
     params.append('sortOrder', sortOrder.value)
     
-    const data = await api.get<{ data: PickupRequest[]; pagination: Pagination }>(
+    const data = await api.get<PaginatedDataResponse<PickupRequest>>(
       `/pickup-requests/admin/list?${params.toString()}`,
       'Failed to load pickup requests'
     )
@@ -185,6 +170,9 @@ const currentPage = computed({
 
 function paymentStatusBadge(s: string) {
   if (s === 'active-plan' || s === 'paid') return { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#22c55e', label: s === 'paid' ? 'Paid' : 'Active Plan' }
+  // "failed" appears when a pickup is cancelled and its outstanding charges are
+  // invalidated so they can never be collected — render as muted "Payment invalidated"
+  if (s === 'failed') return { bg: '#f3f4f6', border: '#e5e7eb', color: '#9ca3af', label: 'Payment invalidated' }
   return { bg: 'white', border: '#ececec', color: '#1a1a1a', label: 'Unpaid' }
 }
 
@@ -456,6 +444,7 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
           <option value="Paid">Paid</option>
           <option value="Unpaid">Unpaid</option>
           <option value="Active Plan">Active Plan</option>
+          <option value="Failed">Payment invalidated</option>
         </select>
         <UIcon name="i-lucide-chevron-down" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:#6b7280;pointer-events:none" />
       </div>
@@ -578,10 +567,10 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
 
     <!-- Pagination -->
     <AppPagination
-      :page="currentPage"
+      :page="pagination.page"
       :total="pagination.total"
       :per-page="pagination.limit"
-      @update:page="currentPage = $event"
+      @update:page="handlePageChange"
     />
 
   </div>

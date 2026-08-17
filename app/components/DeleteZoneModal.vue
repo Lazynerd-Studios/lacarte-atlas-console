@@ -13,14 +13,14 @@ const emit = defineEmits<{
       <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0">
         <h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0">Delete Zone</h2>
         <button @click="emit('close')" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px;display:flex;align-items:center">
-          <Icon name="lucide:x" style="width:20px;height:20px" />
+          <UIcon name="i-lucide-x" style="width:20px;height:20px" />
         </button>
       </div>
 
       <!-- Body -->
       <div style="padding:32px 24px;text-align:center">
         <div style="width:56px;height:56px;border-radius:50%;background:#fef2f2;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
-          <Icon name="lucide:trash-2" style="width:24px;height:24px;color:#ef4444" />
+          <UIcon name="i-lucide-trash-2" style="width:24px;height:24px;color:#ef4444" />
         </div>
         <p style="font-size:15px;font-weight:600;color:#1a1a1a;margin:0 0 8px">Delete "{{ props.zoneName }}"?</p>
         <p style="font-size:13px;color:#6b7280;margin:0;line-height:1.5">This action cannot be undone. The zone will be permanently removed from the system.</p>

@@ -63,3 +63,61 @@ export interface SubscriptionResponse {
   paymentPlan: SubscriptionPaymentPlan
   subscription: Subscription
 }
+
+// ── Admin subscriber management (/subscription/admin/subscriptions) ─────────
+
+/** Statuses accepted by the admin subscriber list filter */
+export type AdminSubscriptionStatus =
+  | 'active'
+  | 'pending'
+  | 'cancelled'
+  | 'expired'
+  | 'past_due'
+  | 'suspended'
+
+/** Item returned by GET /subscription/admin/subscriptions */
+export interface AdminSubscriptionListItem {
+  id: string
+  customerId: string
+  customerName: string | null
+  customerPhone: string
+  status: AdminSubscriptionStatus
+  pricingSource: PricingSource
+  /** Effective payment type (plan type or calculated snapshot) */
+  paymentPlan: SubscriptionPaymentPlan
+  /** Populated for plan-based subscriptions, null for calculated */
+  plan: { id: string; name: string } | null
+  /** Calculated subscriptions only */
+  frequency: SubscriptionFrequency | null
+  /** Calculated subscriptions only */
+  pickupsPerCycle: number | null
+  /** Calculated subscriptions only (GHS major units) */
+  amountPerCycle: number | null
+  /** GHS major units */
+  outstandingBalance: number
+  startDate: string
+  endDate: string | null
+  createdAt: string
+}
+
+/** Payment record within a subscription detail response */
+export interface AdminSubscriptionPayment {
+  id: string
+  amount: number
+  currency: string
+  paymentType: SubscriptionPaymentPlan
+  status: 'pending' | 'paid' | 'failed'
+  provider: string | null
+  providerRef: string | null
+  paidAt: string | null
+  billingPeriodStart: string
+  billingPeriodEnd: string
+  createdAt: string
+}
+
+/** Detail response: GET /subscription/admin/subscriptions/:id */
+export interface AdminSubscriptionDetail extends AdminSubscriptionListItem {
+  updatedAt: string
+  /** Newest first */
+  payments: AdminSubscriptionPayment[]
+}
