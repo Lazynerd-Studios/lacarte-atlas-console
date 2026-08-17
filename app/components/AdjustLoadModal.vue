@@ -5,7 +5,6 @@ interface TruckLoadTier {
   prepayRate: number
   postpayRate: number
   binEquivalent: number
-  displayOrder?: number
   isActive?: boolean
 }
 
@@ -52,16 +51,20 @@ const deltaPreview = computed(() => {
 
 async function fetchTruckTiers() {
   loadingTiers.value = true
-  // Admin endpoint; response shape: { tiers: TruckLoadTier[], total }
-  const res = await api.get<{ tiers?: TruckLoadTier[]; data?: TruckLoadTier[] } | TruckLoadTier[]>(
-    '/rates/admin/truck-loads',
-    'Failed to load truck load tiers'
-  )
+  // Response shape: { tiers: [...], total }
+  const res = await api.get<{ tiers?: TruckLoadTier[] }>('/rates/admin/truck-loads', 'Failed to load truck load tiers')
   if (res) {
-    const list = Array.isArray(res) ? res : (res.tiers ?? res.data ?? [])
+    const list = res.tiers ?? []
     truckTiers.value = list
       .filter(t => t.isActive !== false)
-      .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
+      .map(t => ({
+        id: t.id,
+        label: t.label,
+        prepayRate: Number(t.prepayRate),
+        postpayRate: Number(t.postpayRate),
+        binEquivalent: Number(t.binEquivalent),
+        isActive: t.isActive,
+      }))
   }
   loadingTiers.value = false
 }
