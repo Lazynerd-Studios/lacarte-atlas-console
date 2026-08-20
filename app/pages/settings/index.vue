@@ -208,6 +208,8 @@ function getActivityIcon(action: string) {
   // Subscription & payment lifecycle actions
   if (action.includes('collection_alert')) return 'i-lucide-alert-triangle'
   if (action.includes('balance_waived')) return 'i-lucide-eraser'
+  if (action.includes('exit_billed')) return 'i-lucide-receipt'
+  if (action.includes('debt_settled')) return 'i-lucide-hand-coins'
   if (action.includes('payment_failed')) return 'i-lucide-x-circle'
   if (action.includes('payment_paid') || action.includes('payment_confirmed')) return 'i-lucide-check-circle'
   if (action.includes('reactivated')) return 'i-lucide-play-circle'
@@ -228,6 +230,8 @@ function getActivityColor(action: string) {
   // Subscription & payment lifecycle actions
   if (action.includes('collection_alert')) return '#f59e0b'
   if (action.includes('balance_waived')) return '#d49a00'
+  if (action.includes('exit_billed')) return '#8b5cf6'
+  if (action.includes('debt_settled')) return '#22c55e'
   if (action.includes('payment_failed')) return '#ef4444'
   if (action.includes('payment_paid') || action.includes('payment_confirmed')) return '#22c55e'
   if (action.includes('reactivated')) return '#8b5cf6'
@@ -241,6 +245,8 @@ const ACTION_LABELS: Record<string, string> = {
   'pickup_request.collection_alert': 'Pickup completed with unpaid charge',
   'subscription.reactivated': 'Subscription reactivated',
   'subscription.balance_waived': 'Subscription balance waived',
+  'subscription.exit_billed': 'Postpaid exit usage billed',
+  'subscription.debt_settled': 'Subscription exit debt settled',
   'pickup_request.payment_paid': 'Pickup payment settled',
   'pickup_request.payment_failed': 'Pickup payment failed',
   'subscription.payment_failed': 'Subscription payment failed',
