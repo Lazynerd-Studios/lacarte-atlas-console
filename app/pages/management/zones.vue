@@ -1,16 +1,8 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'dashboard' })
+import type { Zone, ZoneFormPayload } from '~/types/zone'
+import { isZoneScheduleComplete, hasPartialSchedule } from '~/types/zone'
 
-interface Zone {
-  id: string
-  name: string
-  description: string
-  color: string
-  areas: string[]
-  driverCount: number
-  customerCount: number
-  isActive: boolean
-}
+definePageMeta({ layout: 'dashboard' })
 
 interface ZoneStats {
   totalZones: number
@@ -23,6 +15,10 @@ const api = useApi()
 const zones = ref<Zone[]>([])
 const stats = ref<ZoneStats>({ totalZones: 0, activeZones: 0, totalCustomers: 0, assignedDrivers: 0 })
 const loading = ref(true)
+
+// Active item types / quantities for the schedule defaults dropdowns
+const itemTypes = ref<{ id: string; name: string }[]>([])
+const quantities = ref<{ id: string; label: string }[]>([])
 
 // Pagination
 const currentPage = ref(1)
@@ -44,11 +40,44 @@ async function fetchZones() {
   }
 }
 
+/** Options for the zone schedule defaults dropdowns (active only — inactive ids 400) */
+async function fetchScheduleOptions() {
+  const [typesRes, qtyRes] = await Promise.all([
+    api.get<any>('/disposable/item-types/active'),
+    api.get<any>('/disposable/quantities/active'),
+  ])
+  if (typesRes) {
+    const list = Array.isArray(typesRes) ? typesRes : (typesRes.data ?? typesRes.disposableTypes ?? [])
+    itemTypes.value = list.map((t: any) => ({ id: t.id, name: t.name }))
+  }
+  if (qtyRes) {
+    const list = Array.isArray(qtyRes) ? qtyRes : (qtyRes.data ?? qtyRes.quantities ?? [])
+    quantities.value = list.map((q: any) => ({ id: q.id, label: q.label }))
+  }
+}
+
 onMounted(async () => {
   loading.value = true
-  await Promise.all([fetchZones(), fetchStats()])
+  await Promise.all([fetchZones(), fetchStats(), fetchScheduleOptions()])
   loading.value = false
 })
+
+// ── Schedule display helpers ──
+
+/** Badge state for a zone's automatic pickup schedule */
+function scheduleState(z: Zone): { label: string; style: string } {
+  if (isZoneScheduleComplete(z)) return { label: 'Auto-pickups on', style: 'background:#dcfce7;color:#16a34a' }
+  if (hasPartialSchedule(z)) return { label: 'Schedule incomplete', style: 'background:#fef3c7;color:#b45309' }
+  return { label: 'No schedule', style: 'background:#f3f4f6;color:#9ca3af' }
+}
+
+/** Human summary of the schedule, e.g. "Monday · weekly · morning (week 2)" */
+function scheduleSummary(z: Zone): string {
+  if (!z.pickupDay || !z.pickupFrequency || !z.pickupTimeSlot) return ''
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+  const week = z.pickupFrequency === 'monthly' && z.weekOfMonth ? ` (week ${z.weekOfMonth})` : ''
+  return `${cap(z.pickupDay)} · ${z.pickupFrequency}${week} · ${z.pickupTimeSlot}`
+}
 
 const search = ref('')
 const filterStatus = ref<'all' | 'active' | 'inactive'>('all')
@@ -84,7 +113,7 @@ const addModalRef = ref<any>(null)
 
 function openAdd() { showAddModal.value = true }
 
-async function handleAdd(data: { name: string; description: string; color: string; areas: string[]; isActive: boolean }) {
+async function handleAdd(data: ZoneFormPayload) {
   console.log('[handleAdd] payload:', data)
   const result = await api.post<Zone>('/zone/admin/', data, 'Failed to create zone')
   console.log('[handleAdd] result:', result)
@@ -104,8 +133,10 @@ const editModalRef = ref<any>(null)
 
 function openEdit(z: Zone) { editTarget.value = z; showEditModal.value = true }
 
-async function handleEdit(data: { name: string; description: string; color: string; areas: string[]; isActive: boolean }) {
+async function handleEdit(data: ZoneFormPayload) {
   if (!editTarget.value) return
+  // The payload always carries all six schedule fields — null clears a field
+  // server-side, re-sent values stay unchanged
   const result = await api.patch(`/zone/admin/${editTarget.value.id}`, data, 'Failed to update zone')
   if (editModalRef.value) editModalRef.value.submitting = false
   if (result !== null) {
@@ -288,6 +319,13 @@ async function toggleActive(z: Zone) {
               </span>
               <span v-if="zone.areas.length === 0" style="font-size:12px;color:#9ca3af;font-style:italic">No areas defined</span>
             </div>
+            <!-- Automatic pickup schedule -->
+            <div style="display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap">
+              <span :style="`font-size:11px;font-weight:600;padding:2px 10px;border-radius:20px;white-space:nowrap;${scheduleState(zone).style}`">
+                {{ scheduleState(zone).label }}
+              </span>
+              <span v-if="scheduleSummary(zone)" style="font-size:12px;color:#6b7280">{{ scheduleSummary(zone) }}</span>
+            </div>
           </div>
         </div>
 
@@ -345,10 +383,10 @@ async function toggleActive(z: Zone) {
     />
 
     <!-- ── ADD MODAL ── -->
-    <AddZoneModal v-if="showAddModal" ref="addModalRef" @close="showAddModal = false" @submit="handleAdd" />
+    <AddZoneModal v-if="showAddModal" ref="addModalRef" :item-types="itemTypes" :quantities="quantities" @close="showAddModal = false" @submit="handleAdd" />
 
     <!-- ── EDIT MODAL ── -->
-    <LazyEditZoneModal v-if="showEditModal && editTarget" ref="editModalRef" :zone="editTarget" @close="showEditModal = false" @submit="handleEdit" />
+    <LazyEditZoneModal v-if="showEditModal && editTarget" ref="editModalRef" :zone="editTarget" :item-types="itemTypes" :quantities="quantities" @close="showEditModal = false" @submit="handleEdit" />
 
     <!-- ── DELETE MODAL ── -->
     <DeleteZoneModal

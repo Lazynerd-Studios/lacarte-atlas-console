@@ -189,11 +189,24 @@ function statusBadge(s: string) {
 
 const showAssignDriverModal = ref(false)
 const showCreatePickupModal = ref(false)
+const showRescheduleModal = ref(false)
 const selectedRequest = ref<PickupRequest | null>(null)
+const rescheduleTarget = ref<PickupRequest | null>(null)
 
 function openAssignModal(req: PickupRequest) {
   selectedRequest.value = req
   showAssignDriverModal.value = true
+}
+
+function openRescheduleModal(req: PickupRequest) {
+  rescheduleTarget.value = req
+  showRescheduleModal.value = true
+}
+
+async function handleRescheduled() {
+  showRescheduleModal.value = false
+  rescheduleTarget.value = null
+  await Promise.all([fetchRequests(), fetchStats()])
 }
 
 async function handleAssignDriver(data: { driver: string; scheduledDate: string; scheduledTime: string; priority: string; adminNotes: string }) {
@@ -550,6 +563,13 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
                   @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
                   @click="openAssignModal(req)"
                 >Reassign</button>
+                <button
+                  v-if="req.status === 'pending'"
+                  style="height:32px;padding:0 12px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer;white-space:nowrap"
+                  @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
+                  @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
+                  @click="openRescheduleModal(req)"
+                >Reschedule</button>
                 <NuxtLink
                   :to="`/pickups/${req.id}`"
                   style="width:32px;height:32px;background:none;border:none;border-radius:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;text-decoration:none"
@@ -598,6 +618,15 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
     v-if="showCreatePickupModal"
     @close="showCreatePickupModal = false"
     @created="() => { showCreatePickupModal = false; fetchStats(); fetchRequests() }"
+  />
+
+  <!-- Reschedule Modal (pending pickups only) -->
+  <LazyReschedulePickupModal
+    v-if="showRescheduleModal && rescheduleTarget"
+    :pickup-id="rescheduleTarget.id"
+    :customer-name="rescheduleTarget.customer.name"
+    @close="showRescheduleModal = false; rescheduleTarget = null"
+    @done="handleRescheduled"
   />
 </template>
 
