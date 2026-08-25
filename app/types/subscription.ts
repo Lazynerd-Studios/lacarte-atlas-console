@@ -121,3 +121,21 @@ export interface AdminSubscriptionDetail extends AdminSubscriptionListItem {
   /** Newest first */
   payments: AdminSubscriptionPayment[]
 }
+
+/** Settlement report returned by the admin cancel endpoint when debt was billed */
+export interface CancelSettlement {
+  /** Total debt after settlement (GHS major units) */
+  outstandingBalance: number
+  /** Settlement payment id */
+  paymentId: string
+  /** false if the MoMo collection prompt failed to start */
+  promptSent: boolean
+}
+
+/** Response: POST /subscription/admin/subscriptions/:id/cancel */
+export interface CancelSubscriptionResponse {
+  success: boolean
+  message?: string
+  /** null for a clean exit (nothing owed) */
+  settlement: CancelSettlement | null
+}

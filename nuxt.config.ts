@@ -8,6 +8,12 @@ export default defineNuxtConfig({
     '@pinia/nuxt',
     '@pinia-plugin-persistedstate/nuxt',
   ],
+  ui: {
+    // Skip @nuxt/fonts — all UI text uses Manrope loaded via the Google Fonts
+    // import in main.css. The fonts module otherwise resolves/downloads fonts
+    // from network providers during module setup, adding ~seconds to startup.
+    fonts: false,
+  },
   app: {
     head: {
       meta: [

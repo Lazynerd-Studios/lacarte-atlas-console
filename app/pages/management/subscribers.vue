@@ -4,6 +4,7 @@ import type {
   AdminSubscriptionListItem,
   AdminSubscriptionDetail,
   AdminSubscriptionStatus,
+  CancelSubscriptionResponse,
 } from '~/types/subscription'
 
 definePageMeta({ layout: 'dashboard' })
@@ -151,9 +152,10 @@ const confirmState = ref<{ sub: AdminSubscriptionListItem; action: LifecycleActi
 function confirmCopy(action: LifecycleAction, sub: AdminSubscriptionListItem) {
   const who = sub.customerName || sub.customerPhone
   if (action === 'cancel') {
-    // Postpaid subs with unbilled usage settle it into exit debt at cancellation
+    // Postpaid subs settle exit debt at cancellation: deferred charges plus the
+    // full cycle fee when any quota pickup was used this cycle (no pro-rating)
     const exitNote = sub.paymentPlan === 'postpaid'
-      ? ' Any unbilled usage (over-quota pickups, emergency fees) will be settled as exit debt, invoiced, and collected from the customer via MoMo.'
+      ? ' Any unbilled usage (over-quota pickups, emergency fees) is settled as exit debt. If any pickup was used this cycle, the full cycle fee is billed too — no pro-rating. The customer is invoiced and prompted via MoMo.'
       : ''
     return {
       title: 'Cancel Subscription',
@@ -208,14 +210,41 @@ async function runLifecycleAction() {
           toast.error('Failed to reactivate subscription', message)
         }
       }
-    } else {
-      const result = await api.post<{ success: boolean; message?: string }>(
-        `/subscription/admin/subscriptions/${sub.id}/${action}`,
+    } else if (action === 'cancel') {
+      // Cancel now reports the settlement (null for a clean exit)
+      const result = await api.post<CancelSubscriptionResponse>(
+        `/subscription/admin/subscriptions/${sub.id}/cancel`,
         {},
-        action === 'cancel' ? 'Failed to cancel subscription' : 'Failed to suspend subscription'
+        'Failed to cancel subscription'
       )
       if (result) {
-        toast.success(result.message || (action === 'cancel' ? 'Subscription cancelled' : 'Subscription suspended'))
+        confirmState.value = null
+        if (result.settlement) {
+          const { outstandingBalance, promptSent } = result.settlement
+          if (promptSent) {
+            toast.success(
+              'Subscription cancelled',
+              `${format(outstandingBalance)} settled as exit debt — MoMo collection prompt sent to the customer.`
+            )
+          } else {
+            toast.warning(
+              'Cancelled, but MoMo prompt failed to start',
+              `${format(outstandingBalance)} is owed. The customer can still pay via pay-balance, or you can waive the balance.`
+            )
+          }
+        } else {
+          toast.success(result.message || 'Subscription cancelled')
+        }
+        await fetchSubscribers()
+      }
+    } else {
+      const result = await api.post<{ success: boolean; message?: string }>(
+        `/subscription/admin/subscriptions/${sub.id}/suspend`,
+        {},
+        'Failed to suspend subscription'
+      )
+      if (result) {
+        toast.success(result.message || 'Subscription suspended')
         confirmState.value = null
         await fetchSubscribers()
       }
