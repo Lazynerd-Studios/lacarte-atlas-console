@@ -4,6 +4,7 @@ import type {
   AdminSubscriptionListItem,
   AdminSubscriptionDetail,
   AdminSubscriptionStatus,
+  CancelSubscriptionResponse,
 } from '~/types/subscription'
 
 definePageMeta({ layout: 'dashboard' })
@@ -121,7 +122,7 @@ function formatDateTime(dateStr: string | null) {
 // pending    → Cancel
 // past_due   → Suspend, Waive (if balance > 0)
 // suspended  → Reactivate, Waive (if balance > 0)
-// cancelled / expired → none (terminal)
+// cancelled / expired → Waive (if balance > 0 — exit debt), otherwise terminal
 
 function canCancel(sub: AdminSubscriptionListItem) {
   return sub.status === 'active' || sub.status === 'pending'
@@ -133,7 +134,13 @@ function canReactivate(sub: AdminSubscriptionListItem) {
   return sub.status === 'suspended'
 }
 function canWaive(sub: AdminSubscriptionListItem) {
-  return (sub.status === 'past_due' || sub.status === 'suspended') && sub.outstandingBalance > 0
+  const waivable = sub.status === 'past_due' || sub.status === 'suspended'
+    || sub.status === 'cancelled' || sub.status === 'expired'
+  return waivable && sub.outstandingBalance > 0
+}
+/** Exit debt: balance carried by a terminal (cancelled/expired) subscription */
+function hasExitDebt(sub: AdminSubscriptionListItem) {
+  return (sub.status === 'cancelled' || sub.status === 'expired') && sub.outstandingBalance > 0
 }
 
 const actingId = ref<string | null>(null)
@@ -145,9 +152,14 @@ const confirmState = ref<{ sub: AdminSubscriptionListItem; action: LifecycleActi
 function confirmCopy(action: LifecycleAction, sub: AdminSubscriptionListItem) {
   const who = sub.customerName || sub.customerPhone
   if (action === 'cancel') {
+    // Postpaid subs settle exit debt at cancellation: deferred charges plus the
+    // full cycle fee when any quota pickup was used this cycle (no pro-rating)
+    const exitNote = sub.paymentPlan === 'postpaid'
+      ? ' Any unbilled usage (over-quota pickups, emergency fees) is settled as exit debt. If any pickup was used this cycle, the full cycle fee is billed too — no pro-rating. The customer is invoiced and prompted via MoMo.'
+      : ''
     return {
       title: 'Cancel Subscription',
-      message: `Cancel the subscription for ${who}? Any pending payment (including an in-flight MoMo prompt) will be failed and can no longer be collected.`,
+      message: `Cancel the subscription for ${who}? Any pending payment (including an in-flight MoMo prompt) will be failed and can no longer be collected.${exitNote}`,
       text: 'Cancel Subscription',
       color: '#ef4444',
     }
@@ -198,14 +210,41 @@ async function runLifecycleAction() {
           toast.error('Failed to reactivate subscription', message)
         }
       }
-    } else {
-      const result = await api.post<{ success: boolean; message?: string }>(
-        `/subscription/admin/subscriptions/${sub.id}/${action}`,
+    } else if (action === 'cancel') {
+      // Cancel now reports the settlement (null for a clean exit)
+      const result = await api.post<CancelSubscriptionResponse>(
+        `/subscription/admin/subscriptions/${sub.id}/cancel`,
         {},
-        action === 'cancel' ? 'Failed to cancel subscription' : 'Failed to suspend subscription'
+        'Failed to cancel subscription'
       )
       if (result) {
-        toast.success(result.message || (action === 'cancel' ? 'Subscription cancelled' : 'Subscription suspended'))
+        confirmState.value = null
+        if (result.settlement) {
+          const { outstandingBalance, promptSent } = result.settlement
+          if (promptSent) {
+            toast.success(
+              'Subscription cancelled',
+              `${format(outstandingBalance)} settled as exit debt — MoMo collection prompt sent to the customer.`
+            )
+          } else {
+            toast.warning(
+              'Cancelled, but MoMo prompt failed to start',
+              `${format(outstandingBalance)} is owed. The customer can still pay via pay-balance, or you can waive the balance.`
+            )
+          }
+        } else {
+          toast.success(result.message || 'Subscription cancelled')
+        }
+        await fetchSubscribers()
+      }
+    } else {
+      const result = await api.post<{ success: boolean; message?: string }>(
+        `/subscription/admin/subscriptions/${sub.id}/suspend`,
+        {},
+        'Failed to suspend subscription'
+      )
+      if (result) {
+        toast.success(result.message || 'Subscription suspended')
         confirmState.value = null
         await fetchSubscribers()
       }
@@ -269,8 +308,12 @@ function closeDetail() {
   detail.value = null
 }
 
-/** A paid payment on a cancelled/expired subscription is flagged for refund review */
-function needsRefundReview(paymentStatus: string) {
+/**
+ * A paid payment on a cancelled/expired subscription needs attention: it either
+ * settled outstanding exit debt (debt_settled) or — if there was no debt — is
+ * flagged for refund review. The two can't be distinguished client-side.
+ */
+function needsPaymentReview(paymentStatus: string) {
   if (!detail.value) return false
   return paymentStatus === 'paid' && (detail.value.status === 'cancelled' || detail.value.status === 'expired')
 }
@@ -383,7 +426,14 @@ const selectStyle = `height:38px;padding:0 32px 0 12px;border:1.5px solid #e5e7e
             </td>
             <!-- Balance -->
             <td style="padding:16px;text-align:right">
-              <span :style="`font-size:14px;font-weight:600;${sub.outstandingBalance > 0 ? 'color:#ef4444' : 'color:#6b7280'}`">{{ format(sub.outstandingBalance) }}</span>
+              <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px">
+                <span
+                  v-if="hasExitDebt(sub)"
+                  style="font-size:11px;font-weight:600;border-radius:12px;padding:2px 9px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;white-space:nowrap"
+                  title="Exit debt — unbilled usage settled at cancellation. Waive it (or have the customer pay) to unblock re-subscribing."
+                >Debt</span>
+                <span :style="`font-size:14px;font-weight:600;${sub.outstandingBalance > 0 ? 'color:#ef4444' : 'color:#6b7280'}`">{{ format(sub.outstandingBalance) }}</span>
+              </div>
             </td>
             <!-- Started -->
             <td style="padding:16px;font-size:14px;color:#6b7280;white-space:nowrap">{{ formatDate(sub.startDate) }}</td>
@@ -468,6 +518,7 @@ const selectStyle = `height:38px;padding:0 32px 0 12px;border:1.5px solid #e5e7e
           </p>
           <p style="font-size:12px;color:#9ca3af;margin:8px 0 0">
             This zeroes the balance and fails any pending payments tied to it. The subscription status is not changed.
+            For cancelled/expired subscriptions this clears exit debt and lets the customer subscribe again.
           </p>
         </div>
         <div style="padding:16px 24px;display:flex;flex-direction:column;gap:6px">
@@ -579,10 +630,10 @@ const selectStyle = `height:38px;padding:0 32px 0 12px;border:1.5px solid #e5e7e
                           {{ paymentBadge(p.status).label }}
                         </span>
                         <span
-                          v-if="needsRefundReview(p.status)"
+                          v-if="needsPaymentReview(p.status)"
                           style="font-size:11px;font-weight:600;border-radius:12px;padding:2px 9px;color:#d49a00;background:rgba(255,180,0,0.1);border:1px solid rgba(255,180,0,0.3);margin-left:6px"
-                          title="Money arrived for a cancelled/expired subscription — flagged for refund review"
-                        >Refund review</span>
+                          title="Paid on a cancelled/expired subscription — either settled outstanding exit debt or flagged for refund review"
+                        >Review payment</span>
                       </td>
                       <td style="padding:12px 14px;font-size:12px;color:#6b7280;white-space:nowrap">{{ formatDateTime(p.paidAt) }}</td>
                     </tr>
@@ -590,7 +641,9 @@ const selectStyle = `height:38px;padding:0 32px 0 12px;border:1.5px solid #e5e7e
                 </table>
               </div>
               <p style="font-size:12px;color:#9ca3af;margin:10px 0 0">
-                Late MoMo settlements can mark a failed payment as paid later. Paid payments are final and never revert.
+                Late MoMo settlements can mark a failed payment as paid later. Money arriving for a cancelled
+                subscription either clears its outstanding debt or is flagged for refund review. Paid payments
+                are final and never revert.
               </p>
             </div>
           </template>

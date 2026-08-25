@@ -359,6 +359,7 @@ function pickupNoteDate(dateString?: string | null): string {
 const showReassignModal = ref(false)
 const showCancelConfirm = ref(false)
 const showAdjustLoadModal = ref(false)
+const showRescheduleModal = ref(false)
 const assignDriverModalRef = ref<{ submitting: boolean } | null>(null)
 
 const { hasPermission } = usePermissions()
@@ -376,6 +377,11 @@ const canAdjustLoad = computed(() => {
 function handleAdjustLoadSuccess() {
   fetchPickupDetails()
   fetchActivityLog()
+}
+
+async function handleRescheduled() {
+  showRescheduleModal.value = false
+  await Promise.all([fetchPickupDetails(), fetchActivityLog()])
 }
 
 async function startTrip() {
@@ -651,6 +657,15 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
             @click="showReassignModal = true"
           >{{ pickup.status.toLowerCase() === 'pending' ? 'Assign Driver' : 'Reassign' }}</button>
 
+          <!-- Reschedule — only pending pickups can be rescheduled -->
+          <button
+            v-if="pickup.status.toLowerCase() === 'pending'"
+            style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
+            @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
+            @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
+            @click="showRescheduleModal = true"
+          >Reschedule</button>
+
           <!-- Cancel — hidden for terminal statuses (completed/cancelled/expired) -->
           <button
             v-if="!['completed','cancelled','expired'].includes(pickup.status.toLowerCase())"
@@ -925,6 +940,15 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
     :booked-truck-load-label="pickupData.truckLoadLabel ?? null"
     @close="showAdjustLoadModal = false"
     @success="handleAdjustLoadSuccess"
+  />
+
+  <!-- Reschedule modal -->
+  <LazyReschedulePickupModal
+    v-if="showRescheduleModal && pickupData"
+    :pickup-id="pickupData.id"
+    :customer-name="pickupData.customer.name"
+    @close="showRescheduleModal = false"
+    @done="handleRescheduled"
   />
 
 </template>
