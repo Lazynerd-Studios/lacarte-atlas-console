@@ -17,7 +17,7 @@ const emit = defineEmits<{
       <!-- Header -->
       <div style="padding:24px;border-bottom:1px solid #f0f0f0">
         <div style="width:48px;height:48px;border-radius:12px;background:#fef2f2;display:flex;align-items:center;justify-content:center;margin-bottom:16px">
-          <Icon name="lucide:alert-triangle" style="width:24px;height:24px;color:#ef4444" />
+          <UIcon name="i-lucide-triangle-alert" style="width:24px;height:24px;color:#ef4444" />
         </div>
         <h2 style="font-size:20px;font-weight:700;color:#1a1a1a;margin:0 0 8px">{{ title }}</h2>
         <p style="font-size:14px;color:#6b7280;margin:0">{{ message }}</p>

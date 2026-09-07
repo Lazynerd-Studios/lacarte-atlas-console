@@ -12,7 +12,10 @@ interface CustomerOption {
   name: string
   phoneNumber: string | null
   placeName: string | null
+  customerTypeId?: string | null
+  customerType?: { id: string } | null
   user?: { name?: string; email?: string } | null
+  paymentMode?: string | null
 }
 interface DisposableItem {
   id: string
@@ -22,22 +25,43 @@ interface DisposableItem {
 interface EstimatedQuantity {
   id: string
   label: string
+  binCount: number | null
 }
+interface TruckLoadTier {
+  id: string
+  label: string
+  prepayRate: number
+  postpayRate: number
+  binEquivalent: number
+  isActive?: boolean
+}
+type PricingMode = 'per_bin' | 'full_truck'
 
 const customers = ref<CustomerOption[]>([])
 const disposableItems = ref<DisposableItem[]>([])
 const estimatedQuantities = ref<EstimatedQuantity[]>([])
+const truckTiers = ref<TruckLoadTier[]>([])
+// Map of customerTypeId -> pricingMode, used to decide whether the selected
+// customer is priced per_bin (automatic) or full_truck (needs a truck tier).
+const customerTypePricingModes = ref<Record<string, PricingMode>>({})
 const loadingOptions = ref(true)
+const loadingQuantities = ref(false)
 const submitting = ref(false)
 
 const form = reactive({
   customerId: '',
   disposableItemTypeId: '',
   estimatedQuantityId: '',
+  truckLoadRateId: '',
   preferredPickupDate: '',
   additionalNotes: '',
+  isEmergency: false,
 })
 const errors = reactive<Record<string, string>>({})
+// Server-side rejection shown inline: 'balance' renders as a warning (402
+// outstanding balance), anything else as a validation error (400 etc.)
+const submitError = ref('')
+const submitErrorKind = ref<'error' | 'balance'>('error')
 
 const customerSearch = ref('')
 const customerDropdownOpen = ref(false)
@@ -68,8 +92,73 @@ function selectCustomer(c: CustomerOption) {
   selectedCustomer.value = c
   customerSearch.value = c.name
   form.customerId = c.id
+  // A truck tier chosen for a previous customer no longer applies
+  form.truckLoadRateId = ''
   customerDropdownOpen.value = false
   if (errors.customerId) delete errors.customerId
+  // Availability is checked against the customer's type — reload the quantity options scoped to it
+  fetchQuantities(c.customerTypeId ?? c.customerType?.id ?? null)
+}
+
+// Pricing mode of the currently selected customer's type. per_bin customers are
+// priced automatically; full_truck customers require a truck load tier.
+const selectedPricingMode = computed<PricingMode>(() => {
+  const typeId = selectedCustomer.value?.customerTypeId ?? selectedCustomer.value?.customerType?.id ?? null
+  if (!typeId) return 'per_bin'
+  return customerTypePricingModes.value[typeId] ?? 'per_bin'
+})
+const isFullTruck = computed(() => selectedPricingMode.value === 'full_truck')
+
+// Load customer types once to build the id -> pricingMode lookup
+async function fetchCustomerTypePricingModes() {
+  const res = await api.get<{ id: string; pricingMode?: PricingMode }[]>('/customer/admin/types/', 'Failed to load customer types')
+  if (res) {
+    const list = Array.isArray(res) ? res : ((res as any).data ?? [])
+    for (const ct of list) {
+      customerTypePricingModes.value[ct.id] = ct.pricingMode ?? 'per_bin'
+    }
+  }
+}
+
+// Truck load tiers for the full_truck dropdown — response shape: { tiers: [...], total }
+async function fetchTruckTiers() {
+  const res = await api.get<{ tiers?: TruckLoadTier[] }>('/rates/admin/truck-loads', 'Failed to load truck load tiers')
+  if (res) {
+    const list = res.tiers ?? []
+    truckTiers.value = list
+      .filter(t => t.isActive !== false)
+      .map(t => ({
+        id: t.id,
+        label: t.label,
+        prepayRate: Number(t.prepayRate),
+        postpayRate: Number(t.postpayRate),
+        binEquivalent: Number(t.binEquivalent),
+        isActive: t.isActive,
+      }))
+  }
+}
+
+// Load active quantities, scoped to a customer type when one is selected
+async function fetchQuantities(customerTypeId: string | null) {
+  loadingQuantities.value = true
+  const endpoint = customerTypeId
+    ? `/disposable/quantities/active?customerTypeId=${customerTypeId}`
+    : '/disposable/quantities/active'
+  console.log('[CreatePickupModal] Fetching quantities:', endpoint)
+  const res = await api.get<any>(endpoint, 'Failed to load estimated quantities')
+  if (res) {
+    const items = Array.isArray(res) ? res : (res.data ?? res.quantities ?? [])
+    estimatedQuantities.value = items.map((q: any) => ({
+      id: q.id,
+      label: q.label,
+      binCount: q.binCount != null ? Number(q.binCount) : null,
+    }))
+    // Clear a stale selection that isn't available for this customer type
+    if (form.estimatedQuantityId && !estimatedQuantities.value.some(q => q.id === form.estimatedQuantityId)) {
+      form.estimatedQuantityId = ''
+    }
+  }
+  loadingQuantities.value = false
 }
 
 async function fetchAllCustomers(): Promise<CustomerOption[]> {
@@ -89,7 +178,8 @@ async function fetchAllCustomers(): Promise<CustomerOption[]> {
         if (!c.name && c.user?.name) c.name = c.user.name
         if (!c.placeName) c.placeName = (c as any).address ?? null
       }
-      all.push(...res.data)
+      // Pickups are created for subscribed customers only — drop pay-as-you-go accounts
+      all.push(...res.data.filter(c => c.paymentMode === 'subscription'))
     }
     hasNext = !!res.pagination?.hasNextPage
     page++
@@ -99,23 +189,25 @@ async function fetchAllCustomers(): Promise<CustomerOption[]> {
 
 onMounted(async () => {
   loadingOptions.value = true
-  const [cust, dispRes, qtyRes] = await Promise.all([
+  const [cust, dispRes] = await Promise.all([
     fetchAllCustomers(),
-    api.get<any>('/disposable/item-types', 'Failed to load disposable types'),
-    api.get<any>('/disposable/quantities', 'Failed to load estimated quantities'),
+    api.get<any>('/disposable/item-types/active', 'Failed to load disposable types'),
+    fetchQuantities(null),
+    fetchCustomerTypePricingModes(),
+    fetchTruckTiers(),
   ])
   customers.value = cust
   if (dispRes) {
     const items = Array.isArray(dispRes) ? dispRes : (dispRes.data ?? dispRes.disposableTypes ?? [])
     disposableItems.value = items.map((i: any) => ({ id: i.id, name: i.name, icon: i.icon ?? null }))
   }
-  if (qtyRes) {
-    const items = Array.isArray(qtyRes) ? qtyRes : (qtyRes.data ?? qtyRes.quantities ?? [])
-    estimatedQuantities.value = items
-      .filter((q: any) => q.isActive !== false && q.isActive !== 0)
-      .map((q: any) => ({ id: q.id, label: q.label }))
-  }
   loadingOptions.value = false
+})
+
+const todayForDateInput = computed(() => {
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 })
 
 function validate() {
@@ -123,7 +215,11 @@ function validate() {
   if (!form.customerId)                  errors.customerId = 'Select a customer'
   if (!form.disposableItemTypeId)        errors.disposableItemTypeId = 'Required'
   if (!form.estimatedQuantityId)         errors.estimatedQuantityId = 'Required'
+  if (isFullTruck.value && !form.truckLoadRateId) errors.truckLoadRateId = 'Select a truck load tier'
   if (!form.preferredPickupDate)         errors.preferredPickupDate = 'Required'
+  if (!form.isEmergency && form.preferredPickupDate && form.preferredPickupDate < todayForDateInput.value) {
+    errors.preferredPickupDate = 'Pickup date cannot be in the past'
+  }
   if (form.additionalNotes.length > 500)  errors.additionalNotes = 'Max 500 characters'
   return Object.keys(errors).length === 0
 }
@@ -132,22 +228,44 @@ async function submit() {
   if (submitting.value) return
   if (!validate()) return
   submitting.value = true
-  const result = await api.post<any>(
-    '/pickup-requests/admin/',
-    {
-      customerId: form.customerId,
-      disposableItemTypeId: form.disposableItemTypeId,
-      estimatedQuantityId: form.estimatedQuantityId,
-      preferredPickupDate: form.preferredPickupDate,
-      paymentType: 'subscription',
-      additionalNotes: form.additionalNotes.trim(),
-    },
-    'Failed to create pickup request'
-  )
-  submitting.value = false
-  if (result) {
-    toast.success('Pickup request created')
+  submitError.value = ''
+  // paymentType is intentionally omitted — the server auto-resolves it from the
+  // customer's subscription state. truckLoadRateId is only valid for full_truck
+  // customers (the server rejects it for per_bin).
+  const payload: Record<string, unknown> = {
+    customerId: form.customerId,
+    disposableItemTypeId: form.disposableItemTypeId,
+    estimatedQuantityId: form.estimatedQuantityId,
+    preferredPickupDate: form.preferredPickupDate,
+    isEmergency: form.isEmergency,
+    additionalNotes: form.additionalNotes.trim(),
+  }
+  if (isFullTruck.value) {
+    payload.truckLoadRateId = form.truckLoadRateId
+  }
+  try {
+    // Raw request so server rejections (400 no eligible subscription,
+    // 402 outstanding balance) can be shown inline in the form
+    await api.request<unknown>('/pickup-requests/admin/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+    toast.success(form.isEmergency ? 'Emergency pickup request created' : 'Pickup request created')
     emit('created')
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err ?? '')
+    // 402 → subscription has an outstanding balance; render as a balance warning
+    if (message.includes('(402)') || /balance/i.test(message)) {
+      submitErrorKind.value = 'balance'
+      submitError.value = message.includes('(402)')
+        ? 'This customer has an outstanding subscription balance. Collect or waive the balance before booking a pickup.'
+        : message
+    } else {
+      submitErrorKind.value = 'error'
+      submitError.value = message || 'Failed to create pickup request'
+    }
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -167,7 +285,7 @@ function inputStyle(field: string) {
       <!-- Header -->
       <div style="padding:24px 24px 16px;flex-shrink:0;border-bottom:1px solid #e5e7eb">
         <p style="font-size:20px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Create Pickup Request</p>
-        <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:4px">Payment type: Subscription</p>
+        <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:4px">Subscribed customers only · Payment type: Auto-resolved by the system</p>
       </div>
 
       <!-- Close -->
@@ -180,6 +298,16 @@ function inputStyle(field: string) {
 
       <!-- Body -->
       <div style="flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:16px">
+
+        <!-- Server-side rejection (400 validation / 402 outstanding balance) -->
+        <div
+          v-if="submitError"
+          role="alert"
+          :style="`display:flex;align-items:flex-start;gap:10px;border-radius:12px;padding:12px 14px;font-size:13px;font-family:'Manrope',sans-serif;line-height:1.5;${submitErrorKind === 'balance' ? 'background:#fffbeb;border:1px solid #fde68a;color:#92400e' : 'background:#fef2f2;border:1px solid #fecaca;color:#ef4444'}`"
+        >
+          <UIcon :name="submitErrorKind === 'balance' ? 'i-lucide-alert-circle' : 'i-lucide-x-circle'" style="width:16px;height:16px;flex-shrink:0;margin-top:1px" />
+          <span>{{ submitError }}</span>
+        </div>
 
         <div v-if="loadingOptions" style="display:flex;align-items:center;justify-content:center;padding:40px 0">
           <UIcon name="i-lucide-loader-2" style="width:22px;height:22px;color:#ffb400;animation:spin 1s linear infinite" />
@@ -217,7 +345,7 @@ function inputStyle(field: string) {
               </button>
             </div>
             <div v-else-if="customerDropdownOpen && customerSearch && filteredCustomers.length === 0" style="position:absolute;top:calc(100% + 4px);left:0;right:0;background:white;border:1px solid #e5e7eb;border-radius:12px;padding:12px;text-align:center;z-index:10">
-              <span style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">No customers found</span>
+              <span style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">No subscribed customers found</span>
             </div>
           </div>
 
@@ -239,23 +367,60 @@ function inputStyle(field: string) {
             <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Estimated Quantity</label>
             <select
               v-model="form.estimatedQuantityId"
-              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid ${errors.estimatedQuantityId ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:${form.estimatedQuantityId ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+              :disabled="loadingQuantities"
+              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid ${errors.estimatedQuantityId ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:${form.estimatedQuantityId ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:${loadingQuantities ? 'wait' : 'pointer'};appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box;opacity:${loadingQuantities ? 0.6 : 1}`"
             >
-              <option value="" disabled>Select quantity</option>
-              <option v-for="q in estimatedQuantities" :key="q.id" :value="q.id">{{ q.label }}</option>
+              <option value="" disabled>{{ loadingQuantities ? 'Loading quantities...' : 'Select quantity' }}</option>
+              <option v-for="q in estimatedQuantities" :key="q.id" :value="q.id">{{ q.label }}{{ q.binCount != null ? ` (${q.binCount} bins)` : '' }}</option>
             </select>
             <span v-if="errors.estimatedQuantityId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.estimatedQuantityId }}</span>
+            <span v-else-if="selectedCustomer && estimatedQuantities.length === 0 && !loadingQuantities" style="font-size:12px;color:#f59e0b;font-family:'Manrope',sans-serif">No quantities available for this customer's type</span>
+          </div>
+
+          <!-- Truck load tier (full_truck customers only) -->
+          <div v-if="isFullTruck" style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Truck Load Tier</label>
+            <select
+              v-model="form.truckLoadRateId"
+              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid ${errors.truckLoadRateId ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:${form.truckLoadRateId ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+            >
+              <option value="" disabled>Select truck load tier</option>
+              <option v-for="t in truckTiers" :key="t.id" :value="t.id">{{ t.label }}</option>
+            </select>
+            <span v-if="errors.truckLoadRateId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.truckLoadRateId }}</span>
+            <span v-else style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">This customer is priced by truck load — pick the load size for this trip.</span>
           </div>
 
           <!-- Preferred pickup date -->
           <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Preferred Pickup Date</label>
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">
+              Preferred Pickup Date {{ form.isEmergency ? '(today only for emergencies)' : '' }}
+            </label>
             <input
               v-model="form.preferredPickupDate"
               type="date"
+              :min="todayForDateInput"
               :style="inputStyle('preferredPickupDate')"
             />
             <span v-if="errors.preferredPickupDate" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.preferredPickupDate }}</span>
+            <span v-else-if="form.isEmergency" style="font-size:12px;color:#f59e0b;font-family:'Manrope',sans-serif">Emergency pickups are scheduled for today</span>
+          </div>
+
+          <!-- Emergency toggle -->
+          <div
+            style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;border:1px solid #e5e7eb;cursor:pointer;background:#fff"
+            @click="form.isEmergency = !form.isEmergency"
+          >
+            <input
+              v-model="form.isEmergency"
+              type="checkbox"
+              style="width:18px;height:18px;accent-color:#ef4444;cursor:pointer;flex-shrink:0"
+              @click.stop
+            />
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <span style="font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Emergency Pickup</span>
+              <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Same-day urgent collection. Extra emergency fee may apply.</span>
+            </div>
           </div>
 
           <!-- Additional notes -->

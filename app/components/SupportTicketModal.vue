@@ -327,9 +327,3 @@ onMounted(() => {
     </div>
   </div>
 </template>
-
-<style scoped>
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-</style>

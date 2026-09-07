@@ -44,6 +44,13 @@ function validate() {
   return Object.keys(errors).length === 0
 }
 
+// Allow the parent to stop the loading state when the API call fails
+function stopSubmitting() {
+  submitting.value = false
+}
+
+defineExpose({ stopSubmitting })
+
 function submit() {
   if (!validate()) return
   submitting.value = true
@@ -91,7 +98,8 @@ function onBlur(e: Event, field: string) {
         @mouseover="($event.currentTarget as HTMLElement).style.background='#f3f4f6'"
         @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
       >
-        <Icon name="lucide:x" style="width:16px;height:16px;color:#111" />      </button>
+        <UIcon name="i-lucide-x" style="width:16px;height:16px;color:#111" />
+      </button>
 
       <!-- Body -->
       <div style="flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:16px">
@@ -185,7 +193,7 @@ function onBlur(e: Event, field: string) {
           :disabled="submitting"
           @click="submit"
         >
-          <Icon v-if="submitting" name="lucide:loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
+          <UIcon v-if="submitting" name="i-lucide-loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
           {{ submitting ? 'Saving...' : 'Save Changes' }}
         </button>
       </div>

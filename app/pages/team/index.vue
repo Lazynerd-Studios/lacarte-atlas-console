@@ -1,6 +1,18 @@
 <script setup lang="ts">
 import type { TeamMember, CreateRolePayload } from '~/types/team'
 
+/** Shape of a single admin record returned by GET /team/ */
+interface TeamAdminRecord {
+  id: string
+  user?: { name?: string; email?: string }
+  phoneNumber?: string
+  role?: { id: string; name: string; displayName?: string }
+  status: 'active' | 'inactive'
+  lastLoginAt?: string
+  createdAt: string
+  updatedAt?: string
+}
+
 interface TeamStats {
   totalMembers: number
   activeMembers: number
@@ -103,10 +115,18 @@ function openDeleteModal(member: TeamMember) {
  * Authorization:
  * - Verifies user has admin privileges before allowing operation
  * 
+ * API Call:
+ * - DELETE /team/:id
+ * 
+ * Success Flow (204 No Content):
+ * - Show success toast
+ * - Close modal and reset state
+ * - Refresh both member list and stats
+ * 
  * Error Handling:
+ * - 404: Show "Member not found" error toast
  * - 401: Automatic redirect to login (handled by useApi)
- * - 403, 404, 500: Automatic error toast (handled by useErrorHandler)
- * - Network errors: Automatic error toast (handled by useErrorHandler)
+ * - 403, 500, network: Show error toast
  */
 async function handleDelete() {
   if (!memberToDelete.value) return
@@ -126,19 +146,32 @@ async function handleDelete() {
   const toast = useAppToast()
   
   console.log('[Team Management] Sending DELETE request to /team/' + memberToDelete.value.id)
-  const response = await api.del(`/team/${memberToDelete.value.id}`)
   
-  if (response) {
-    console.log('[Team Management] Member deleted successfully')
+  try {
+    // Use raw request to handle 204 responses (returns null for no body, but is still success)
+    await api.request(`/team/${memberToDelete.value.id}`, {
+      method: 'DELETE',
+    })
+    
+    console.log('[Team Management] Member deleted successfully (204)')
     toast.success('Team member deleted successfully')
     showDeleteModal.value = false
     memberToDelete.value = null
-    await fetchMembers() // Refresh the member list
-  } else {
-    console.log('[Team Management] Member deletion failed or returned null')
+    await Promise.all([fetchMembers(), fetchStats()]) // Refresh member list and stats
+  } catch (err: unknown) {
+    console.error('[Team Management] Member deletion failed', { error: err })
+    // 404 not found
+    const message = err instanceof Error ? err.message : String(err ?? '')
+    if (message.toLowerCase().includes('not found')) {
+      toast.error('Member not found', 'The requested team member could not be found')
+    } else {
+      // Other errors (403, 500, network) show as toast
+      const errorMessage = message || 'Failed to delete team member'
+      toast.error('Failed to delete team member', errorMessage)
+    }
+  } finally {
+    deleting.value = false
   }
-  
-  deleting.value = false
 }
 
 /**
@@ -155,7 +188,7 @@ async function fetchMembers() {
   const api = useApi()
   
   console.log('[Team Management] Sending GET request to /team/')
-  const response = await api.get<{ data: any[] }>('/team/')
+  const response = await api.get<{ data: TeamAdminRecord[] }>('/team/')
   if (response && response.data) {
     console.log('[Team Management] Members fetched successfully', { 
       count: response.data.length,
@@ -165,7 +198,7 @@ async function fetchMembers() {
     })
     
     // Transform backend response to match our TeamMember interface
-    members.value = response.data.map((item: any) => ({
+    members.value = response.data.map((item: TeamAdminRecord) => ({
       id: item.id,
       firstName: item.user?.name?.split(' ')[0] || '',
       lastName: item.user?.name?.split(' ').slice(1).join(' ') || '',
@@ -522,7 +555,7 @@ onMounted(async () => {
 
   </div>
 
-  <AddRoleModal
+  <LazyAddRoleModal
     v-if="showAddRoleModal"
     :submitting="submitting"
     @close="showAddRoleModal = false"
@@ -590,10 +623,6 @@ onMounted(async () => {
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
-}
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
 }
 .skeleton {
   background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);

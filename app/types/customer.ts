@@ -1,5 +1,7 @@
 // Customer type definitions
 
+import type { PaginatedDataResponse } from './api'
+
 /** User account attached to a customer (Better Auth shape) */
 export interface CustomerUser {
   id: string
@@ -18,6 +20,7 @@ export interface CustomerUser {
 export interface CustomerType {
   id: string
   name: string
+  pricingMode?: 'per_bin' | 'full_truck'
   createdAt: string
   updatedAt: string
 }
@@ -38,7 +41,11 @@ export interface Customer {
   zoneId: string
   phoneNumber: string
   noBins: number
+  balance?: number
+  capacityRateId?: string | null
   status: string
+  createdVia?: string | null
+  createdById?: string | null
   address: string | null
   city: string | null
   region: string | null
@@ -52,6 +59,11 @@ export interface Customer {
   user: CustomerUser
   customerType: CustomerType | null
   zone: CustomerZone | null
+}
+
+/** Customer item returned in list views (includes optional lastPickupDate) */
+export interface CustomerListItem extends Customer {
+  lastPickupDate?: string | null
 }
 
 /** Disposable item type attached to a customer pickup history entry */
@@ -89,14 +101,4 @@ export interface CustomerPickupHistoryEntry {
 }
 
 /** Paginated response envelope for customer pickup history */
-export interface CustomerPickupHistoryResponse {
-  data: CustomerPickupHistoryEntry[]
-  pagination: {
-    page: number
-    limit: number
-    total: number
-    totalPages: number
-    hasNextPage: boolean
-    hasPreviousPage: boolean
-  }
-}
+export type CustomerPickupHistoryResponse = PaginatedDataResponse<CustomerPickupHistoryEntry>

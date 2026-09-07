@@ -44,7 +44,7 @@ const emit = defineEmits<{
           @click="emit('confirm')"
         >
           <UIcon v-if="loading" name="i-lucide-loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
-          {{ loading ? 'Deleting...' : (confirmText || 'Confirm') }}
+          {{ loading ? confirmText || 'Deleting...' : (confirmText || 'Confirm') }}
         </button>
       </div>
     </div>

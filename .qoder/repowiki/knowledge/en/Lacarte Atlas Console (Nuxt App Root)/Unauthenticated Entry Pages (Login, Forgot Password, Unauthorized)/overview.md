@@ -1,0 +1,1 @@
+Nuxt file-based routes for the unauthenticated entry flow: sign-in form, password-reset request, and an in-app access-denied screen rendered outside or inside the dashboard shell.

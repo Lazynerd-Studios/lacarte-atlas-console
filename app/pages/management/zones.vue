@@ -1,16 +1,8 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'dashboard' })
+import type { Zone, ZoneFormPayload } from '~/types/zone'
+import { isZoneScheduleComplete, hasPartialSchedule } from '~/types/zone'
 
-interface Zone {
-  id: string
-  name: string
-  description: string
-  color: string
-  areas: string[]
-  driverCount: number
-  customerCount: number
-  isActive: boolean
-}
+definePageMeta({ layout: 'dashboard' })
 
 interface ZoneStats {
   totalZones: number
@@ -23,6 +15,10 @@ const api = useApi()
 const zones = ref<Zone[]>([])
 const stats = ref<ZoneStats>({ totalZones: 0, activeZones: 0, totalCustomers: 0, assignedDrivers: 0 })
 const loading = ref(true)
+
+// Active item types / quantities for the schedule defaults dropdowns
+const itemTypes = ref<{ id: string; name: string }[]>([])
+const quantities = ref<{ id: string; label: string }[]>([])
 
 // Pagination
 const currentPage = ref(1)
@@ -44,17 +40,53 @@ async function fetchZones() {
   }
 }
 
+/** Options for the zone schedule defaults dropdowns (active only — inactive ids 400) */
+async function fetchScheduleOptions() {
+  const [typesRes, qtyRes] = await Promise.all([
+    api.get<any>('/disposable/item-types/active'),
+    api.get<any>('/disposable/quantities/active'),
+  ])
+  if (typesRes) {
+    const list = Array.isArray(typesRes) ? typesRes : (typesRes.data ?? typesRes.disposableTypes ?? [])
+    itemTypes.value = list.map((t: any) => ({ id: t.id, name: t.name }))
+  }
+  if (qtyRes) {
+    const list = Array.isArray(qtyRes) ? qtyRes : (qtyRes.data ?? qtyRes.quantities ?? [])
+    quantities.value = list.map((q: any) => ({ id: q.id, label: q.label }))
+  }
+}
+
 onMounted(async () => {
   loading.value = true
-  await Promise.all([fetchZones(), fetchStats()])
+  await Promise.all([fetchZones(), fetchStats(), fetchScheduleOptions()])
   loading.value = false
 })
+
+// ── Schedule display helpers ──
+
+/** Badge state for a zone's automatic pickup schedule */
+function scheduleState(z: Zone): { label: string; style: string } {
+  if (isZoneScheduleComplete(z)) return { label: 'Auto-pickups on', style: 'background:#dcfce7;color:#16a34a' }
+  if (hasPartialSchedule(z)) return { label: 'Schedule incomplete', style: 'background:#fef3c7;color:#b45309' }
+  return { label: 'No schedule', style: 'background:#f3f4f6;color:#9ca3af' }
+}
+
+/** Human summary of the schedule, e.g. "Monday · weekly · morning (week 2)" */
+function scheduleSummary(z: Zone): string {
+  if (!z.pickupDay || !z.pickupFrequency || !z.pickupTimeSlot) return ''
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+  const week = z.pickupFrequency === 'monthly' && z.weekOfMonth ? ` (week ${z.weekOfMonth})` : ''
+  return `${cap(z.pickupDay)} · ${z.pickupFrequency}${week} · ${z.pickupTimeSlot}`
+}
 
 const search = ref('')
 const filterStatus = ref<'all' | 'active' | 'inactive'>('all')
 
 const filtered = computed(() => zones.value.filter(z => {
-  const matchSearch = !search.value || z.name.toLowerCase().includes(search.value.toLowerCase()) || z.areas.some(a => a.toLowerCase().includes(search.value.toLowerCase()))
+  const q = search.value?.toLowerCase().trim() || ''
+  const matchSearch = !q ||
+    (z.name?.toLowerCase().includes(q) ?? false) ||
+    (z.areas?.some(a => a?.toLowerCase().includes(q)) ?? false)
   const matchStatus = filterStatus.value === 'all' || (filterStatus.value === 'active' ? z.isActive : !z.isActive)
   return matchSearch && matchStatus
 }))
@@ -81,7 +113,7 @@ const addModalRef = ref<any>(null)
 
 function openAdd() { showAddModal.value = true }
 
-async function handleAdd(data: { name: string; description: string; color: string; areas: string[]; isActive: boolean }) {
+async function handleAdd(data: ZoneFormPayload) {
   console.log('[handleAdd] payload:', data)
   const result = await api.post<Zone>('/zone/admin/', data, 'Failed to create zone')
   console.log('[handleAdd] result:', result)
@@ -101,8 +133,10 @@ const editModalRef = ref<any>(null)
 
 function openEdit(z: Zone) { editTarget.value = z; showEditModal.value = true }
 
-async function handleEdit(data: { name: string; description: string; color: string; areas: string[]; isActive: boolean }) {
+async function handleEdit(data: ZoneFormPayload) {
   if (!editTarget.value) return
+  // The payload always carries all six schedule fields — null clears a field
+  // server-side, re-sent values stay unchanged
   const result = await api.patch(`/zone/admin/${editTarget.value.id}`, data, 'Failed to update zone')
   if (editModalRef.value) editModalRef.value.submitting = false
   if (result !== null) {
@@ -218,7 +252,7 @@ async function toggleActive(z: Zone) {
         <p style="font-size:14px;color:#6b7280;margin:6px 0 0">Manage service zones and area coverage</p>
       </div>
       <button @click="openAdd" style="display:flex;align-items:center;gap:8px;background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">
-        <Icon name="lucide:plus" style="width:16px;height:16px" />
+        <UIcon name="i-lucide-plus" style="width:16px;height:16px" />
         Add Zone
       </button>
     </div>
@@ -245,7 +279,7 @@ async function toggleActive(z: Zone) {
     <!-- Filters -->
     <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
       <div style="position:relative;flex:1;min-width:200px;max-width:320px">
-        <Icon name="lucide:search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:#9ca3af;pointer-events:none" />
+        <UIcon name="i-lucide-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:#9ca3af;pointer-events:none" />
         <input v-model="search" placeholder="Search zones or areas..." style="width:100%;height:38px;padding:0 14px 0 36px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:13px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box" />
       </div>
       <div style="position:relative">
@@ -254,7 +288,7 @@ async function toggleActive(z: Zone) {
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
         </select>
-        <Icon name="lucide:chevron-down" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:#6b7280;pointer-events:none" />
+        <UIcon name="i-lucide-chevron-down" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:#6b7280;pointer-events:none" />
       </div>
       <span style="font-size:13px;color:#9ca3af;margin-left:auto">{{ filtered.length }} zone{{ filtered.length !== 1 ? 's' : '' }}</span>
     </div>
@@ -267,7 +301,7 @@ async function toggleActive(z: Zone) {
         <!-- Left: icon + info -->
         <div style="display:flex;align-items:flex-start;gap:16px;flex:1;min-width:220px">
           <div :style="`width:48px;height:48px;border-radius:14px;background:${zone.color}22;display:flex;align-items:center;justify-content:center;flex-shrink:0`">
-            <Icon name="lucide:map-pin" :style="`width:20px;height:20px;color:${zone.color}`" />
+            <UIcon name="i-lucide-map-pin" :style="`width:20px;height:20px;color:${zone.color}`" />
           </div>
           <div style="flex:1">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;flex-wrap:wrap">
@@ -284,6 +318,13 @@ async function toggleActive(z: Zone) {
                 {{ area }}
               </span>
               <span v-if="zone.areas.length === 0" style="font-size:12px;color:#9ca3af;font-style:italic">No areas defined</span>
+            </div>
+            <!-- Automatic pickup schedule -->
+            <div style="display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap">
+              <span :style="`font-size:11px;font-weight:600;padding:2px 10px;border-radius:20px;white-space:nowrap;${scheduleState(zone).style}`">
+                {{ scheduleState(zone).label }}
+              </span>
+              <span v-if="scheduleSummary(zone)" style="font-size:12px;color:#6b7280">{{ scheduleSummary(zone) }}</span>
             </div>
           </div>
         </div>
@@ -308,16 +349,16 @@ async function toggleActive(z: Zone) {
         <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
           <button @click="toggleActive(zone)"
             :style="`display:flex;align-items:center;gap:6px;background:${zone.isActive ? '#fef2f2' : '#dcfce7'};color:${zone.isActive ? '#ef4444' : '#16a34a'};border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer`">
-            <Icon :name="zone.isActive ? 'lucide:pause-circle' : 'lucide:play-circle'" style="width:14px;height:14px" />
+            <UIcon :name="zone.isActive ? 'i-lucide-pause-circle' : 'i-lucide-play-circle'" style="width:14px;height:14px" />
             {{ zone.isActive ? 'Deactivate' : 'Activate' }}
           </button>
           <button @click="openEdit(zone)" style="display:flex;align-items:center;gap:6px;background:#ececec;color:#1a1a1a;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">
-            <Icon name="lucide:pencil" style="width:14px;height:14px" />
+            <UIcon name="i-lucide-pencil" style="width:14px;height:14px" />
             Edit
           </button>
           <button @click="openDelete(zone)" :disabled="zone.customerCount > 0"
             :style="`display:flex;align-items:center;gap:6px;background:${zone.customerCount > 0 ? '#f5f5f5' : '#fef2f2'};color:${zone.customerCount > 0 ? '#9ca3af' : '#ef4444'};border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${zone.customerCount > 0 ? 'not-allowed' : 'pointer'}`">
-            <Icon name="lucide:trash-2" style="width:14px;height:14px" />
+            <UIcon name="i-lucide-trash-2" style="width:14px;height:14px" />
             Delete
           </button>
         </div>
@@ -326,7 +367,7 @@ async function toggleActive(z: Zone) {
 
     <!-- Empty state -->
     <div v-if="filtered.length === 0" style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;padding:60px 24px;text-align:center">
-      <Icon name="lucide:map" style="width:40px;height:40px;color:#d1d5db;margin-bottom:12px" />
+      <UIcon name="i-lucide-map" style="width:40px;height:40px;color:#d1d5db;margin-bottom:12px" />
       <p style="font-size:15px;font-weight:600;color:#1a1a1a;margin:0 0 6px">No zones found</p>
       <p style="font-size:13px;color:#6b7280;margin:0 0 20px">Try adjusting your filters or create a new zone.</p>
       <button @click="openAdd" style="background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Add Zone</button>
@@ -342,10 +383,10 @@ async function toggleActive(z: Zone) {
     />
 
     <!-- ── ADD MODAL ── -->
-    <AddZoneModal v-if="showAddModal" ref="addModalRef" @close="showAddModal = false" @submit="handleAdd" />
+    <AddZoneModal v-if="showAddModal" ref="addModalRef" :item-types="itemTypes" :quantities="quantities" @close="showAddModal = false" @submit="handleAdd" />
 
     <!-- ── EDIT MODAL ── -->
-    <EditZoneModal v-if="showEditModal && editTarget" ref="editModalRef" :zone="editTarget" @close="showEditModal = false" @submit="handleEdit" />
+    <LazyEditZoneModal v-if="showEditModal && editTarget" ref="editModalRef" :zone="editTarget" :item-types="itemTypes" :quantities="quantities" @close="showEditModal = false" @submit="handleEdit" />
 
     <!-- ── DELETE MODAL ── -->
     <DeleteZoneModal

@@ -40,7 +40,12 @@ interface PickupRequestDetail {
     id: string
     label: string
     description: string
+    binCount?: number | null
   }
+  pricingMode?: 'per_bin' | 'full_truck'
+  truckLoadRateId?: string | null
+  truckLoadLabel?: string | null
+  loadAdjustedAt?: string | null
   assignment: {
     id: string
     scheduledDate: string
@@ -186,6 +191,10 @@ const pickup = computed(() => {
     notes: data.additionalNotes || '—',
     disposableType: data.disposableItemType.name,
     estimatedQuantity: data.estimatedQuantity.label,
+    // Bins snapshot taken at request time; falls back to the customer's bin count when absent
+    bins: data.estimatedQuantity.binCount != null
+      ? `${data.estimatedQuantity.binCount}`
+      : (data.customer.noBins != null ? `${data.customer.noBins} (customer default)` : '—'),
     createdAt: formatDateTime(data.createdAt),
     assignedAt: assignment ? formatDateTime(assignment.scheduledDate) : '',
     startedAt: '',
@@ -193,10 +202,19 @@ const pickup = computed(() => {
   }
 })
 
+const activeTab = ref('Details')
+const tabs = ['Details', 'Activity Log', 'Notes']
+
 // Fetch data on mount
 onMounted(() => {
   fetchPickupDetails()
   fetchActivityLog()
+})
+
+watch(activeTab, (tab) => {
+  if (tab === 'Notes' && pickupData.value) {
+    fetchNotes()
+  }
 })
 
 const statusBadge = computed(() => {
@@ -210,6 +228,7 @@ const statusBadge = computed(() => {
   if (status === 'picked_up')         return { bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)', color: '#3b82f6',  label: 'Picked Up' }
   if (status === 'completed')         return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#22c55e',  label: 'Completed' }
   if (status === 'cancelled')         return { bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.2)',  color: '#ef4444',  label: 'Cancelled' }
+  if (status === 'expired')           return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: 'Expired' }
   return { bg: '#e5e7eb', border: '#e5e7eb', color: '#6b7280', label: pickup.value.status }
 })
 
@@ -219,6 +238,8 @@ const paymentStatusBadge = computed(() => {
   const status = pickup.value.paymentStatus.toLowerCase()
   if (status === 'active-plan' || status === 'active_plan') return { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#22c55e', label: 'Active Plan' }
   if (status === 'paid')        return { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#22c55e', label: 'Paid' }
+  // Charges invalidated by cancellation — can never be collected
+  if (status === 'failed')      return { bg: '#f3f4f6', border: '#e5e7eb', color: '#9ca3af', label: 'Payment invalidated' }
   if (status === 'unpaid')      return { bg: 'white', border: '#ececec', color: '#1a1a1a', label: 'Unpaid' }
   return { bg: 'white', border: '#ececec', color: '#1a1a1a', label: pickup.value.paymentStatus }
 })
@@ -227,9 +248,6 @@ const paymentTypeLabel = computed(() => {
   if (!pickup.value) return '—'
   return pickup.value.paymentType === 'subscription' ? 'Subscription' : 'Pay as you go'
 })
-
-const activeTab = ref('Details')
-const tabs = ['Details', 'Activity Log']
 
 // Timeline steps
 const timeline = computed(() => {
@@ -283,9 +301,88 @@ const activityLog = computed(() => {
   })
 })
 
+// Pickup Notes
+interface PickupNote {
+  id: string
+  entityType: string
+  entityId: string
+  content: string
+  authorId: string
+  createdAt: string
+  updatedAt: string
+  author: { id: string; name: string; email: string }
+}
+
+const notes = ref<PickupNote[]>([])
+const notesLoading = ref(false)
+const newNote = ref('')
+
+async function fetchNotes() {
+  if (!pickupData.value) return
+  notesLoading.value = true
+  try {
+    const data = await api.get<PickupNote[]>(
+      `/pickup-requests/admin/${route.params.id}/notes`,
+      'Failed to load notes'
+    )
+    if (data) notes.value = data
+  } catch {
+    console.error('Failed to fetch pickup notes')
+  } finally {
+    notesLoading.value = false
+  }
+}
+
+async function addPickupNote() {
+  if (!newNote.value.trim() || !pickupData.value) return
+  const created = await api.post<PickupNote>(
+    `/pickup-requests/admin/${route.params.id}/notes`,
+    { content: newNote.value.trim() },
+    'Failed to add note'
+  )
+  if (created) {
+    notes.value.unshift(created)
+    newNote.value = ''
+  }
+}
+
+function pickupNoteDate(dateString?: string | null): string {
+  if (!dateString) return '—'
+  try {
+    return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return dateString
+  }
+}
+
 // Actions
 const showReassignModal = ref(false)
 const showCancelConfirm = ref(false)
+const showAdjustLoadModal = ref(false)
+const showRescheduleModal = ref(false)
+const assignDriverModalRef = ref<{ submitting: boolean } | null>(null)
+
+const { hasPermission } = usePermissions()
+
+const canAdjustLoad = computed(() => {
+  if (!pickup.value) return false
+  if (!hasPermission('pickups.manage')) return false
+  const status = pickup.value.status.toLowerCase()
+  // Terminal states (incl. expired) — nothing left to adjust
+  if (status === 'completed' || status === 'cancelled' || status === 'expired') return false
+  if (pickupData.value?.loadAdjustedAt) return false
+  return true
+})
+
+function handleAdjustLoadSuccess() {
+  fetchPickupDetails()
+  fetchActivityLog()
+}
+
+async function handleRescheduled() {
+  showRescheduleModal.value = false
+  await Promise.all([fetchPickupDetails(), fetchActivityLog()])
+}
 
 async function startTrip() {
   try {
@@ -427,6 +524,10 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
     await fetchActivityLog()
   } catch (err: any) {
     console.error('Error assigning/reassigning driver:', err)
+    // Reset submitting state so user can retry
+    if (assignDriverModalRef.value) {
+      assignDriverModalRef.value.submitting = false
+    }
   }
 }
 </script>
@@ -535,12 +636,17 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
           >Complete Trip</button>
 
           <!-- Track Driver — shown when truck_dispatched, en_route, picked_up, or assigned -->
-          <button
+          <NuxtLink
             v-if="['assigned', 'truck_dispatched', 'en_route', 'picked_up'].includes(pickup.status.toLowerCase())"
-            style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
-            @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
-            @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
-          >Track Driver</button>
+            to="/tracking"
+            style="text-decoration:none"
+          >
+            <button
+              style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
+              @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
+              @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
+            >Track Driver</button>
+          </NuxtLink>
 
           <!-- Reassign — shown when pending/assigned/truck_dispatched -->
           <button
@@ -551,14 +657,32 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
             @click="showReassignModal = true"
           >{{ pickup.status.toLowerCase() === 'pending' ? 'Assign Driver' : 'Reassign' }}</button>
 
-          <!-- Cancel — shown when not completed/cancelled -->
+          <!-- Reschedule — only pending pickups can be rescheduled -->
           <button
-            v-if="!['completed','cancelled'].includes(pickup.status.toLowerCase())"
+            v-if="pickup.status.toLowerCase() === 'pending'"
+            style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
+            @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
+            @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
+            @click="showRescheduleModal = true"
+          >Reschedule</button>
+
+          <!-- Cancel — hidden for terminal statuses (completed/cancelled/expired) -->
+          <button
+            v-if="!['completed','cancelled','expired'].includes(pickup.status.toLowerCase())"
             style="height:40px;padding:0 16px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);border-radius:20px;font-size:14px;font-weight:500;color:#ef4444;font-family:'Manrope',sans-serif;cursor:pointer"
             @mouseover="($event.currentTarget as HTMLElement).style.background='rgba(239,68,68,0.18)'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background='rgba(239,68,68,0.1)'"
             @click="showCancelConfirm = true"
           >Cancel</button>
+
+          <!-- Adjust Load — shown when eligible -->
+          <button
+            v-if="canAdjustLoad"
+            style="height:40px;padding:0 16px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.2);border-radius:20px;font-size:14px;font-weight:500;color:#a855f7;font-family:'Manrope',sans-serif;cursor:pointer"
+            @mouseover="($event.currentTarget as HTMLElement).style.background='rgba(168,85,247,0.18)'"
+            @mouseleave="($event.currentTarget as HTMLElement).style.background='rgba(168,85,247,0.1)'"
+            @click="showAdjustLoadModal = true"
+          >Adjust Load</button>
         </div>
       </div>
     </div>
@@ -615,6 +739,7 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
                 { label: 'Time Slot',   value: pickup.timeSlot },
                 { label: 'Disposable Type', value: pickup.disposableType },
                 { label: 'Estimated Quantity', value: pickup.estimatedQuantity },
+                { label: 'Bins', value: pickup.bins },
                 { label: 'Notes',       value: pickup.notes || '—' },
               ]" :key="item.label" style="display:flex;flex-direction:column;gap:2px">
                 <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">{{ item.label }}</p>
@@ -708,14 +833,59 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
           </div>
         </div>
 
+        <!-- Notes tab -->
+        <div v-else-if="activeTab === 'Notes'" style="display:flex;flex-direction:column;gap:16px">
+          <div v-if="notesLoading" style="display:flex;align-items:center;justify-content:center;padding:48px">
+            <UIcon name="i-lucide-loader-2" style="width:24px;height:24px;color:#ffb400;animation:spin 1s linear infinite" />
+          </div>
+          <div v-else-if="notes.length === 0" style="text-align:center;padding:48px 24px;background:#f8f9fa;border-radius:16px">
+            <UIcon name="i-lucide-message-square" style="width:40px;height:40px;color:#d1d5db;margin-bottom:12px" />
+            <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No notes yet. Add the first note below.</p>
+          </div>
+          <div v-else style="display:flex;flex-direction:column;gap:12px">
+            <div v-for="note in notes" :key="note.id" style="background:#f8f9fa;border:1px solid #e5e7eb;border-radius:16px;padding:16px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div style="width:28px;height:28px;border-radius:9999px;background:#3b82f6;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                    <span style="font-size:11px;font-weight:700;color:white;font-family:'Manrope',sans-serif">{{ note.author.name[0] }}</span>
+                  </div>
+                  <span style="font-size:13px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ note.author.name }}</span>
+                </div>
+                <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ pickupNoteDate(note.createdAt) }}</span>
+              </div>
+              <p style="font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;line-height:1.6;margin-left:36px">{{ note.content }}</p>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+            <textarea
+              v-model="newNote"
+              placeholder="Add a note..."
+              rows="3"
+              style="width:100%;padding:10px 12px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;resize:none;box-sizing:border-box;line-height:1.5"
+              @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+              @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
+            />
+            <div style="display:flex;justify-content:flex-end">
+              <button
+                style="height:36px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer"
+                @click="addPickupNote"
+                @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
+                @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
+              >Add Note</button>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
   </div>
 
   <!-- Reassign modal (reuse AssignDriverModal) -->
-  <AssignDriverModal
+  <LazyAssignDriverModal
     v-if="showReassignModal && pickup"
+    ref="assignDriverModalRef"
     :request="{
       id: pickup.id,
       customer: pickup.customer,
@@ -727,6 +897,7 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
       paymentDetail: paymentTypeLabel,
       notes: pickup.notes,
     }"
+    :customer-id="pickupData?.customer?.id"
     @close="showReassignModal = false"
     @submit="handleReassign"
   />
@@ -758,6 +929,27 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
       </div>
     </div>
   </div>
+
+  <!-- Adjust Load modal -->
+  <AdjustLoadModal
+    v-if="showAdjustLoadModal && pickupData"
+    :pickup-id="pickupData.id"
+    :pricing-mode="pickupData.pricingMode ?? 'per_bin'"
+    :current-bins="pickupData.customer.noBins"
+    :booked-truck-load-rate-id="pickupData.truckLoadRateId ?? null"
+    :booked-truck-load-label="pickupData.truckLoadLabel ?? null"
+    @close="showAdjustLoadModal = false"
+    @success="handleAdjustLoadSuccess"
+  />
+
+  <!-- Reschedule modal -->
+  <LazyReschedulePickupModal
+    v-if="showRescheduleModal && pickupData"
+    :pickup-id="pickupData.id"
+    :customer-name="pickupData.customer.name"
+    @close="showRescheduleModal = false"
+    @done="handleRescheduled"
+  />
 
 </template>
 

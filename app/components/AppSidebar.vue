@@ -16,8 +16,9 @@ const navLinks = computed(() => [
   { label: 'Pickup Requests',    icon: 'i-lucide-package',          to: '/pickups', permission: 'pickups.view' },
   { label: 'Live Tracking',      icon: 'i-lucide-map-pin',          to: '/tracking', permission: 'tracking.view' },
   { label: 'Billing & Payments', icon: 'i-lucide-credit-card',      to: '/billing', permission: 'billing.view' },
-  // { label: 'Shop',               icon: 'i-lucide-shopping-bag',     to: '/shop', permission: 'shop.view' },
-  // { label: 'Inventory',          icon: 'i-lucide-boxes',            to: '/inventory', permission: 'inventory.view' },
+  { label: 'Driver Payouts',     icon: 'i-lucide-wallet-cards',     to: '/pay', permission: 'billing.view' },
+  { label: 'Shop',               icon: 'i-lucide-shopping-bag',     to: '/shop', permission: 'shop.view' },
+  { label: 'Inventory',          icon: 'i-lucide-boxes',            to: '/inventory', permission: 'inventory.view' },
   { label: 'Support Tickets',    icon: 'i-lucide-headphones',       to: '/support', permission: 'support.view' },
   { label: 'Team',               icon: 'i-lucide-users-round',      to: '/team', permission: 'team.view' },
   { label: 'Settings',           icon: 'i-lucide-settings',         to: '/settings', permission: null },
@@ -40,9 +41,11 @@ const commsSubLinks = computed(() => [
 const managementSubLinks = computed(() => [
   { label: 'Customer Types',          to: '/management/customer-types', permission: 'management.view' },
   { label: 'Subscription Management', to: '/management/subscriptions', permission: 'management.view' },
+  { label: 'Subscriptions List',      to: '/management/subscribers', permission: 'management.view' },
   { label: 'Rate Management',         to: '/management/rates', permission: 'management.view' },
   { label: 'Zone Management',         to: '/management/zones', permission: 'management.view' },
   { label: 'Pickup Management',       to: '/management/pickup-management', permission: 'management.view' },
+  { label: 'Fees',                    to: '/management/fees', permission: 'management.view' },
 ].filter(link => !link.permission || hasPermission(link.permission)))
 
 // Show groups only if user has access to at least one sub-link

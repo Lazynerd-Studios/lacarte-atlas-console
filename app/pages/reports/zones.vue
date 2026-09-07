@@ -95,7 +95,7 @@ function completionColor(v: number) {
           </button>
         </div>
         <button style="height:38px;padding:0 16px;background:#ececec;border:none;border-radius:10px;font-size:13px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px">
-          <Icon name="lucide:download" style="width:15px;height:15px" />
+          <UIcon name="i-lucide-download" style="width:15px;height:15px" />
           Export
         </button>
       </div>
@@ -104,14 +104,14 @@ function completionColor(v: number) {
     <!-- Summary stats -->
     <div class="grid-cols-4" style="gap:20px">
       <div v-for="s in [
-        { icon: 'lucide:map-pin',     iconBg: '#eff6ff', iconColor: '#3b82f6', label: 'Active Zones',      value: zones.length,              sub: 'all operational' },
-        { icon: 'lucide:users',       iconBg: '#f0fdf4', iconColor: '#22c55e', label: 'Total Customers',   value: totalCustomers,            sub: 'across all zones' },
-        { icon: 'lucide:package',     iconBg: '#fff9e6', iconColor: '#ffb400', label: 'Total Pickups',     value: totalPickups.toLocaleString(), sub: 'this period' },
-        { icon: 'lucide:trending-up', iconBg: '#fdf4ff', iconColor: '#a855f7', label: 'Avg Completion',    value: avgCompletion + '%',       sub: 'across all zones' },
+        { icon: 'i-lucide-map-pin',     iconBg: '#eff6ff', iconColor: '#3b82f6', label: 'Active Zones',      value: zones.length,              sub: 'all operational' },
+        { icon: 'i-lucide-users',       iconBg: '#f0fdf4', iconColor: '#22c55e', label: 'Total Customers',   value: totalCustomers,            sub: 'across all zones' },
+        { icon: 'i-lucide-package',     iconBg: '#fff9e6', iconColor: '#ffb400', label: 'Total Pickups',     value: totalPickups.toLocaleString(), sub: 'this period' },
+        { icon: 'i-lucide-trending-up', iconBg: '#fdf4ff', iconColor: '#a855f7', label: 'Avg Completion',    value: avgCompletion + '%',       sub: 'across all zones' },
       ]" :key="s.label" style="background:white;border:1px solid #ececec;border-radius:16px;padding:20px 22px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
           <div :style="`width:38px;height:38px;background:${s.iconBg};border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0`">
-            <Icon :name="s.icon" :style="`width:18px;height:18px;color:${s.iconColor}`" />
+            <UIcon :name="s.icon" :style="`width:18px;height:18px;color:${s.iconColor}`" />
           </div>
           <span style="font-size:13px;color:#6b7280">{{ s.label }}</span>
         </div>
@@ -173,7 +173,7 @@ function completionColor(v: number) {
           <select v-model="selectedZone" style="height:36px;padding:0 32px 0 12px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:13px;font-family:'Manrope',sans-serif;color:#1a1a1a;outline:none;background:#fff;cursor:pointer;appearance:none">
             <option v-for="z in zones" :key="z.name" :value="z.name">{{ z.name }}</option>
           </select>
-          <Icon name="lucide:chevron-down" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:13px;height:13px;color:#6b7280;pointer-events:none" />
+          <UIcon name="i-lucide-chevron-down" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:13px;height:13px;color:#6b7280;pointer-events:none" />
         </div>
       </div>
       <svg :viewBox="`0 0 ${chartW} ${chartH}`" style="overflow:visible;width:100%;height:auto">

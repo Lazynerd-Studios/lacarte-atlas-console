@@ -1,11 +1,11 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'dashboard' })
 
-const activeTab = ref('general')
+const activeTab = ref('security')
 
 const tabs = [
-  { key: 'general',       label: 'General' },
-  { key: 'notifications', label: 'Notifications' },
+  // { key: 'general',       label: 'General' },
+  // { key: 'notifications', label: 'Notifications' },
   { key: 'security',      label: 'Security' },
   { key: 'activity',      label: 'Activity Logs' },
 ]
@@ -59,6 +59,52 @@ const security = reactive({
   twoFactor: false,
 })
 
+const api = useApi()
+const toast = useAppToast()
+const securityErrors = reactive<Record<string, string>>({})
+const securityLoading = ref(false)
+
+// Password visibility toggles
+const showCurrentPassword = ref(false)
+const showNewPassword = ref(false)
+const showConfirmPassword = ref(false)
+
+function validatePasswordForm() {
+  Object.keys(securityErrors).forEach(k => delete securityErrors[k])
+  if (!security.currentPassword) securityErrors.currentPassword = 'Required'
+  if (!security.newPassword) securityErrors.newPassword = 'Required'
+  else if (security.newPassword.length < 8) securityErrors.newPassword = 'Must be at least 8 characters'
+  if (!security.confirmPassword) securityErrors.confirmPassword = 'Required'
+  else if (security.newPassword !== security.confirmPassword) securityErrors.confirmPassword = 'Passwords do not match'
+  return Object.keys(securityErrors).length === 0
+}
+
+async function changePassword() {
+  if (!validatePasswordForm()) return
+  securityLoading.value = true
+  try {
+    const result = await api.post<{ token: string; user: any }>('/auth/change-password', {
+      currentPassword: security.currentPassword,
+      newPassword: security.newPassword,
+      revokeOtherSessions: false,
+    }, 'Failed to change password')
+    if (result) {
+      // Update token and reset session timers if new one is returned
+      if (result.token) {
+        const authStore = useAuthStore()
+        authStore.updateToken(result.token, result.user)
+      }
+      // Clear form
+      security.currentPassword = ''
+      security.newPassword = ''
+      security.confirmPassword = ''
+      toast.success('Password changed successfully')
+    }
+  } finally {
+    securityLoading.value = false
+  }
+}
+
 // Activity Logs tab state
 interface ActivityLog {
   id: string
@@ -77,31 +123,21 @@ interface ActivityLog {
   createdAt: string
 }
 
-interface ActivityLogsPagination {
-  page: number
-  limit: number
-  total: number
-  totalPages: number
-  hasNextPage: boolean
-  hasPreviousPage: boolean
-}
-
 const activityLogs = ref<ActivityLog[]>([])
-const activityPagination = ref<ActivityLogsPagination>({
+const activityLoading = ref(false)
+const activitySearch = ref('')
+const activityActionFilter = ref('')
+const activityModuleFilter = ref('')
+const activityEntityTypeFilter = ref('')
+
+const activityPagination = ref({
   page: 1,
   limit: 20,
   total: 0,
   totalPages: 0,
   hasNextPage: false,
-  hasPreviousPage: false
+  hasPreviousPage: false,
 })
-const activitySearch = ref('')
-const activityActionFilter = ref<string>('')
-const activityModuleFilter = ref<string>('')
-const activityEntityTypeFilter = ref<string>('')
-const activityLoading = ref(false)
-
-const api = useApi()
 
 async function fetchActivityLogs() {
   activityLoading.value = true
@@ -109,7 +145,6 @@ async function fetchActivityLogs() {
     const params = new URLSearchParams({
       page: activityPagination.value.page.toString(),
       limit: activityPagination.value.limit.toString(),
-      actorType: 'admin',
     })
     
     if (activitySearch.value) params.append('search', activitySearch.value)
@@ -162,15 +197,25 @@ function formatTimestamp(timestamp: string) {
 }
 
 function getActivityIcon(action: string) {
-  if (action.includes('create')) return 'lucide:plus-circle'
-  if (action.includes('update') || action.includes('edit')) return 'lucide:edit'
-  if (action.includes('delete')) return 'lucide:trash-2'
-  if (action.includes('login')) return 'lucide:log-in'
-  if (action.includes('logout')) return 'lucide:log-out'
-  if (action.includes('assign')) return 'lucide:user-check'
-  if (action.includes('approve')) return 'lucide:check-circle'
-  if (action.includes('reject') || action.includes('decline')) return 'lucide:x-circle'
-  return 'lucide:activity'
+  if (action.includes('create')) return 'i-lucide-plus-circle'
+  if (action.includes('update') || action.includes('edit')) return 'i-lucide-edit'
+  if (action.includes('delete')) return 'i-lucide-trash-2'
+  if (action.includes('login')) return 'i-lucide-log-in'
+  if (action.includes('logout')) return 'i-lucide-log-out'
+  if (action.includes('assign')) return 'i-lucide-user-check'
+  if (action.includes('approve')) return 'i-lucide-check-circle'
+  if (action.includes('reject') || action.includes('decline')) return 'i-lucide-x-circle'
+  // Subscription & payment lifecycle actions
+  if (action.includes('collection_alert')) return 'i-lucide-alert-triangle'
+  if (action.includes('balance_waived')) return 'i-lucide-eraser'
+  if (action.includes('exit_billed')) return 'i-lucide-receipt'
+  if (action.includes('debt_settled')) return 'i-lucide-hand-coins'
+  if (action.includes('payment_failed')) return 'i-lucide-x-circle'
+  if (action.includes('payment_paid') || action.includes('payment_confirmed')) return 'i-lucide-check-circle'
+  if (action.includes('reactivated')) return 'i-lucide-play-circle'
+  if (action.includes('renewed')) return 'i-lucide-refresh-cw'
+  if (action.includes('cycle_billed')) return 'i-lucide-receipt'
+  return 'i-lucide-activity'
 }
 
 function getActivityColor(action: string) {
@@ -182,7 +227,36 @@ function getActivityColor(action: string) {
   if (action.includes('assign')) return '#f59e0b'
   if (action.includes('approve')) return '#10b981'
   if (action.includes('reject') || action.includes('decline')) return '#ef4444'
+  // Subscription & payment lifecycle actions
+  if (action.includes('collection_alert')) return '#f59e0b'
+  if (action.includes('balance_waived')) return '#d49a00'
+  if (action.includes('exit_billed')) return '#8b5cf6'
+  if (action.includes('debt_settled')) return '#22c55e'
+  if (action.includes('payment_failed')) return '#ef4444'
+  if (action.includes('payment_paid') || action.includes('payment_confirmed')) return '#22c55e'
+  if (action.includes('reactivated')) return '#8b5cf6'
+  if (action.includes('renewed')) return '#3b82f6'
+  if (action.includes('cycle_billed')) return '#8b5cf6'
   return '#6b7280'
+}
+
+/** Human-readable labels for known activity actions (falls back to the raw action) */
+const ACTION_LABELS: Record<string, string> = {
+  'pickup_request.collection_alert': 'Pickup completed with unpaid charge',
+  'subscription.reactivated': 'Subscription reactivated',
+  'subscription.balance_waived': 'Subscription balance waived',
+  'subscription.exit_billed': 'Postpaid exit usage billed',
+  'subscription.debt_settled': 'Subscription exit debt settled',
+  'pickup_request.payment_paid': 'Pickup payment settled',
+  'pickup_request.payment_failed': 'Pickup payment failed',
+  'subscription.payment_failed': 'Subscription payment failed',
+  'subscription.payment_confirmed': 'Subscription payment confirmed',
+  'subscription.renewed': 'Subscription renewed',
+  'subscription.cycle_billed': 'Subscription cycle billed',
+}
+
+function getActivityLabel(action: string) {
+  return ACTION_LABELS[action] ?? action
 }
 
 onMounted(() => {
@@ -239,10 +313,9 @@ watch(activeTab, (newTab) => {
       <!-- Tab content -->
       <div style="padding:32px 24px">
 
-        <!-- General -->
+        <!-- General (commented out)
         <div v-if="activeTab === 'general'" style="display:flex;flex-direction:column;gap:32px;max-width:672px">
 
-          <!-- Company Information -->
           <div style="display:flex;flex-direction:column;gap:16px">
             <h3 style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Company Information</h3>
 
@@ -291,7 +364,6 @@ watch(activeTab, (newTab) => {
             </div>
           </div>
 
-          <!-- Regional Settings -->
           <div style="display:flex;flex-direction:column;gap:16px">
             <h3 style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Regional Settings</h3>
 
@@ -326,7 +398,6 @@ watch(activeTab, (newTab) => {
             </div>
           </div>
 
-          <!-- Save button -->
           <div style="display:flex;align-items:center;gap:12px">
             <button
               style="height:40px;padding:0 24px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
@@ -342,8 +413,9 @@ watch(activeTab, (newTab) => {
             </span>
           </div>
         </div>
+        -->
 
-        <!-- Notifications -->
+        <!-- Notifications (commented out)
         <div v-else-if="activeTab === 'notifications'" style="display:flex;flex-direction:column;gap:24px;max-width:672px">
           <h3 style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Notification Preferences</h3>
 
@@ -385,44 +457,76 @@ watch(activeTab, (newTab) => {
             Save Changes
           </button>
         </div>
+        -->
 
         <!-- Security -->
-        <div v-else-if="activeTab === 'security'" style="display:flex;flex-direction:column;gap:24px;max-width:480px">
+        <div v-if="activeTab === 'security'" style="display:flex;flex-direction:column;gap:24px;max-width:480px">
           <h3 style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Change Password</h3>
 
           <div style="display:flex;flex-direction:column;gap:16px">
             <div style="display:flex;flex-direction:column;gap:6px">
               <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Current Password</label>
-              <input
-                v-model="security.currentPassword"
-                type="password"
-                style="height:39px;padding:8px 12px;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;width:100%"
-                @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
-                @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
-              />
+              <div style="position:relative">
+                <input
+                  v-model="security.currentPassword"
+                  :type="showCurrentPassword ? 'text' : 'password'"
+                  :style="`height:39px;padding:8px 40px 8px 12px;border:1px solid ${securityErrors.currentPassword ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;width:100%`"
+                  @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+                  @blur="($event.target as HTMLElement).style.borderColor=securityErrors.currentPassword ? '#ef4444' : '#e5e7eb'"
+                />
+                <button
+                  type="button"
+                  style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:28px;height:28px;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px"
+                  @click="showCurrentPassword = !showCurrentPassword"
+                >
+                  <UIcon :name="showCurrentPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'" style="width:16px;height:16px;color:#6b7280" />
+                </button>
+              </div>
+              <span v-if="securityErrors.currentPassword" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ securityErrors.currentPassword }}</span>
             </div>
             <div style="display:flex;flex-direction:column;gap:6px">
               <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">New Password</label>
-              <input
-                v-model="security.newPassword"
-                type="password"
-                style="height:39px;padding:8px 12px;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;width:100%"
-                @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
-                @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
-              />
+              <div style="position:relative">
+                <input
+                  v-model="security.newPassword"
+                  :type="showNewPassword ? 'text' : 'password'"
+                  :style="`height:39px;padding:8px 40px 8px 12px;border:1px solid ${securityErrors.newPassword ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;width:100%`"
+                  @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+                  @blur="($event.target as HTMLElement).style.borderColor=securityErrors.newPassword ? '#ef4444' : '#e5e7eb'"
+                />
+                <button
+                  type="button"
+                  style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:28px;height:28px;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px"
+                  @click="showNewPassword = !showNewPassword"
+                >
+                  <UIcon :name="showNewPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'" style="width:16px;height:16px;color:#6b7280" />
+                </button>
+              </div>
+              <span v-if="securityErrors.newPassword" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ securityErrors.newPassword }}</span>
             </div>
             <div style="display:flex;flex-direction:column;gap:6px">
               <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Confirm New Password</label>
-              <input
-                v-model="security.confirmPassword"
-                type="password"
-                style="height:39px;padding:8px 12px;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;width:100%"
-                @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
-                @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
-              />
+              <div style="position:relative">
+                <input
+                  v-model="security.confirmPassword"
+                  :type="showConfirmPassword ? 'text' : 'password'"
+                  :style="`height:39px;padding:8px 40px 8px 12px;border:1px solid ${securityErrors.confirmPassword ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;width:100%`"
+                  @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+                  @blur="($event.target as HTMLElement).style.borderColor=securityErrors.confirmPassword ? '#ef4444' : '#e5e7eb'"
+                />
+                <button
+                  type="button"
+                  style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:28px;height:28px;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px"
+                  @click="showConfirmPassword = !showConfirmPassword"
+                >
+                  <UIcon :name="showConfirmPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'" style="width:16px;height:16px;color:#6b7280" />
+                </button>
+              </div>
+              <span v-if="securityErrors.confirmPassword" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ securityErrors.confirmPassword }}</span>
             </div>
           </div>
 
+          <!-- 2FA (commented out)
           <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border:1px solid #e5e7eb;border-radius:16px">
             <div>
               <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0">Two-Factor Authentication</p>
@@ -435,13 +539,15 @@ watch(activeTab, (newTab) => {
               <span :style="`position:absolute;top:2px;width:20px;height:20px;border-radius:50%;background:white;box-shadow:0 1px 3px rgba(0,0,0,0.2);transition:left 0.2s;left:${security.twoFactor ? '22px' : '2px'}`" />
             </button>
           </div>
+          -->
 
           <button
-            style="align-self:flex-start;height:40px;padding:0 24px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
-            @mouseover="($event.currentTarget as HTMLElement).style.background='#e6a200'"
-            @mouseleave="($event.currentTarget as HTMLElement).style.background='#ffb400'"
+            :disabled="securityLoading"
+            :style="`align-self:flex-start;height:40px;padding:0 24px;background:${securityLoading ? '#f3f4f6' : '#ffb400'};border:none;border-radius:20px;font-size:14px;font-weight:500;color:${securityLoading ? '#9ca3af' : '#0a0d12'};font-family:'Manrope',sans-serif;cursor:${securityLoading ? 'not-allowed' : 'pointer'};box-shadow:0 1px 3px rgba(255,180,0,0.2);display:flex;align-items:center;gap:8px`"
+            @click="changePassword"
           >
-            Update Password
+            <UIcon v-if="securityLoading" name="i-lucide-loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
+            {{ securityLoading ? 'Updating...' : 'Update Password' }}
           </button>
         </div>
 
@@ -455,7 +561,7 @@ watch(activeTab, (newTab) => {
             <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
               <!-- Search -->
               <div style="position:relative">
-                <Icon name="lucide:search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:#9ca3af;pointer-events:none" />
+                <UIcon name="i-lucide-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:#9ca3af;pointer-events:none" />
                 <input 
                   v-model="activitySearch" 
                   placeholder="Search logs..." 
@@ -475,10 +581,11 @@ watch(activeTab, (newTab) => {
                   <option value="driver">Driver</option>
                   <option value="pickup">Pickup</option>
                   <option value="billing">Billing</option>
+                  <option value="subscription">Subscription</option>
                   <option value="inventory">Inventory</option>
                   <option value="team">Team</option>
                 </select>
-                <Icon name="lucide:chevron-down" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#6b7280;pointer-events:none" />
+                <UIcon name="i-lucide-chevron-down" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#6b7280;pointer-events:none" />
               </div>
               
               <!-- Entity Type Filter -->
@@ -494,16 +601,17 @@ watch(activeTab, (newTab) => {
                   <option value="truck">Truck</option>
                   <option value="rate">Rate</option>
                   <option value="zone">Zone</option>
+                  <option value="subscription">Subscription</option>
                   <option value="admin">Admin</option>
                 </select>
-                <Icon name="lucide:chevron-down" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#6b7280;pointer-events:none" />
+                <UIcon name="i-lucide-chevron-down" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#6b7280;pointer-events:none" />
               </div>
             </div>
           </div>
 
           <!-- Loading state -->
           <div v-if="activityLoading" style="padding:60px 24px;text-align:center">
-            <Icon name="lucide:loader-2" style="width:40px;height:40px;color:#ffb400;margin-bottom:12px;animation:spin 1s linear infinite" />
+            <UIcon name="i-lucide-loader-2" style="width:40px;height:40px;color:#ffb400;margin-bottom:12px;animation:spin 1s linear infinite" />
             <p style="font-size:15px;font-weight:600;color:#1a1a1a;margin:0">Loading activity logs...</p>
           </div>
 
@@ -516,14 +624,14 @@ watch(activeTab, (newTab) => {
             >
               <!-- Icon -->
               <div :style="`width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:${getActivityColor(log.action)}15;flex-shrink:0`">
-                <Icon :name="getActivityIcon(log.action)" :style="`width:18px;height:18px;color:${getActivityColor(log.action)}`" />
+                <UIcon :name="getActivityIcon(log.action)" :style="`width:18px;height:18px;color:${getActivityColor(log.action)}`" />
               </div>
               
               <!-- Content -->
               <div style="flex:1;min-width:0">
                 <div style="display:flex;align-items:start;justify-content:space-between;gap:12px;margin-bottom:4px">
                   <div>
-                    <p style="font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0">{{ log.action }}</p>
+                    <p style="font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0">{{ getActivityLabel(log.action) }}</p>
                     <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
                       <span style="font-size:11px;font-weight:500;font-family:'Manrope',sans-serif;padding:2px 8px;border-radius:10px;background:#f3f4f6;color:#6b7280">{{ log.module }}</span>
                       <span v-if="log.entityType" style="font-size:11px;font-weight:500;font-family:'Manrope',sans-serif;padding:2px 8px;border-radius:10px;background:#f3f4f6;color:#6b7280">{{ log.entityType }}</span>
@@ -533,7 +641,7 @@ watch(activeTab, (newTab) => {
                 </div>
                 <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">{{ log.description }}</p>
                 <div v-if="log.ipAddress" style="display:flex;align-items:center;gap:6px;margin-top:6px">
-                  <Icon name="lucide:map-pin" style="width:12px;height:12px;color:#9ca3af" />
+                  <UIcon name="i-lucide-map-pin" style="width:12px;height:12px;color:#9ca3af" />
                   <span style="font-size:12px;color:#9ca3af;font-family:'Manrope',sans-serif">{{ log.ipAddress }}</span>
                 </div>
               </div>
@@ -541,7 +649,7 @@ watch(activeTab, (newTab) => {
             
             <!-- Empty state -->
             <div v-if="activityLogs.length === 0" style="padding:60px 24px;text-align:center">
-              <Icon name="lucide:activity" style="width:40px;height:40px;color:#d1d5db;margin-bottom:12px" />
+              <UIcon name="i-lucide-activity" style="width:40px;height:40px;color:#d1d5db;margin-bottom:12px" />
               <p style="font-size:15px;font-weight:600;color:#1a1a1a;margin:0 0 6px">No activity logs found</p>
               <p style="font-size:13px;color:#6b7280;margin:0">Try adjusting your search or filter criteria.</p>
             </div>

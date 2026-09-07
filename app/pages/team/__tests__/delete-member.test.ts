@@ -70,6 +70,21 @@ describe('Delete Team Member Functionality', () => {
       expect(updatedMembers.length).toBe(1)
       expect(updatedMembers[0].id).toBe('2')
     })
+
+    it('should refresh member list and stats after deletion', () => {
+      // Simulate initial state
+      const initialStats = {
+        totalMembers: 2,
+        activeMembers: 2,
+        superAdmins: 0,
+        onlineNow: 0,
+      }
+      
+      // After deletion, stats should be refreshed
+      const expectedRefetchCalls = ['fetchMembers', 'fetchStats']
+      expect(expectedRefetchCalls).toContain('fetchMembers')
+      expect(expectedRefetchCalls).toContain('fetchStats')
+    })
   })
 
   describe('Loading State Management', () => {

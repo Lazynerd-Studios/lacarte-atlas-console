@@ -1,18 +1,31 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'dashboard' })
 
+interface EstimatedQuantityOption {
+  id: string
+  label: string
+  description: string
+  binCount: number | null
+}
+
+type PricingMode = 'per_bin' | 'full_truck'
+
 interface CustomerType {
   id: string  // UUID from API
   name: string
   description: string  // Client-side only
   color: string  // Client-side only
   customerCount: number  // Client-side only
+  estimatedQuantities: EstimatedQuantityOption[]
+  pricingMode: PricingMode
 }
 
 interface ApiCustomerType {
   id: string
   name: string
   customerCount?: number
+  estimatedQuantities?: EstimatedQuantityOption[]
+  pricingMode?: PricingMode
   createdAt: string
   updatedAt: string
 }
@@ -42,6 +55,8 @@ async function fetchCustomerTypes() {
       description: '',  // Not in API
       color: getColorForIndex(index),  // Assign colors cyclically
       customerCount: ct.customerCount ?? 0,  // Use API value if available
+      estimatedQuantities: ct.estimatedQuantities ?? [],
+      pricingMode: ct.pricingMode ?? 'per_bin',
     }))
   }
   
@@ -54,16 +69,47 @@ function getColorForIndex(index: number): string {
   return colors[index % colors.length]!
 }
 
+// Estimated quantity options for the multi-select
+const quantityOptions = ref<EstimatedQuantityOption[]>([])
+const loadingQuantities = ref(false)
+
+async function fetchQuantityOptions() {
+  loadingQuantities.value = true
+  const api = useApi()
+  const data = await api.get<any>('/disposable/quantities', 'Failed to load estimated quantities')
+  if (data) {
+    const items = Array.isArray(data) ? data : (data.data ?? data.quantities ?? [])
+    quantityOptions.value = items.map((q: any) => ({
+      id: q.id,
+      label: q.label,
+      description: q.description,
+      binCount: q.binCount != null ? Number(q.binCount) : null,
+    }))
+  }
+  loadingQuantities.value = false
+}
+
+function toggleQuantity(ids: string[], id: string): string[] {
+  return ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]
+}
+
 // Add modal
 const showAddModal = ref(false)
-const addForm = ref({ name: '', description: '', color: '#ffb400' })
+const addForm = ref({ name: '', description: '', color: '#ffb400', pricingMode: 'per_bin' as PricingMode })
+const addSelectedQuantityIds = ref<string[]>([])
 const addError = ref('')
 
 function openAdd() {
-  addForm.value = { name: '', description: '', color: '#ffb400' }
+  addForm.value = { name: '', description: '', color: '#ffb400', pricingMode: 'per_bin' }
+  addSelectedQuantityIds.value = []
   addError.value = ''
   showAddModal.value = true
 }
+
+const pricingModeHelper = (mode: PricingMode) =>
+  mode === 'per_bin'
+    ? 'Customers priced by bin size × number of bins'
+    : 'Customers priced by truck load tier (flat per trip)'
 
 async function handleAdd() {
   if (!addForm.value.name.trim()) { 
@@ -78,11 +124,20 @@ async function handleAdd() {
     const api = useApi()
     const toast = useAppToast()
     
-    console.log('[CustomerTypes] Creating customer type:', addForm.value.name)
+    console.log('[CustomerTypes] Creating customer type:', addForm.value.name, 'quantities:', addSelectedQuantityIds.value)
+    
+    // Omit estimatedQuantityIds when nothing selected — type falls back to all active quantities
+    const payload: Record<string, unknown> = {
+      name: addForm.value.name.trim(),
+      pricingMode: addForm.value.pricingMode,
+    }
+    if (addSelectedQuantityIds.value.length > 0) {
+      payload.estimatedQuantityIds = addSelectedQuantityIds.value
+    }
     
     const response = await api.post<ApiCustomerType>(
       '/customer/admin/types',
-      { name: addForm.value.name.trim() },
+      payload,
       'Failed to create customer type'
     )
     
@@ -108,11 +163,13 @@ async function handleAdd() {
 }
 
 const showEditModal = ref(false)
-const editForm = ref<CustomerType>({ id: '', name: '', description: '', color: '#ffb400', customerCount: 0 })
+const editForm = ref<CustomerType>({ id: '', name: '', description: '', color: '#ffb400', customerCount: 0, estimatedQuantities: [], pricingMode: 'per_bin' })
+const editSelectedQuantityIds = ref<string[]>([])
 const editError = ref('')
 
 function openEdit(ct: CustomerType) {
   editForm.value = { ...ct }
+  editSelectedQuantityIds.value = ct.estimatedQuantities.map(q => q.id)
   editError.value = ''
   showEditModal.value = true
 }
@@ -130,11 +187,12 @@ async function handleEdit() {
     const api = useApi()
     const toast = useAppToast()
     
-    console.log('[CustomerTypes] Updating customer type:', editForm.value.id)
+    console.log('[CustomerTypes] Updating customer type:', editForm.value.id, 'quantities:', editSelectedQuantityIds.value)
     
+    // Always send the full set on PATCH — it replaces the associations; [] detaches all (falls back to all active)
     const response = await api.patch<ApiCustomerType>(
       `/customer/admin/types/${editForm.value.id}`,
-      { name: editForm.value.name.trim() },
+      { name: editForm.value.name.trim(), estimatedQuantityIds: editSelectedQuantityIds.value, pricingMode: editForm.value.pricingMode },
       'Failed to update customer type'
     )
     
@@ -195,15 +253,21 @@ async function handleDelete() {
 
 const colorOptions = ['#6b7280','#3b82f6','#8b5cf6','#f97316','#22c55e','#ef4444','#ffb400','#ec4899','#14b8a6']
 
+// Summary stats (fixed 3 cards)
+const totalCustomers = computed(() => customerTypes.value.reduce((sum, ct) => sum + ct.customerCount, 0))
+const largestType = computed(() => {
+  if (customerTypes.value.length === 0) return null
+  return customerTypes.value.reduce((max, ct) => ct.customerCount > max.customerCount ? ct : max)
+})
+
 // Fetch data on mount
-onMounted(fetchCustomerTypes)
+onMounted(() => {
+  fetchCustomerTypes()
+  fetchQuantityOptions()
+})
 </script>
 
 <style scoped>
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
@@ -231,35 +295,25 @@ onMounted(fetchCustomerTypes)
       </div>
 
       <!-- Stats row skeleton -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px">
-        <div v-for="i in 4" :key="i" style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-            <div class="skeleton" style="width:10px;height:10px;border-radius:50%" />
-            <div class="skeleton" style="height:12px;width:80px" />
-          </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
+        <div v-for="i in 3" :key="i" style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
+          <div class="skeleton" style="height:12px;width:80px;margin-bottom:10px" />
           <div class="skeleton" style="height:28px;width:60px;margin-bottom:4px" />
           <div class="skeleton" style="height:11px;width:70px" />
         </div>
       </div>
 
-      <!-- Types list skeleton -->
-      <div style="display:flex;flex-direction:column;gap:16px">
-        <div v-for="i in 3" :key="i" style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;padding:24px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
-          <!-- Left -->
-          <div style="display:flex;align-items:flex-start;gap:16px;flex:1;min-width:200px">
-            <div class="skeleton" style="width:44px;height:44px;border-radius:12px" />
-            <div style="flex:1">
-              <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-                <div class="skeleton" style="height:16px;width:140px" />
-                <div class="skeleton" style="height:20px;width:100px;border-radius:20px" />
-              </div>
-              <div class="skeleton" style="height:13px;width:70%;max-width:320px" />
-            </div>
+      <!-- Types table skeleton -->
+      <div style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;padding:24px">
+        <div v-for="i in 4" :key="i" style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0">
+          <div style="display:flex;align-items:center;gap:12px;flex:1">
+            <div class="skeleton" style="width:32px;height:32px;border-radius:10px" />
+            <div class="skeleton" style="height:15px;width:140px" />
           </div>
-          <!-- Right -->
-          <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
-            <div class="skeleton" style="height:36px;width:70px;border-radius:8px" />
-            <div class="skeleton" style="height:36px;width:80px;border-radius:8px" />
+          <div class="skeleton" style="height:20px;width:100px;border-radius:20px" />
+          <div style="display:flex;gap:8px">
+            <div class="skeleton" style="height:34px;width:60px;border-radius:8px" />
+            <div class="skeleton" style="height:34px;width:70px;border-radius:8px" />
           </div>
         </div>
       </div>
@@ -275,65 +329,94 @@ onMounted(fetchCustomerTypes)
       </div>
       <button @click="openAdd" :disabled="submitting || deleting" 
         :style="`display:flex;align-items:center;gap:8px;background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting || deleting ? 'not-allowed' : 'pointer'};opacity:${submitting || deleting ? '0.5' : '1'}`">
-        <Icon name="lucide:plus" style="width:16px;height:16px" />
+        <UIcon name="i-lucide-plus" style="width:16px;height:16px" />
         Add Customer Type
       </button>
     </div>
 
-    <!-- Stats row -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px">
+    <!-- Stats row: 3 fixed cards -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
       <div style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
         <p style="font-size:12px;color:#6b7280;margin:0 0 6px;font-weight:500">Total Types</p>
         <p style="font-size:28px;font-weight:700;color:#1a1a1a;margin:0">{{ customerTypes.length }}</p>
       </div>
-      <div v-for="ct in customerTypes" :key="ct.id" style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <span :style="`width:10px;height:10px;border-radius:50%;background:${ct.color};display:inline-block`"></span>
-          <p style="font-size:12px;color:#6b7280;margin:0;font-weight:500">{{ ct.name }}</p>
+      <div style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
+        <p style="font-size:12px;color:#6b7280;margin:0 0 6px;font-weight:500">Total Customers</p>
+        <p style="font-size:28px;font-weight:700;color:#1a1a1a;margin:0">{{ totalCustomers }}</p>
+        <p style="font-size:11px;color:#9ca3af;margin:4px 0 0">across all types</p>
+      </div>
+      <div style="background:#fff;border-radius:16px;padding:20px 24px;border:1px solid #f0f0f0">
+        <p style="font-size:12px;color:#6b7280;margin:0 0 6px;font-weight:500">Largest Type</p>
+        <div v-if="largestType" style="display:flex;align-items:center;gap:8px">
+          <span :style="`width:10px;height:10px;border-radius:50%;background:${largestType.color};display:inline-block;flex-shrink:0`"></span>
+          <p style="font-size:22px;font-weight:700;color:#1a1a1a;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ largestType.name }}</p>
         </div>
-        <p style="font-size:28px;font-weight:700;color:#1a1a1a;margin:0">{{ ct.customerCount }}</p>
-        <p style="font-size:11px;color:#9ca3af;margin:4px 0 0">customers</p>
+        <p v-else style="font-size:22px;font-weight:700;color:#1a1a1a;margin:0">—</p>
+        <p style="font-size:11px;color:#9ca3af;margin:4px 0 0">{{ largestType ? `${largestType.customerCount} customers` : 'no types yet' }}</p>
       </div>
     </div>
 
-    <!-- Types list -->
-    <div style="display:flex;flex-direction:column;gap:16px">
-      <div v-for="ct in customerTypes" :key="ct.id"
-        style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;padding:24px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
-
-        <!-- Left: badge + info -->
-        <div style="display:flex;align-items:flex-start;gap:16px;flex:1;min-width:200px">
-          <div :style="`width:44px;height:44px;border-radius:12px;background:${ct.color}22;display:flex;align-items:center;justify-content:center;flex-shrink:0`">
-            <span :style="`width:16px;height:16px;border-radius:50%;background:${ct.color};display:inline-block`"></span>
-          </div>
-          <div>
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-              <span style="font-size:16px;font-weight:700;color:#1a1a1a">{{ ct.name }}</span>
-              <span :style="`background:${ct.color}22;color:${ct.color};font-size:11px;font-weight:600;padding:2px 10px;border-radius:20px`">{{ ct.customerCount }} customers</span>
-            </div>
-            <p style="font-size:13px;color:#6b7280;margin:0;max-width:480px">{{ ct.description }}</p>
-          </div>
-        </div>
-
-        <!-- Right: actions -->
-        <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
-          <button @click="openEdit(ct)" :disabled="submitting || deleting" 
-            :style="`display:flex;align-items:center;gap:6px;background:#ececec;color:#1a1a1a;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting || deleting ? 'not-allowed' : 'pointer'};opacity:${submitting || deleting ? '0.5' : '1'}`">
-            <Icon name="lucide:pencil" style="width:14px;height:14px" />
-            Edit
-          </button>
-          <button @click="openDelete(ct)" :disabled="ct.customerCount > 0 || submitting || deleting" 
-            :style="`display:flex;align-items:center;gap:6px;background:${ct.customerCount > 0 || submitting || deleting ? '#f5f5f5' : '#fef2f2'};color:${ct.customerCount > 0 || submitting || deleting ? '#9ca3af' : '#ef4444'};border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${ct.customerCount > 0 || submitting || deleting ? 'not-allowed' : 'pointer'}`">
-            <Icon name="lucide:trash-2" style="width:14px;height:14px" />
-            Delete
-          </button>
-        </div>
-      </div>
+    <!-- Types table -->
+    <div v-if="customerTypes.length > 0" style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;padding:8px 0;overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="border-bottom:1px solid #f0f0f0">
+            <th style="padding:14px 24px;text-align:left;font-size:13px;font-weight:600;color:#6b7280">Type</th>
+            <th style="padding:14px 16px;text-align:left;font-size:13px;font-weight:600;color:#6b7280">Customers</th>
+            <th style="padding:14px 16px;text-align:left;font-size:13px;font-weight:600;color:#6b7280">Pricing Mode</th>
+            <th style="padding:14px 16px;text-align:left;font-size:13px;font-weight:600;color:#6b7280">Quantities</th>
+            <th style="padding:14px 24px;text-align:right;font-size:13px;font-weight:600;color:#6b7280">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(ct, i) in customerTypes" :key="ct.id"
+            :style="`border-bottom:${i < customerTypes.length - 1 ? '1px solid #f5f5f5' : 'none'}`"
+            @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
+            @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'">
+            <td style="padding:14px 24px">
+              <div style="display:flex;align-items:center;gap:12px">
+                <div :style="`width:32px;height:32px;border-radius:10px;background:${ct.color}22;display:flex;align-items:center;justify-content:center;flex-shrink:0`">
+                  <span :style="`width:12px;height:12px;border-radius:50%;background:${ct.color};display:inline-block`"></span>
+                </div>
+                <span style="font-size:14px;font-weight:600;color:#1a1a1a">{{ ct.name }}</span>
+              </div>
+            </td>
+            <td style="padding:14px 16px">
+              <span :style="`background:${ct.color}22;color:${ct.color};font-size:12px;font-weight:600;padding:3px 12px;border-radius:20px;white-space:nowrap`">{{ ct.customerCount }} customers</span>
+            </td>
+            <td style="padding:14px 16px">
+              <span :style="`font-size:12px;font-weight:600;padding:3px 12px;border-radius:20px;white-space:nowrap;background:${ct.pricingMode === 'per_bin' ? '#f0f9ff' : '#fdf4ff'};color:${ct.pricingMode === 'per_bin' ? '#0369a1' : '#a21caf'}`">
+                {{ ct.pricingMode === 'per_bin' ? 'Per Bin' : 'Full Truck' }}
+              </span>
+            </td>
+            <td style="padding:14px 16px">
+              <div v-if="ct.estimatedQuantities.length > 0" style="display:flex;gap:6px;flex-wrap:wrap">
+                <span v-for="q in ct.estimatedQuantities" :key="q.id" style="background:#f5f5f5;color:#374151;font-size:12px;font-weight:500;padding:3px 10px;border-radius:20px;white-space:nowrap">{{ q.label }}</span>
+              </div>
+              <span v-else style="font-size:12px;color:#9ca3af">All active</span>
+            </td>
+            <td style="padding:14px 24px">
+              <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end">
+                <button @click="openEdit(ct)" :disabled="submitting || deleting"
+                  :style="`display:flex;align-items:center;gap:6px;background:#ececec;color:#1a1a1a;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting || deleting ? 'not-allowed' : 'pointer'};opacity:${submitting || deleting ? '0.5' : '1'}`">
+                  <UIcon name="i-lucide-pencil" style="width:14px;height:14px" />
+                  Edit
+                </button>
+                <button @click="openDelete(ct)" :disabled="ct.customerCount > 0 || submitting || deleting"
+                  :style="`display:flex;align-items:center;gap:6px;background:${ct.customerCount > 0 || submitting || deleting ? '#f5f5f5' : '#fef2f2'};color:${ct.customerCount > 0 || submitting || deleting ? '#9ca3af' : '#ef4444'};border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${ct.customerCount > 0 || submitting || deleting ? 'not-allowed' : 'pointer'}`">
+                  <UIcon name="i-lucide-trash-2" style="width:14px;height:14px" />
+                  Delete
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <!-- Empty state -->
     <div v-if="customerTypes.length === 0" style="background:#fff;border-radius:16px;border:1px solid #f0f0f0;padding:60px 24px;text-align:center">
-      <Icon name="lucide:tag" style="width:40px;height:40px;color:#d1d5db;margin-bottom:12px" />
+      <UIcon name="i-lucide-tag" style="width:40px;height:40px;color:#d1d5db;margin-bottom:12px" />
       <p style="font-size:15px;font-weight:600;color:#1a1a1a;margin:0 0 6px">No customer types yet</p>
       <p style="font-size:13px;color:#6b7280;margin:0 0 20px">Add your first customer type to get started.</p>
       <button @click="openAdd" style="background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Add Customer Type</button>
@@ -345,7 +428,7 @@ onMounted(fetchCustomerTypes)
         <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0">
           <h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0">Add Customer Type</h2>
           <button @click="showAddModal=false" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px">
-            <Icon name="lucide:x" style="width:20px;height:20px" />
+            <UIcon name="i-lucide-x" style="width:20px;height:20px" />
           </button>
         </div>
         <div style="padding:24px;display:flex;flex-direction:column;gap:16px">
@@ -353,6 +436,16 @@ onMounted(fetchCustomerTypes)
           <div>
             <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Name <span style="color:#ef4444">*</span></label>
             <input v-model="addForm.name" placeholder="e.g. Commercial" style="width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box" />
+          </div>
+          <div>
+            <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:8px">Pricing Mode</label>
+            <div style="display:flex;gap:10px">
+              <button v-for="mode in (['per_bin', 'full_truck'] as const)" :key="mode" type="button" @click="addForm.pricingMode = mode"
+                :style="`flex:1;padding:10px 14px;border:1.5px solid ${addForm.pricingMode === mode ? '#ffb400' : '#e5e7eb'};border-radius:10px;background:${addForm.pricingMode === mode ? '#fff9e6' : '#fff'};cursor:pointer;text-align:left`">
+                <span style="display:block;font-size:13px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ mode === 'per_bin' ? 'Per Bin' : 'Full Truck' }}</span>
+              </button>
+            </div>
+            <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">{{ pricingModeHelper(addForm.pricingMode) }}</p>
           </div>
           <div>
             <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Description</label>
@@ -366,13 +459,27 @@ onMounted(fetchCustomerTypes)
               </button>
             </div>
           </div>
+          <div>
+            <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Estimated Quantities</label>
+            <div v-if="loadingQuantities" style="font-size:13px;color:#9ca3af;padding:10px 0">Loading quantities...</div>
+            <div v-else-if="quantityOptions.length === 0" style="font-size:13px;color:#9ca3af;padding:10px 0">No estimated quantities available</div>
+            <div v-else style="border:1.5px solid #e5e7eb;border-radius:10px;max-height:180px;overflow-y:auto">
+              <label v-for="(q, qi) in quantityOptions" :key="q.id"
+                :style="`display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;${qi < quantityOptions.length - 1 ? 'border-bottom:1px solid #f5f5f5' : ''}`">
+                <input type="checkbox" :checked="addSelectedQuantityIds.includes(q.id)" @change="addSelectedQuantityIds = toggleQuantity(addSelectedQuantityIds, q.id)" style="width:16px;height:16px;accent-color:#ffb400;cursor:pointer;flex-shrink:0" />
+                <span style="font-size:13px;font-weight:600;color:#1a1a1a">{{ q.label }}</span>
+                <span style="font-size:12px;color:#9ca3af;margin-left:auto;white-space:nowrap">{{ q.binCount != null ? `${q.binCount} bins` : 'descriptive' }}</span>
+              </label>
+            </div>
+            <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">Leave empty to allow all active quantities for this type</p>
+          </div>
         </div>
         <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px">
           <button @click="showAddModal=false" :disabled="submitting" 
             :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.5' : '1'}`">Cancel</button>
           <button @click="handleAdd" :disabled="submitting" 
             :style="`background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px;opacity:${submitting ? '0.8' : '1'}`">
-            <Icon v-if="submitting" name="lucide:loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
+            <UIcon v-if="submitting" name="i-lucide-loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
             {{ submitting ? 'Creating...' : 'Add Type' }}
           </button>
         </div>
@@ -385,7 +492,7 @@ onMounted(fetchCustomerTypes)
         <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0">
           <h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0">Edit Customer Type</h2>
           <button @click="showEditModal=false" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px">
-            <Icon name="lucide:x" style="width:20px;height:20px" />
+            <UIcon name="i-lucide-x" style="width:20px;height:20px" />
           </button>
         </div>
         <div style="padding:24px;display:flex;flex-direction:column;gap:16px">
@@ -393,6 +500,16 @@ onMounted(fetchCustomerTypes)
           <div>
             <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Name <span style="color:#ef4444">*</span></label>
             <input v-model="editForm.name" style="width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box" />
+          </div>
+          <div>
+            <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:8px">Pricing Mode</label>
+            <div style="display:flex;gap:10px">
+              <button v-for="mode in (['per_bin', 'full_truck'] as const)" :key="mode" type="button" @click="editForm.pricingMode = mode"
+                :style="`flex:1;padding:10px 14px;border:1.5px solid ${editForm.pricingMode === mode ? '#ffb400' : '#e5e7eb'};border-radius:10px;background:${editForm.pricingMode === mode ? '#fff9e6' : '#fff'};cursor:pointer;text-align:left`">
+                <span style="display:block;font-size:13px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ mode === 'per_bin' ? 'Per Bin' : 'Full Truck' }}</span>
+              </button>
+            </div>
+            <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">{{ pricingModeHelper(editForm.pricingMode) }}</p>
           </div>
           <div>
             <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Description</label>
@@ -406,13 +523,27 @@ onMounted(fetchCustomerTypes)
               </button>
             </div>
           </div>
+          <div>
+            <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Estimated Quantities</label>
+            <div v-if="loadingQuantities" style="font-size:13px;color:#9ca3af;padding:10px 0">Loading quantities...</div>
+            <div v-else-if="quantityOptions.length === 0" style="font-size:13px;color:#9ca3af;padding:10px 0">No estimated quantities available</div>
+            <div v-else style="border:1.5px solid #e5e7eb;border-radius:10px;max-height:180px;overflow-y:auto">
+              <label v-for="(q, qi) in quantityOptions" :key="q.id"
+                :style="`display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;${qi < quantityOptions.length - 1 ? 'border-bottom:1px solid #f5f5f5' : ''}`">
+                <input type="checkbox" :checked="editSelectedQuantityIds.includes(q.id)" @change="editSelectedQuantityIds = toggleQuantity(editSelectedQuantityIds, q.id)" style="width:16px;height:16px;accent-color:#ffb400;cursor:pointer;flex-shrink:0" />
+                <span style="font-size:13px;font-weight:600;color:#1a1a1a">{{ q.label }}</span>
+                <span style="font-size:12px;color:#9ca3af;margin-left:auto;white-space:nowrap">{{ q.binCount != null ? `${q.binCount} bins` : 'descriptive' }}</span>
+              </label>
+            </div>
+            <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">Saving replaces the entire set. Deselect all to fall back to all active quantities</p>
+          </div>
         </div>
         <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px">
           <button @click="showEditModal=false" :disabled="submitting" 
             :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.5' : '1'}`">Cancel</button>
           <button @click="handleEdit" :disabled="submitting" 
             :style="`background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px;opacity:${submitting ? '0.8' : '1'}`">
-            <Icon v-if="submitting" name="lucide:loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
+            <UIcon v-if="submitting" name="i-lucide-loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
             {{ submitting ? 'Saving...' : 'Save Changes' }}
           </button>
         </div>
@@ -425,12 +556,12 @@ onMounted(fetchCustomerTypes)
         <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0">
           <h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0">Delete Customer Type</h2>
           <button @click="showDeleteModal=false" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px">
-            <Icon name="lucide:x" style="width:20px;height:20px" />
+            <UIcon name="i-lucide-x" style="width:20px;height:20px" />
           </button>
         </div>
         <div style="padding:28px 24px;text-align:center">
           <div style="width:56px;height:56px;border-radius:50%;background:#fef2f2;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
-            <Icon name="lucide:trash-2" style="width:24px;height:24px;color:#ef4444" />
+            <UIcon name="i-lucide-trash-2" style="width:24px;height:24px;color:#ef4444" />
           </div>
           <p style="font-size:15px;font-weight:600;color:#1a1a1a;margin:0 0 8px">Delete "{{ deleteTarget?.name }}"?</p>
           <p style="font-size:13px;color:#6b7280;margin:0">This action cannot be undone. All configuration for this type will be permanently removed.</p>
@@ -440,7 +571,7 @@ onMounted(fetchCustomerTypes)
             :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${deleting ? 'not-allowed' : 'pointer'};opacity:${deleting ? '0.5' : '1'}`">Cancel</button>
           <button @click="handleDelete" :disabled="deleting" 
             :style="`background:#ef4444;color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${deleting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px;opacity:${deleting ? '0.8' : '1'}`">
-            <Icon v-if="deleting" name="lucide:loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
+            <UIcon v-if="deleting" name="i-lucide-loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
             {{ deleting ? 'Deleting...' : 'Delete' }}
           </button>
         </div>

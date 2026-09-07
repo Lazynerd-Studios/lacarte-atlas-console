@@ -8,6 +8,12 @@ export default defineNuxtConfig({
     '@pinia/nuxt',
     '@pinia-plugin-persistedstate/nuxt',
   ],
+  ui: {
+    // Skip @nuxt/fonts — all UI text uses Manrope loaded via the Google Fonts
+    // import in main.css. The fonts module otherwise resolves/downloads fonts
+    // from network providers during module setup, adding ~seconds to startup.
+    fonts: false,
+  },
   app: {
     head: {
       meta: [
@@ -22,6 +28,9 @@ export default defineNuxtConfig({
     public: {
       apiBase: process.env.NUXT_PUBLIC_API_BASE || 'https://lacarte.lazynerdstudios.com/api',
       tomtomApiKey: process.env.NUXT_PUBLIC_TOMTOM_API_KEY || '',
+      sessionDurationMinutes: Number(process.env.NUXT_PUBLIC_SESSION_DURATION_MINUTES) || 30,
+      sessionWarningSeconds: Number(process.env.NUXT_PUBLIC_SESSION_WARNING_SECONDS) || 120,
+      sessionCheckIntervalMinutes: Number(process.env.NUXT_PUBLIC_SESSION_CHECK_INTERVAL_MINUTES) || 5,
     },
   },
   router: {

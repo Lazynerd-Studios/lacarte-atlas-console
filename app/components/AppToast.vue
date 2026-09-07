@@ -3,11 +3,11 @@ const { toasts, dismiss } = useAppToast()
 
 function getIcon(type: string) {
   switch (type) {
-    case 'success': return 'lucide:check-circle'
-    case 'error': return 'lucide:alert-circle'
-    case 'warning': return 'lucide:alert-triangle'
-    case 'info': return 'lucide:info'
-    default: return 'lucide:info'
+    case 'success': return 'i-lucide-circle-check'
+    case 'error': return 'i-lucide-circle-alert'
+    case 'warning': return 'i-lucide-triangle-alert'
+    case 'info': return 'i-lucide-info'
+    default: return 'i-lucide-info'
   }
 }
 
@@ -44,7 +44,7 @@ function getColors(type: string) {
           animation:slideIn 0.3s ease-out;
         `"
       >
-        <Icon 
+        <UIcon 
           :name="getIcon(toast.type)" 
           :style="`width:20px;height:20px;color:${getColors(toast.type).icon};flex-shrink:0;margin-top:2px`" 
         />
@@ -76,7 +76,7 @@ function getColors(type: string) {
           @mouseover="($event.currentTarget as HTMLElement).style.opacity='1';($event.currentTarget as HTMLElement).style.background='rgba(0,0,0,0.05)'"
           @mouseleave="($event.currentTarget as HTMLElement).style.opacity='0.5';($event.currentTarget as HTMLElement).style.background='transparent'"
         >
-          <Icon name="lucide:x" style="width:14px;height:14px" />
+          <UIcon name="i-lucide-x" style="width:14px;height:14px" />
         </button>
       </div>
     </TransitionGroup>

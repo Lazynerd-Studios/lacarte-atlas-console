@@ -5,6 +5,7 @@ const props = defineProps<{
     date: string; timeSlot: string; binType: string
     paymentType: string; paymentDetail: string; notes: string
   }
+  customerId?: string
 }>()
 
 const emit = defineEmits<{
@@ -29,20 +30,40 @@ interface Driver {
 
 const drivers = ref<Driver[]>([])
 const loadingDrivers = ref(false)
+const submitting = ref(false)
 const api = useApi()
 
-// Fetch available drivers
+defineExpose({ submitting })
+
+// Fetch drivers in the customer's zone (falls back to all drivers)
 async function fetchDrivers() {
   loadingDrivers.value = true
   try {
-    const data = await api.get<{ data: Driver[] }>(
-      '/drivers/admin/',
+    let zoneId: string | null = null
+
+    // Resolve the customer's zone from the customer record
+    if (props.customerId) {
+      try {
+        const customer = await api.get<{ zoneId?: string; zone?: { id: string } }>(
+          `/customer/admin/${props.customerId}`,
+          'Failed to load customer zone'
+        )
+        zoneId = customer?.zoneId || customer?.zone?.id || null
+      } catch (err) {
+        console.error('Error fetching customer zone:', err)
+      }
+    }
+
+    const endpoint = zoneId ? `/drivers/admin/by-zone/${zoneId}` : '/drivers/admin/'
+    const data = await api.get<{ data: Driver[] } | Driver[]>(
+      endpoint,
       'Failed to load drivers'
     )
-    
-    if (data?.data) {
+
+    const list = Array.isArray(data) ? data : data?.data
+    if (list) {
       // Filter to only show active drivers
-      drivers.value = data.data.filter(d => d.status === 'active' || d.status === 'online')
+      drivers.value = list.filter(d => d.status === 'active' || d.status === 'online')
     }
   } catch (err) {
     console.error('Error fetching drivers:', err)
@@ -64,7 +85,13 @@ const selectStyle = `width:100%;height:42px;padding:0 16px;background:white;bord
 function onFocus(e: Event) { (e.target as HTMLElement).style.borderColor = '#ffb400' }
 function onBlur(e: Event)  { (e.target as HTMLElement).style.borderColor = '#e5e7eb' }
 
-function submit() { emit('submit', { ...form }) }
+function submit() {
+  if (!form.driver) return
+  if (!form.scheduledDate) return
+  if (!form.scheduledTime) return
+  submitting.value = true
+  emit('submit', { ...form })
+}
 
 const paymentTypeBadge = computed(() => {
   if (props.request.paymentType === 'subscription')
@@ -152,7 +179,7 @@ const paymentTypeBadge = computed(() => {
         <!-- Select Driver -->
         <div style="display:flex;flex-direction:column;gap:6px">
           <label style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">Select Driver</label>
-          <select v-model="form.driver" :style="selectStyle" @focus="onFocus" @blur="onBlur" :disabled="loadingDrivers">
+          <select v-model="form.driver" :style="selectStyle" @focus="onFocus" @blur="onBlur" :disabled="loadingDrivers || submitting">
             <option value="" disabled>{{ loadingDrivers ? 'Loading drivers...' : 'Select a driver' }}</option>
             <option v-for="d in drivers" :key="d.id" :value="d.id">{{ d.name }} - {{ d.phoneNumber }}</option>
           </select>
@@ -165,13 +192,14 @@ const paymentTypeBadge = computed(() => {
             <input
               v-model="form.scheduledDate"
               type="date"
+              :disabled="submitting"
               style="width:100%;height:39px;padding:0 12px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box"
               @focus="onFocus" @blur="onBlur"
             />
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
             <label style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">Scheduled Time</label>
-            <select v-model="form.scheduledTime" :style="selectStyle" @focus="onFocus" @blur="onBlur">
+            <select v-model="form.scheduledTime" :style="selectStyle" @focus="onFocus" @blur="onBlur" :disabled="submitting">
               <option value="" disabled>Select time slot</option>
               <option v-for="t in timeSlots" :key="t" :value="t">{{ t }}</option>
             </select>
@@ -181,7 +209,7 @@ const paymentTypeBadge = computed(() => {
         <!-- Priority Level -->
         <div style="display:flex;flex-direction:column;gap:6px">
           <label style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">Priority Level</label>
-          <select v-model="form.priority" :style="selectStyle" @focus="onFocus" @blur="onBlur">
+          <select v-model="form.priority" :style="selectStyle" @focus="onFocus" @blur="onBlur" :disabled="submitting">
             <option v-for="p in priorities" :key="p" :value="p" style="text-transform:capitalize">{{ p }}</option>
           </select>
         </div>
@@ -191,6 +219,7 @@ const paymentTypeBadge = computed(() => {
           <label style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">Admin Notes (Optional)</label>
           <textarea
             v-model="form.adminNotes"
+            :disabled="submitting"
             placeholder="Add any special instructions for the driver..."
             rows="4"
             style="width:100%;padding:8px 12px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;resize:none;box-sizing:border-box;line-height:1.5"
@@ -204,18 +233,20 @@ const paymentTypeBadge = computed(() => {
       <div style="padding:17px 24px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:8px">
         <button
           style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
-          @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
-          @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
+          :disabled="submitting"
+          @mouseover="!submitting && (($event.currentTarget as HTMLElement).style.background='#e0e0e0')"
+          @mouseleave="!submitting && (($event.currentTarget as HTMLElement).style.background='#ececec')"
           @click="emit('close')"
         >Cancel</button>
         <button
-          style="height:40px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
-          @mouseover="($event.currentTarget as HTMLElement).style.opacity='0.9'"
-          @mouseleave="($event.currentTarget as HTMLElement).style.opacity='1'"
+          :disabled="submitting"
+          :style="`height:40px;padding:0 16px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};box-shadow:0 1px 3px rgba(255,180,0,0.2);display:flex;align-items:center;gap:8px;opacity:${submitting ? 0.7 : 1}`"
           @click="submit"
-        >Assign Driver</button>
+        >
+          <UIcon v-if="submitting" name="i-lucide-loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
+          {{ submitting ? 'Assigning...' : 'Assign Driver' }}
+        </button>
       </div>
-
     </div>
   </div>
 </template>

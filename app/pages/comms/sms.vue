@@ -157,10 +157,10 @@ async function sendSms() {
 
     <!-- Tabs -->
     <div style="display:flex;gap:2px;background:#f3f4f6;border-radius:12px;padding:3px;width:fit-content">
-      <button v-for="t in [{ val: 'compose', label: 'Compose', icon: 'lucide:send' }, { val: 'history', label: 'History', icon: 'lucide:clock' }]"
+      <button v-for="t in [{ val: 'compose', label: 'Compose', icon: 'i-lucide-send' }, { val: 'history', label: 'History', icon: 'i-lucide-clock' }]"
         :key="t.val" @click="activeTab = t.val as any"
         :style="`display:flex;align-items:center;gap:7px;padding:8px 20px;border:none;border-radius:10px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer;transition:all 0.15s;${activeTab === t.val ? 'background:#fff;color:#1a1a1a;box-shadow:0 1px 3px rgba(0,0,0,0.1)' : 'background:transparent;color:#6b7280'}`">
-        <Icon :name="t.icon" style="width:14px;height:14px" />
+        <UIcon :name="t.icon" style="width:14px;height:14px" />
         {{ t.label }}
       </button>
     </div>
@@ -186,7 +186,7 @@ async function sendSms() {
             <option value="" disabled>Choose a zone…</option>
             <option v-for="z in zones" :key="z" :value="z">{{ z }}</option>
           </select>
-          <Icon name="lucide:chevron-down" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:#6b7280;pointer-events:none" />
+          <UIcon name="i-lucide-chevron-down" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:#6b7280;pointer-events:none" />
         </div>
       </div>
 
@@ -204,13 +204,13 @@ async function sendSms() {
               style="width:16px;height:16px;border:none;background:none;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;color:#9ca3af;margin-left:2px"
               @mouseover="($event.currentTarget as HTMLElement).style.color='#ef4444'"
               @mouseleave="($event.currentTarget as HTMLElement).style.color='#9ca3af'">
-              <Icon name="lucide:x" style="width:12px;height:12px" />
+              <UIcon name="i-lucide-x" style="width:12px;height:12px" />
             </button>
           </div>
         </div>
         <div style="position:relative">
           <div style="position:relative">
-            <Icon name="lucide:search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:#9ca3af;pointer-events:none" />
+            <UIcon name="i-lucide-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:#9ca3af;pointer-events:none" />
             <input v-model="customerSearch" type="text" placeholder="Search by name or phone…"
               @focus="showDropdown = true" @blur="hideDropdown()"
               style="width:100%;height:42px;padding:0 12px 0 36px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;color:#1a1a1a;outline:none;box-sizing:border-box" />
@@ -230,7 +230,7 @@ async function sendSms() {
                   <p style="font-size:12px;color:#6b7280;margin:0">{{ c.phone }}</p>
                 </div>
               </div>
-              <Icon name="lucide:plus" style="width:15px;height:15px;color:#9ca3af" />
+              <UIcon name="i-lucide-plus" style="width:15px;height:15px;color:#9ca3af" />
             </div>
           </div>
           <p v-if="showDropdown && customerSearch && !filteredCustomers.length"
@@ -247,7 +247,7 @@ async function sendSms() {
               style="height:42px;padding:0 18px;border:none;border-radius:10px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer;background:#f3f4f6;color:#374151;display:flex;align-items:center;gap:6px;white-space:nowrap"
               @mouseover="($event.currentTarget as HTMLElement).style.background='#e5e7eb'"
               @mouseleave="($event.currentTarget as HTMLElement).style.background='#f3f4f6'">
-              <Icon name="lucide:plus" style="width:14px;height:14px" /> Add
+              <UIcon name="i-lucide-plus" style="width:14px;height:14px" /> Add
             </button>
           </div>
           <p v-if="manualError" style="font-size:12px;color:#ef4444;margin:6px 0 0">{{ manualError }}</p>
@@ -267,12 +267,12 @@ async function sendSms() {
       <div style="display:flex;align-items:center;gap:12px">
         <button @click="sendSms" :disabled="sending || !canSend"
           :style="`height:42px;padding:0 28px;border:none;border-radius:10px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${sending || !canSend ? 'not-allowed' : 'pointer'};background:${sending || !canSend ? '#f3f4f6' : '#ffb400'};color:${sending || !canSend ? '#9ca3af' : '#111'};display:flex;align-items:center;gap:8px`">
-          <Icon v-if="sending" name="lucide:loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
-          <Icon v-else name="lucide:send" style="width:16px;height:16px" />
+          <UIcon v-if="sending" name="i-lucide-loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
+          <UIcon v-else name="i-lucide-send" style="width:16px;height:16px" />
           {{ sending ? 'Sending…' : 'Send SMS' }}
         </button>
         <div v-if="sent" style="display:flex;align-items:center;gap:6px;color:#22c55e;font-size:13px;font-weight:600">
-          <Icon name="lucide:check-circle" style="width:16px;height:16px" />
+          <UIcon name="i-lucide-circle-check" style="width:16px;height:16px" />
           SMS sent successfully
         </div>
       </div>
@@ -307,12 +307,12 @@ async function sendSms() {
               <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap">
                 <!-- Status badge -->
                 <span :style="`display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;${log.status === 'successful' ? 'background:#f0fdf4;color:#16a34a' : 'background:#fef2f2;color:#ef4444'}`">
-                  <Icon :name="log.status === 'successful' ? 'lucide:check-circle' : 'lucide:alert-circle'" style="width:12px;height:12px" />
+                  <UIcon :name="log.status === 'successful' ? 'i-lucide-circle-check' : 'i-lucide-circle-alert'" style="width:12px;height:12px" />
                   {{ log.status === 'successful' ? 'Successful' : 'Failed' }}
                 </span>
                 <!-- Recipient -->
                 <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;background:#f3f4f6;color:#374151">
-                  <Icon name="lucide:users" style="width:12px;height:12px" />
+                  <UIcon name="i-lucide-users" style="width:12px;height:12px" />
                   {{ recipientLabel(log) }}
                 </span>
                 <!-- Delivery count -->

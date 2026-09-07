@@ -16,7 +16,7 @@ const notifications = ref([
   {
     id: 2,
     type: 'payment',
-    icon: 'i-lucide-dollar-sign',
+    icon: 'i-lucide-banknote',
     iconBg: 'rgba(34,197,94,0.1)',
     iconColor: '#22c55e',
     title: 'Payment Received',

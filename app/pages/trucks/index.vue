@@ -4,6 +4,7 @@ import type { Truck, CreateTruckPayload } from '~/types/driver'
 definePageMeta({ layout: 'dashboard' })
 
 const showAddTruckModal = ref(false)
+const addTruckModalRef = ref<{ stopSubmitting: () => void } | null>(null)
 const showDeleteModal = ref(false)
 const deleteTarget = ref<Truck | null>(null)
 const trucks = ref<Truck[]>([])
@@ -30,6 +31,9 @@ async function handleAddTruck(formData: CreateTruckPayload) {
   if (result !== null) {
     showAddTruckModal.value = false
     await fetchTrucks()
+  } else {
+    // Request failed — stop the button spinner so the user can retry
+    addTruckModalRef.value?.stopSubmitting()
   }
 }
 
@@ -62,7 +66,8 @@ function statusBadge(s: string) {
 </script>
 
 <template>
-  <div style="display:flex;flex-direction:column;gap:32px">
+  <PageSkeleton v-if="loading && trucks.length === 0" type="table" :rows="5" :cards="0" />
+  <div v-else style="display:flex;flex-direction:column;gap:32px">
 
     <!-- Header -->
     <div style="display:flex;align-items:flex-start;justify-content:space-between">
@@ -88,8 +93,8 @@ function statusBadge(s: string) {
     <!-- Table card -->
     <div style="background:white;border:1px solid #ececec;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
       
-      <!-- Loading skeleton -->
-      <div v-if="loading" style="padding:48px 24px;text-align:center">
+      <!-- Loading skeleton (subsequent loads) -->
+      <div v-if="loading && trucks.length > 0" style="padding:48px 24px;text-align:center">
         <div style="display:inline-block;width:40px;height:40px;border:3px solid #f3f4f6;border-top-color:#ffb400;border-radius:50%;animation:spin 1s linear infinite"></div>
         <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:16px">Loading trucks...</p>
       </div>
@@ -169,6 +174,7 @@ function statusBadge(s: string) {
 
   <AddTruckModal
     v-if="showAddTruckModal"
+    ref="addTruckModalRef"
     @close="showAddTruckModal = false"
     @submit="handleAddTruck"
   />

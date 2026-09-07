@@ -6,6 +6,7 @@ definePageMeta({ layout: 'dashboard' })
 const { format } = useCurrency()
 
 const showAddDriverModal = ref(false)
+const addDriverModalRef = ref<{ stopSubmitting: () => void } | null>(null)
 const drivers = ref<Driver[]>([])
 const loading = ref(false)
 const toast = useAppToast()
@@ -29,6 +30,9 @@ async function handleAddDriver(payload: CreateDriverPayload) {
     showAddDriverModal.value = false
     toast.success('Driver added successfully')
     await fetchDrivers()
+  } else {
+    // Request failed — stop the button spinner so the user can retry
+    addDriverModalRef.value?.stopSubmitting()
   }
 }
 
@@ -42,7 +46,8 @@ function statusStyle(s: string) {
 </script>
 
 <template>
-  <div style="display:flex;flex-direction:column;gap:32px">
+  <PageSkeleton v-if="loading && drivers.length === 0" type="card-grid" />
+  <div v-else style="display:flex;flex-direction:column;gap:32px">
     <div style="display:flex;align-items:flex-start;justify-content:space-between">
       <div>
         <h1 style="font-size:32px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;line-height:1.3">Drivers &amp; Trucks</h1>
@@ -120,12 +125,10 @@ function statusStyle(s: string) {
 
         <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:4px">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-            <UIcon name="i-lucide-dollar-sign" style="width:16px;height:16px;color:#15803d;flex-shrink:0" />
             <span style="font-size:14px;font-weight:500;color:#15803d;font-family:'Manrope',sans-serif">Period Earnings</span>
           </div>
-          <p style="font-size:20px;font-weight:700;color:#15803d;font-family:'Manrope',sans-serif;margin:0">{{ format(d.earnings ?? 0) }}</p>
-          <p style="font-size:12px;color:#dc2626;font-family:'Manrope',sans-serif;margin:0">-{{ d.incomplete ?? 0 }} incomplete ({{ d.incomplete ?? 0 }} × GHS 15 = -{{ format(d.deductionAmt ?? 0) }})</p>
-          <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">{{ d.completed ?? 0 }}/{{ d.total ?? 0 }} tasks completed</p>
+          <p style="font-size:20px;font-weight:700;color:#15803d;font-family:'Manrope',sans-serif;margin:0">{{ format(d.currentEarnings ?? 0) }}</p>
+          <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:0">{{ d.binsCompleted ?? 0 }}/{{ d.binsAssigned ?? 0 }} bins completed</p>
         </div>
 
         <div style="display:flex;gap:8px">
@@ -142,6 +145,7 @@ function statusStyle(s: string) {
 
   <AddDriverModal
     v-if="showAddDriverModal"
+    ref="addDriverModalRef"
     @close="showAddDriverModal = false"
     @submit="handleAddDriver"
   />

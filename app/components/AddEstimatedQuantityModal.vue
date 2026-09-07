@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const emit = defineEmits<{
   close: []
-  submit: [data: { label: string; description: string; displayOrder: number; isActive: boolean }]
+  submit: [data: { label: string; description: string; binCount: number | null; displayOrder: number; isActive: boolean }]
 }>()
 
 const submitting = ref(false)
@@ -9,6 +9,7 @@ const submitting = ref(false)
 const form = reactive({
   label: '',
   description: '',
+  binCount: '' as string | number,
   displayOrder: 0,
   isActive: true
 })
@@ -16,12 +17,14 @@ const form = reactive({
 const errors = reactive({
   label: '',
   description: '',
+  binCount: '',
   displayOrder: ''
 })
 
 function validate() {
   errors.label = ''
   errors.description = ''
+  errors.binCount = ''
   errors.displayOrder = ''
   
   if (!form.label.trim()) {
@@ -32,6 +35,10 @@ function validate() {
     errors.description = 'Description is required'
     return false
   }
+  if (form.binCount !== '' && (!Number.isInteger(Number(form.binCount)) || Number(form.binCount) < 1)) {
+    errors.binCount = 'Bin equivalent must be a whole number of 1 or greater'
+    return false
+  }
   if (form.displayOrder < 0) {
     errors.displayOrder = 'Display order must be 0 or greater'
     return false
@@ -39,11 +46,24 @@ function validate() {
   return true
 }
 
+// Allow the parent to stop the loading state when the API call fails
+function stopSubmitting() {
+  submitting.value = false
+}
+
+defineExpose({ stopSubmitting })
+
 async function handleSubmit() {
   if (!validate()) return
   submitting.value = true
-  emit('submit', { ...form })
-  // Note: submitting will be reset by parent after API call completes
+  emit('submit', {
+    label: form.label,
+    description: form.description,
+    binCount: form.binCount === '' ? null : Number(form.binCount),
+    displayOrder: form.displayOrder,
+    isActive: form.isActive
+  })
+  // Note: submitting is reset by the parent via stopSubmitting() if the request fails
 }
 </script>
 
@@ -55,7 +75,7 @@ async function handleSubmit() {
       <div style="padding:24px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between">
         <h2 style="font-size:20px;font-weight:700;color:#1a1a1a;margin:0">Add Estimated Quantity</h2>
         <button @click="emit('close')" style="width:32px;height:32px;border-radius:8px;border:none;background:#f5f5f5;cursor:pointer;display:flex;align-items:center;justify-content:center">
-          <Icon name="lucide:x" style="width:16px;height:16px;color:#6b7280" />
+          <UIcon name="i-lucide-x" style="width:16px;height:16px;color:#6b7280" />
         </button>
       </div>
 
@@ -74,6 +94,14 @@ async function handleSubmit() {
           <label style="display:block;font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:8px">Description *</label>
           <textarea v-model="form.description" placeholder="Describe this quantity range..." rows="3" style="width:100%;padding:12px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box;resize:vertical"></textarea>
           <p v-if="errors.description" style="font-size:12px;color:#ef4444;margin:6px 0 0">{{ errors.description }}</p>
+        </div>
+
+        <!-- Bin Equivalent -->
+        <div>
+          <label style="display:block;font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:8px">Bin Equivalent (optional)</label>
+          <input v-model="form.binCount" type="number" min="1" step="1" placeholder="e.g., 400" style="width:100%;height:42px;padding:0 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box" />
+          <p v-if="errors.binCount" style="font-size:12px;color:#ef4444;margin:6px 0 0">{{ errors.binCount }}</p>
+          <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">Leave empty for a descriptive-only option — it won't be selectable during customer sign-up</p>
         </div>
 
         <!-- Display Order -->
@@ -98,7 +126,7 @@ async function handleSubmit() {
           Cancel
         </button>
         <button @click="handleSubmit" :disabled="submitting" :style="`padding:10px 20px;border-radius:10px;border:none;background:${submitting ? '#f3f4f6' : '#ffb400'};font-size:14px;font-weight:600;color:${submitting ? '#9ca3af' : '#1a1a1a'};font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px`">
-          <Icon v-if="submitting" name="lucide:loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
+          <UIcon v-if="submitting" name="i-lucide-loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite" />
           {{ submitting ? 'Creating...' : 'Create' }}
         </button>
       </div>

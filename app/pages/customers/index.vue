@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { CustomerListItem } from '~/types/customer'
+
 definePageMeta({ layout: 'dashboard' })
 
 const toast = useAppToast()
@@ -7,16 +9,16 @@ const api = useApi()
 const showModal = ref(false)
 const showSuspendModal = ref(false)
 const showUnsuspendConfirm = ref(false)
-const selectedCustomer = ref<any | null>(null)
+const selectedCustomer = ref<CustomerListItem | null>(null)
 const suspending = ref(false)
 const unsuspending = ref(false)
 
-function openSuspend(c: any) {
+function openSuspend(c: CustomerListItem) {
   selectedCustomer.value = c
   showSuspendModal.value = true
 }
 
-function openUnsuspend(c: any) {
+function openUnsuspend(c: CustomerListItem) {
   selectedCustomer.value = c
   showUnsuspendConfirm.value = true
 }
@@ -38,10 +40,12 @@ async function handleSuspend(reason: string) {
   suspending.value = false
 
   if (result) {
-    updateCustomerStatus(selectedCustomer.value.id, 'inactive')
     toast.success(result.message || 'Account suspended successfully')
     showSuspendModal.value = false
     selectedCustomer.value = null
+    // Suspension cascades: subscriptions are cancelled and non-final pickups
+    // are cancelled server-side — refetch the list to reflect the new state
+    await fetchCustomers()
   }
 }
 
@@ -67,7 +71,7 @@ async function handleUnsuspend() {
 function updateCustomerStatus(id: string, status: string) {
   const idx = customers.value.findIndex((c) => c.id === id)
   if (idx !== -1) {
-    customers.value[idx].status = status
+    customers.value[idx]!.status = status
   }
 }
 
@@ -75,7 +79,7 @@ const search = ref('')
 const statusFilter = ref('all')
 const planFilter = ref('all')
 
-const customers = ref<any[]>([])
+const customers = ref<CustomerListItem[]>([])
 const total = ref(0)
 const loading = ref(false)
 const initialLoading = ref(true)
@@ -90,9 +94,10 @@ async function fetchCustomers() {
   params.set('limit', String(perPage))
   if (search.value) params.set('search', search.value)
   if (statusFilter.value !== 'all') params.set('status', statusFilter.value)
+  if (planFilter.value !== 'all') params.set('plan', planFilter.value)
 
   const api = useApi()
-  const data = await api.get<{ data: any[]; pagination: any }>(`/customer/admin/list?${params}`)
+  const data = await api.get<{ data: CustomerListItem[]; pagination: { total: number } }>(`/customer/admin/list?${params}`)
   if (data) {
     customers.value = data.data
     total.value = data.pagination.total
@@ -103,16 +108,23 @@ async function fetchCustomers() {
 watch([search, statusFilter, planFilter], () => { page.value = 1; fetchCustomers() })
 watch(page, fetchCustomers)
 
+// Last pickup: prefer lastPickupDate, fall back to locationUpdatedAt
+function lastPickupDisplay(c: CustomerListItem) {
+  const date = c.lastPickupDate ?? c.locationUpdatedAt
+  if (!date) return '—'
+  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 onMounted(async () => {
   initialLoading.value = true
   await fetchCustomers()
   initialLoading.value = false
 })
 
-function handleAddCustomer(data: Record<string, unknown>) {
-  // TODO: call API to create customer
-  console.log('New customer:', data)
+function handleCustomerCreated() {
   showModal.value = false
+  fetchCustomers()
+  toast.success('Customer created')
 }
 
 function planBadge(plan: string | undefined) {
@@ -141,7 +153,7 @@ async function downloadExcel() {
       Phone: c.phoneNumber ?? '—',
       Address: c.address ?? '—',
       Plan: formatPlanLabel(c.customerType?.name),
-      'Last Pickup': c.lastPickup ?? '—',
+      'Last Pickup': lastPickupDisplay(c),
       Balance: c.balance ?? 0,
       Status: c.status ?? '—',
     }))
@@ -276,8 +288,8 @@ function statusBadge(status: string) {
                 {{ planBadge(c.customerType?.name).label }}
               </span>
             </td>
-            <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ c.lastPickup }}</td>
-            <td style="padding:16px;font-size:14px;font-family:'Manrope',sans-serif;white-space:nowrap" :style="c.balance > 0 ? 'color:#ef4444;font-weight:500' : 'color:#1a1a1a'">
+            <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ lastPickupDisplay(c) }}</td>
+            <td style="padding:16px;font-size:14px;font-family:'Manrope',sans-serif;white-space:nowrap" :style="(c.balance ?? 0) > 0 ? 'color:#ef4444;font-weight:500' : 'color:#1a1a1a'">
               GHS {{ c.balance ?? 0 }}
             </td>
             <td style="padding:16px">
@@ -326,22 +338,22 @@ function statusBadge(status: string) {
   </div>
 
   <!-- Add Customer Modal -->
-  <CustomerModal v-if="showModal" @close="showModal = false" @submit="handleAddCustomer" />
+  <LazyCustomerModal v-if="showModal" @close="showModal = false" @success="handleCustomerCreated" />
 
   <!-- Suspend Modal -->
-  <SuspendModal
+  <LazySuspendModal
     v-if="showSuspendModal && selectedCustomer"
-    :customer-name="selectedCustomer.user?.name ?? selectedCustomer.name"
+    :customer-name="selectedCustomer.user?.name ?? 'Customer'"
     :loading="suspending"
     @close="showSuspendModal = false"
     @confirm="handleSuspend"
   />
 
   <!-- Unsuspend Confirm Dialog -->
-  <ConfirmDialog
+  <LazyConfirmDialog
     v-if="showUnsuspendConfirm && selectedCustomer"
     title="Unsuspend Account"
-    :message="`Are you sure you want to reactivate ${selectedCustomer.user?.name ?? selectedCustomer.name}'s account?`"
+    :message="`Are you sure you want to reactivate ${selectedCustomer.user?.name ?? 'Customer'}'s account?`"
     confirm-text="Unsuspend Account"
     confirm-color="#22c55e"
     :loading="unsuspending"

@@ -1,0 +1,35 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: en-US
+branch: main
+nodes_managed: true
+exported_at: "2026-08-08T05:35:00Z"
+modules:
+    "":
+        dir_name: Lacarte Atlas Console (Nuxt App Root)
+        title: Lacarte Atlas Console (Nuxt App Root)
+        scope:
+            - README.md
+            - .gitignore
+            - package.json
+            - nuxt.config.ts
+            - tsconfig.json
+            - vitest.config.ts
+            - bun.lock
+            - skills-lock.json
+        source_files: []
+        children:
+            - auth_pages
+        depends_on: []
+        related_to: []
+    auth_pages:
+        dir_name: Unauthenticated Entry Pages (Login, Forgot Password, Unauthorized)
+        title: Unauthenticated Entry Pages (Login, Forgot Password, Unauthorized)
+        scope:
+            - app/pages/login.vue
+            - app/pages/forgot-password.vue
+            - app/pages/unauthorized.vue
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []

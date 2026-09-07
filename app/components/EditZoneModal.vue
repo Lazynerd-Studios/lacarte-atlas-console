@@ -1,34 +1,61 @@
 <script setup lang="ts">
-interface Zone {
-  id: string
-  name: string
-  description: string
-  color: string
-  areas: string[]
-  driverCount: number
-  customerCount: number
-  isActive: boolean
-}
+import type { PickupDay, PickupFrequency, PickupTimeSlot, Zone, ZoneFormPayload } from '~/types/zone'
 
-const props = defineProps<{ zone: Zone }>()
+const props = defineProps<{
+  zone: Zone
+  /** Active disposable item types for the default dropdown */
+  itemTypes: { id: string; name: string }[]
+  /** Active estimated quantities for the default dropdown */
+  quantities: { id: string; label: string }[]
+}>()
+
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'submit', data: { name: string; description: string; color: string; areas: string[]; isActive: boolean }): void
+  (e: 'submit', data: ZoneFormPayload): void
 }>()
 
 const colorOptions = ['#3b82f6','#22c55e','#f97316','#8b5cf6','#ec4899','#ef4444','#14b8a6','#ffb400','#6b7280']
+const days: PickupDay[] = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday']
+const frequencies: PickupFrequency[] = ['weekly','biweekly','monthly']
+const timeSlots: PickupTimeSlot[] = ['morning','afternoon','evening']
 
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
+// Schedule fields are nullable — null/'' means unset. Emitting null on PATCH
+// clears the field server-side; every loaded value is re-sent so untouched
+// fields stay unchanged.
 const form = ref({
   name: props.zone.name,
   description: props.zone.description,
   color: props.zone.color,
   areasStr: props.zone.areas.join('\n'),
   isActive: props.zone.isActive,
+  pickupDay: props.zone.pickupDay ?? '',
+  pickupFrequency: props.zone.pickupFrequency ?? '',
+  pickupTimeSlot: props.zone.pickupTimeSlot ?? '',
+  weekOfMonth: props.zone.weekOfMonth != null ? String(props.zone.weekOfMonth) : '',
+  defaultItemTypeId: props.zone.defaultItemTypeId ?? '',
+  defaultEstimatedQuantityId: props.zone.defaultEstimatedQuantityId ?? '',
 })
 const error = ref('')
 const submitting = ref(false)
 
 defineExpose({ submitting })
+
+const isMonthly = computed(() => form.value.pickupFrequency === 'monthly')
+
+/** Generation only runs once every schedule field is set */
+const scheduleComplete = computed(() =>
+  !!form.value.pickupDay &&
+  !!form.value.pickupFrequency &&
+  !!form.value.pickupTimeSlot &&
+  (!isMonthly.value || !!form.value.weekOfMonth) &&
+  !!form.value.defaultItemTypeId &&
+  !!form.value.defaultEstimatedQuantityId
+)
+
+const selectStyle = (invalid = false) =>
+  `width:100%;height:40px;padding:0 12px;background:white;border:1px solid ${invalid ? '#ef4444' : '#e5e7eb'};border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;box-sizing:border-box`
 
 function submit() {
   if (!form.value.name.trim()) { error.value = 'Zone name is required.'; return }
@@ -39,6 +66,13 @@ function submit() {
     color: form.value.color,
     areas: form.value.areasStr.split('\n').map(a => a.trim()).filter(Boolean),
     isActive: form.value.isActive,
+    pickupDay: (form.value.pickupDay || null) as PickupDay | null,
+    pickupFrequency: (form.value.pickupFrequency || null) as PickupFrequency | null,
+    pickupTimeSlot: (form.value.pickupTimeSlot || null) as PickupTimeSlot | null,
+    // weekOfMonth is only valid with monthly frequency — sending it otherwise is a 400
+    weekOfMonth: isMonthly.value && form.value.weekOfMonth ? Number(form.value.weekOfMonth) : null,
+    defaultItemTypeId: form.value.defaultItemTypeId || null,
+    defaultEstimatedQuantityId: form.value.defaultEstimatedQuantityId || null,
   })
 }
 </script>
@@ -50,7 +84,7 @@ function submit() {
       <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0;position:sticky;top:0;background:#fff;z-index:1">
         <h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0">Edit Zone</h2>
         <button @click="emit('close')" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px;display:flex;align-items:center">
-          <Icon name="lucide:x" style="width:20px;height:20px" />
+          <UIcon name="i-lucide-x" style="width:20px;height:20px" />
         </button>
       </div>
 
@@ -71,6 +105,71 @@ function submit() {
         <div>
           <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Areas / Localities <span style="font-weight:400;color:#9ca3af">(one per line)</span></label>
           <textarea v-model="form.areasStr" rows="4" style="width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;resize:vertical;box-sizing:border-box"></textarea>
+        </div>
+
+        <!-- Automatic pickup schedule (optional) -->
+        <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <p style="font-size:13px;font-weight:600;color:#374151;margin:0">Automatic Pickup Schedule <span style="font-weight:400;color:#9ca3af">(optional)</span></p>
+            <span
+              :style="`font-size:11px;font-weight:600;padding:2px 10px;border-radius:20px;white-space:nowrap;${scheduleComplete ? 'background:#dcfce7;color:#16a34a' : 'background:#f3f4f6;color:#9ca3af'}`"
+            >{{ scheduleComplete ? 'Complete' : 'Incomplete' }}</span>
+          </div>
+          <p style="font-size:12px;color:#9ca3af;margin:0">Clearing any field disables automatic pickup generation for this zone.</p>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div>
+              <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Pickup Day</label>
+              <select v-model="form.pickupDay" :style="selectStyle()">
+                <option value="">Not set</option>
+                <option v-for="d in days" :key="d" :value="d">{{ capitalize(d) }}</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Frequency</label>
+              <select v-model="form.pickupFrequency" :style="selectStyle()">
+                <option value="">Not set</option>
+                <option v-for="f in frequencies" :key="f" :value="f">{{ capitalize(f) }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div>
+              <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Time Slot</label>
+              <select v-model="form.pickupTimeSlot" :style="selectStyle()">
+                <option value="">Not set</option>
+                <option v-for="t in timeSlots" :key="t" :value="t">{{ capitalize(t) }}</option>
+              </select>
+            </div>
+            <!-- Only meaningful (and valid) for monthly frequency -->
+            <div v-if="isMonthly">
+              <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Week of Month</label>
+              <select v-model="form.weekOfMonth" :style="selectStyle()">
+                <option value="">Not set</option>
+                <option value="1">Week 1</option>
+                <option value="2">Week 2</option>
+                <option value="3">Week 3</option>
+                <option value="4">Week 4</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Default Item Type</label>
+            <select v-model="form.defaultItemTypeId" :style="selectStyle()">
+              <option value="">Not set</option>
+              <option v-for="t in itemTypes" :key="t.id" :value="t.id">{{ t.name }}</option>
+            </select>
+          </div>
+
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Default Estimated Quantity</label>
+            <select v-model="form.defaultEstimatedQuantityId" :style="selectStyle()">
+              <option value="">Not set</option>
+              <option v-for="q in quantities" :key="q.id" :value="q.id">{{ q.label }}</option>
+            </select>
+          </div>
         </div>
 
         <div>
@@ -95,7 +194,7 @@ function submit() {
         <button @click="emit('close')" :disabled="submitting" style="background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer">Cancel</button>
         <button @click="submit" :disabled="submitting"
           :style="`background:${submitting ? '#ffd966' : '#ffb400'};color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px;opacity:${submitting ? '0.7' : '1'}`">
-          <Icon v-if="submitting" name="lucide:loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
+          <UIcon v-if="submitting" name="i-lucide-loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
           {{ submitting ? 'Saving...' : 'Save Changes' }}
         </button>
       </div>

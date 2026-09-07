@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DriverTracking } from '~/types/driver'
+import type { DriverTracking, Driver } from '~/types/driver'
 import { nextTick } from 'vue'
 
 definePageMeta({ layout: 'dashboard' })
@@ -8,13 +8,25 @@ const config = useRuntimeConfig()
 const authStore = useAuthStore()
 
 const drivers = ref<Map<string, DriverTracking>>(new Map())
+const driverDetails = ref<Map<string, Driver>>(new Map())
 const loading = ref(true)
 const mapError = ref('')
+const mapFailed = ref(false)
+const streamError = ref('')
 const connected = ref(false)
 
 let map: any = null
 let abortController: AbortController | null = null
 let iconsLoaded = false
+let mapReady = false
+let hasFitOnce = false
+let PopupClass: any = null
+let hoverPopup: any = null
+let staleTimer: ReturnType<typeof setInterval> | null = null
+let detailsTimer: ReturnType<typeof setInterval> | null = null
+
+// A driver is considered offline if their last fix is older than this
+const STALE_AFTER_MS = 60_000
 
 function truckIconDataUrl(bodyColor: string, accentColor: string): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
@@ -82,13 +94,65 @@ function loadTruckIcons(mapLibreMap: any): Promise<void> {
 
 const driversList = computed(() => Array.from(drivers.value.values()))
 const onlineCount = computed(() => driversList.value.filter(d => d.isOnline).length)
-const offlineCount = computed(() => driversList.value.filter(d => !d.isOnline).length)
+
+// Merge live tracking data with static driver profiles (name, truck, zone, ...)
+const enrichedDrivers = computed(() =>
+  driversList.value.map(t => {
+    const d = driverDetails.value.get(t.driverId)
+    return {
+      ...t,
+      name: d?.name || d?.user?.name || 'Unknown Driver',
+      phoneNumber: d?.phoneNumber ?? '',
+      plateNumber: d?.assignedTruck?.plateNumber ?? '',
+      zoneName: d?.zone?.name ?? '',
+    }
+  })
+)
+
+// Panel list: only drivers with a valid fix (matches the map), online first
+const panelDrivers = computed(() =>
+  enrichedDrivers.value
+    .filter(d => d.lat && d.lng)
+    .sort((a, b) => {
+      if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1
+      return a.name.localeCompare(b.name)
+    })
+)
+
+function initials(name: string): string {
+  return name.split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?'
+}
+
+function timeAgo(iso: string): string {
+  if (!iso) return '—'
+  const diffSec = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000))
+  if (diffSec < 60) return `${diffSec}s ago`
+  const diffMin = Math.floor(diffSec / 60)
+  if (diffMin < 60) return `${diffMin}m ago`
+  return `${Math.floor(diffMin / 60)}h ago`
+}
+
+function formatCoord(lat: number, lng: number): string {
+  if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) return '—'
+  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+}
+
+async function fetchDriverDetails() {
+  const api = useApi()
+  const data = await api.get<{ data: Driver[] }>('/drivers/admin/', 'Failed to load driver details')
+  if (data?.data) {
+    for (const d of data.data) {
+      driverDetails.value.set(d.id, d)
+    }
+  }
+}
 
 async function initMap() {
   const apiKey = config.public.tomtomApiKey
   console.log('[Map] API Key:', apiKey ? 'present' : 'missing')
 
   if (!apiKey) {
+    mapFailed.value = true
     mapError.value = 'TomTom API key not configured. Set NUXT_PUBLIC_TOMTOM_API_KEY environment variable.'
     return
   }
@@ -99,6 +163,7 @@ async function initMap() {
   console.log('[Map] Container:', container ? 'found' : 'not found')
 
   if (!container) {
+    mapFailed.value = true
     mapError.value = 'Map container not found in DOM'
     return
   }
@@ -125,21 +190,31 @@ async function initMap() {
     map.mapLibreMap.on('load', async () => {
       console.log('[Map] Map loaded successfully')
       try {
+        const maplibreModule: any = await import('maplibre-gl')
+        PopupClass = maplibreModule.default?.Popup ?? maplibreModule.Popup
+      } catch (err) {
+        console.error('[Map] Failed to load maplibre for popups:', err)
+      }
+      try {
         await loadTruckIcons(map.mapLibreMap)
       } catch (err) {
-        console.error('[Map] Failed to load truck icons:', err)
-        mapError.value = 'Failed to load driver markers. Please refresh the page.'
+        // Non-fatal: updateMarkers falls back to colored circle markers
+        console.error('[Map] Failed to load truck icons, using circle fallback:', err)
       }
+      setupMapInteractions(map.mapLibreMap)
+      mapReady = true
       loading.value = false
       updateMarkers()
     })
 
     map.mapLibreMap.on('error', (e: any) => {
       console.error('[Map] Map error:', e)
+      mapFailed.value = true
       mapError.value = 'Map failed to load. Check console for details.'
     })
   } catch (err) {
     console.error('[Map] Failed to initialize map:', err)
+    mapFailed.value = true
     mapError.value = 'Failed to load map. Please refresh the page.'
   }
 }
@@ -147,9 +222,6 @@ async function initMap() {
 function updateMarkers() {
   if (!map?.mapLibreMap) return
   const mapLibreMap = map.mapLibreMap
-
-  if (mapLibreMap.getLayer('drivers-truck')) mapLibreMap.removeLayer('drivers-truck')
-  if (mapLibreMap.getSource('drivers')) mapLibreMap.removeSource('drivers')
 
   const driversArray = driversList.value
   const geojson = {
@@ -173,84 +245,107 @@ function updateMarkers() {
       })),
   }
 
-  mapLibreMap.addSource('drivers', { type: 'geojson', data: geojson })
-
-  if (iconsLoaded) {
-    mapLibreMap.addLayer({
-      id: 'drivers-truck',
-      type: 'symbol',
-      source: 'drivers',
-      layout: {
-        'icon-image': ['case', ['get', 'isOnline'], 'truck-online', 'truck-offline'],
-        'icon-size': 1.2,
-        'icon-allow-overlap': true,
-        'icon-rotate': ['get', 'heading'],
-        'icon-rotation-alignment': 'map',
-      },
-    })
+  const existingSource = mapLibreMap.getSource('drivers')
+  if (existingSource) {
+    // Update in place — avoids tearing down/re-adding the layer on every tick
+    ;(existingSource as any).setData(geojson)
   } else {
-    // Fallback to colored circles if custom icons failed to load
-    mapLibreMap.addLayer({
-      id: 'drivers-truck',
-      type: 'circle',
-      source: 'drivers',
-      paint: {
-        'circle-radius': 8,
-        'circle-color': ['case', ['get', 'isOnline'], '#ffb400', '#111111'],
-        'circle-stroke-width': 2,
-        'circle-stroke-color': 'white',
-      },
-    })
+    mapLibreMap.addSource('drivers', { type: 'geojson', data: geojson })
+    if (iconsLoaded) {
+      mapLibreMap.addLayer({
+        id: 'drivers-truck',
+        type: 'symbol',
+        source: 'drivers',
+        layout: {
+          'icon-image': ['case', ['get', 'isOnline'], 'truck-online', 'truck-offline'],
+          'icon-size': 1.2,
+          'icon-allow-overlap': true,
+          'icon-rotate': ['get', 'heading'],
+          'icon-rotation-alignment': 'map',
+        },
+      })
+    } else {
+      // Fallback to colored circles if custom icons failed to load
+      mapLibreMap.addLayer({
+        id: 'drivers-truck',
+        type: 'circle',
+        source: 'drivers',
+        paint: {
+          'circle-radius': 8,
+          'circle-color': ['case', ['get', 'isOnline'], '#ffb400', '#111111'],
+          'circle-stroke-width': 2,
+          'circle-stroke-color': 'white',
+        },
+      })
+    }
   }
 
-  mapLibreMap.on('click', 'drivers-truck', (e: any) => {
-    if (!e.features?.[0]) return
-    const props = e.features[0].properties
-    const coords = e.features[0].geometry.coordinates
-
-    new mapLibreMap.Popup({ offset: 20, closeButton: false })
-      .setLngLat(coords)
-      .setHTML(`
-        <div style="font-family:'Manrope',sans-serif;padding:4px 0;min-width:160px">
-          <div style="font-size:14px;font-weight:600;color:#111;margin-bottom:6px">Driver</div>
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-            <div style="width:8px;height:8px;border-radius:50%;background:${props.isOnline ? '#22c55e' : '#9ca3af'}"></div>
-            <span style="font-size:12px;color:#6b7280">${props.isOnline ? 'Online' : 'Offline'}</span>
-          </div>
-          <div style="font-size:12px;color:#6b7280">Speed: ${props.speed?.toFixed(1) || 0} km/h</div>
-          <div style="font-size:12px;color:#6b7280">Heading: ${props.heading?.toFixed(0) || 0}°</div>
-        </div>
-      `)
-      .addTo(mapLibreMap)
-  })
-
-  mapLibreMap.on('mouseenter', 'drivers-truck', () => {
-    mapLibreMap.getCanvas().style.cursor = 'pointer'
-  })
-  mapLibreMap.on('mouseleave', 'drivers-truck', () => {
-    mapLibreMap.getCanvas().style.cursor = ''
-  })
-
-  if (driversArray.length > 0) {
+  // Fit the camera once when we first have data; don't fight the user afterwards
+  if (!hasFitOnce) {
     const coords = driversArray
       .filter(d => d.lat && d.lng)
-      .map(d => [d.lng, d.lat])
+      .map(d => [d.lng, d.lat] as [number, number])
     if (coords.length > 0) {
-      const minLng = Math.min(...coords.map((c: number[]) => c[0] as number))
-      const maxLng = Math.max(...coords.map((c: number[]) => c[0] as number))
-      const minLat = Math.min(...coords.map((c: number[]) => c[1] as number))
-      const maxLat = Math.max(...coords.map((c: number[]) => c[1] as number))
+      const minLng = Math.min(...coords.map(c => c[0]))
+      const maxLng = Math.max(...coords.map(c => c[0]))
+      const minLat = Math.min(...coords.map(c => c[1]))
+      const maxLat = Math.max(...coords.map(c => c[1]))
       mapLibreMap.fitBounds(
         [[minLng, minLat], [maxLng, maxLat]],
         { padding: 80, maxZoom: 14 },
       )
+      hasFitOnce = true
     }
   }
 }
 
+// Build the hover-popup HTML for a driver marker from its live props + profile
+function driverPopupHtml(driverId: string, props: any): string {
+  const d = driverDetails.value.get(driverId)
+  const name = d?.name || d?.user?.name || 'Driver'
+  const online = !!props.isOnline
+  const speed = Number(props.speed) || 0
+  const plate = d?.assignedTruck?.plateNumber
+  const zone = d?.zone?.name
+  const phone = d?.phoneNumber
+  const rows: string[] = []
+  rows.push(`<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><div style="width:8px;height:8px;border-radius:50%;background:${online ? '#22c55e' : '#9ca3af'}"></div><span style="font-size:12px;color:#6b7280">${online ? 'Online' : 'Offline'}</span></div>`)
+  rows.push(`<div style="font-size:12px;color:#6b7280">Speed: ${speed.toFixed(1)} km/h</div>`)
+  if (plate) rows.push(`<div style="font-size:12px;color:#6b7280">Truck: ${plate}</div>`)
+  if (zone) rows.push(`<div style="font-size:12px;color:#6b7280">Zone: ${zone}</div>`)
+  if (phone) rows.push(`<div style="font-size:12px;color:#6b7280">Phone: ${phone}</div>`)
+  return `<div style="font-family:'Manrope',sans-serif;padding:4px 0;min-width:180px"><div style="font-size:14px;font-weight:700;color:#111;margin-bottom:6px">${name}</div>${rows.join('')}</div>`
+}
+
+// Hover popup + cursor. Registered once — updateMarkers re-creates the layer,
+// but delegated handlers are matched by layer id at event time, so they persist.
+function setupMapInteractions(mapLibreMap: any) {
+  mapLibreMap.on('mouseenter', 'drivers-truck', (e: any) => {
+    mapLibreMap.getCanvas().style.cursor = 'pointer'
+    const f = e.features?.[0]
+    if (!f || !PopupClass) return
+    if (!hoverPopup) hoverPopup = new PopupClass({ offset: 20, closeButton: false })
+    hoverPopup.setLngLat(f.geometry.coordinates).setHTML(driverPopupHtml(f.properties.driverId, f.properties)).addTo(mapLibreMap)
+  })
+
+  mapLibreMap.on('mousemove', 'drivers-truck', (e: any) => {
+    const f = e.features?.[0]
+    if (!f || !hoverPopup) return
+    hoverPopup.setLngLat(f.geometry.coordinates).setHTML(driverPopupHtml(f.properties.driverId, f.properties))
+  })
+
+  mapLibreMap.on('mouseleave', 'drivers-truck', () => {
+    mapLibreMap.getCanvas().style.cursor = ''
+    if (hoverPopup) {
+      hoverPopup.remove()
+      hoverPopup = null
+    }
+  })
+}
+
 function connectSSE() {
   if (!authStore.token) {
-    mapError.value = 'Not authenticated. Please log in again.'
+    streamError.value = 'Not authenticated. Please log in again.'
     return
   }
 
@@ -265,16 +360,19 @@ function connectSSE() {
     signal: abortController.signal,
   }).then(async (response) => {
     if (!response.ok) {
-      mapError.value = `Failed to connect to tracking stream (${response.status})`
+      streamError.value = `Failed to connect to tracking stream (${response.status})`
+      connected.value = false
       return
     }
 
     connected.value = true
+    streamError.value = ''
     loading.value = false
 
     const reader = response.body?.getReader()
     if (!reader) {
-      mapError.value = 'Failed to read tracking stream'
+      streamError.value = 'Failed to read tracking stream'
+      connected.value = false
       return
     }
 
@@ -295,7 +393,7 @@ function connectSSE() {
             const data = JSON.parse(line.slice(6))
             if (data && data.driverId) {
               drivers.value.set(data.driverId, data)
-              if (map?.mapLibreMap?.isStyleLoaded()) {
+              if (mapReady) {
                 updateMarkers()
               }
             }
@@ -308,7 +406,7 @@ function connectSSE() {
   }).catch((err) => {
     if (err.name !== 'AbortError') {
       console.error('SSE connection error:', err)
-      mapError.value = 'Lost connection to tracking stream'
+      streamError.value = 'Lost connection to tracking stream'
       connected.value = false
     }
   })
@@ -335,19 +433,34 @@ const reconnecting = ref(false)
 async function reconnectStream() {
   reconnecting.value = true
   disconnectSSE()
-  mapError.value = ''
+  streamError.value = ''
   connectSSE()
   await new Promise(r => setTimeout(r, 1000))
   reconnecting.value = false
 }
 
+// Flip drivers to offline if their last fix is too old (server stopped sending)
+function markStaleDriversOffline() {
+  const now = Date.now()
+  for (const [id, d] of Array.from(drivers.value.entries())) {
+    if (d.isOnline && d.recordedAt && now - new Date(d.recordedAt).getTime() > STALE_AFTER_MS) {
+      drivers.value.set(id, { ...d, isOnline: false })
+    }
+  }
+}
+
 onMounted(async () => {
+  fetchDriverDetails()
   await initMap()
   connectSSE()
+  staleTimer = setInterval(markStaleDriversOffline, 15_000)
+  detailsTimer = setInterval(fetchDriverDetails, 60_000)
 })
 
 onUnmounted(() => {
   disconnectSSE()
+  if (staleTimer) clearInterval(staleTimer)
+  if (detailsTimer) clearInterval(detailsTimer)
   if (map?.remove) map.remove()
 })
 </script>
@@ -361,35 +474,8 @@ onUnmounted(() => {
       <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:8px">Real-time location of all drivers on the map</p>
     </div>
 
-    <!-- Stats row -->
+    <!-- Connection status -->
     <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-      <div style="background:white;border:1px solid #ececec;border-radius:12px;padding:16px 24px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
-        <div style="width:40px;height:40px;background:rgba(255,180,0,0.1);border-radius:12px;display:flex;align-items:center;justify-content:center">
-          <UIcon name="i-lucide-users" style="width:20px;height:20px;color:#ffb400" />
-        </div>
-        <div>
-          <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;line-height:1">Total Drivers</p>
-          <p style="font-size:20px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;line-height:1.3;margin-top:2px">{{ driversList.length }}</p>
-        </div>
-      </div>
-      <div style="background:white;border:1px solid #ececec;border-radius:12px;padding:16px 24px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
-        <div style="width:40px;height:40px;background:rgba(34,197,94,0.1);border-radius:12px;display:flex;align-items:center;justify-content:center">
-          <div style="width:10px;height:10px;border-radius:50%;background:#22c55e"></div>
-        </div>
-        <div>
-          <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;line-height:1">Online</p>
-          <p style="font-size:20px;font-weight:700;color:#22c55e;font-family:'Manrope',sans-serif;line-height:1.3;margin-top:2px">{{ onlineCount }}</p>
-        </div>
-      </div>
-      <div style="background:white;border:1px solid #ececec;border-radius:12px;padding:16px 24px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
-        <div style="width:40px;height:40px;background:rgba(107,114,128,0.1);border-radius:12px;display:flex;align-items:center;justify-content:center">
-          <div style="width:10px;height:10px;border-radius:50%;background:#9ca3af"></div>
-        </div>
-        <div>
-          <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;line-height:1">Offline</p>
-          <p style="font-size:20px;font-weight:700;color:#6b7280;font-family:'Manrope',sans-serif;line-height:1.3;margin-top:2px">{{ offlineCount }}</p>
-        </div>
-      </div>
       <div style="margin-left:auto;display:flex;align-items:center;gap:12px;background:white;border:1px solid #ececec;border-radius:12px;padding:12px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
         <div style="display:flex;align-items:center;gap:8px">
           <div :style="`width:8px;height:8px;border-radius:50%;background:${connected ? '#22c55e' : '#ef4444'}`"></div>
@@ -407,14 +493,31 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- Map -->
+    <!-- Non-blocking stream error banner (map stays visible) -->
+    <div
+      v-if="streamError"
+      style="display:flex;align-items:center;gap:12px;background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:12px 20px"
+    >
+      <UIcon name="i-lucide-alert-triangle" style="width:20px;height:20px;color:#ef4444;flex-shrink:0" />
+      <p style="font-size:13px;color:#991b1b;font-family:'Manrope',sans-serif;flex:1">{{ streamError }}</p>
+      <button
+        style="display:flex;align-items:center;gap:6px;background:#ef4444;color:white;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-family:'Manrope',sans-serif;font-weight:600;cursor:pointer"
+        @click="reconnectStream"
+      >
+        <UIcon name="i-lucide-refresh-cw" style="width:12px;height:12px" />
+        Retry
+      </button>
+    </div>
+
+    <!-- Map + driver panel -->
+    <div class="grid-map" style="align-items:stretch">
     <div
       class="tracking-map"
-      style="background:white;border:1px solid #ececec;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);height:700px;position:relative"
+      style="flex:1;min-width:0;background:white;border:1px solid #ececec;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);height:700px;position:relative"
     >
       <!-- Loading overlay -->
       <div
-        v-if="loading"
+        v-if="loading && !mapFailed"
         style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.8);z-index:100;border-radius:16px"
       >
         <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
@@ -423,9 +526,9 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- Error state -->
+      <!-- Fatal map error overlay -->
       <div
-        v-if="mapError"
+        v-if="mapFailed"
         style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:white;z-index:100;border-radius:16px"
       >
         <div style="display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;padding:32px">
@@ -470,6 +573,65 @@ onUnmounted(() => {
           <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Offline</span>
         </div>
       </div>
+    </div>
+
+    <!-- Driver panel -->
+    <div class="tracking-sidebar" style="background:white;border:1px solid #ececec;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,0.1);height:700px;display:flex;flex-direction:column;overflow:hidden">
+      <div style="padding:20px 24px;border-bottom:1px solid #ececec;flex-shrink:0">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <p style="font-size:16px;font-weight:700;color:#111;font-family:'Manrope',sans-serif">Drivers</p>
+          <span style="font-size:12px;font-weight:600;color:#16a34a;background:#dcfce7;border-radius:20px;padding:3px 10px">{{ onlineCount }} online</span>
+        </div>
+        <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:4px">Live location of connected drivers</p>
+      </div>
+
+      <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px">
+        <div v-if="panelDrivers.length === 0" style="text-align:center;padding:40px 16px">
+          <UIcon name="i-lucide-users" style="width:32px;height:32px;color:#d1d5db;margin-bottom:8px" />
+          <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">No drivers reporting location yet.</p>
+        </div>
+
+        <div
+          v-for="d in panelDrivers"
+          :key="d.driverId"
+          style="border:1px solid #ececec;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:10px"
+        >
+          <!-- Name + status -->
+          <div style="display:flex;align-items:center;gap:10px">
+            <div :style="`width:36px;height:36px;border-radius:50%;background:${d.isOnline ? 'rgba(34,197,94,0.15)' : 'rgba(107,114,128,0.15)'};color:${d.isOnline ? '#16a34a' : '#6b7280'};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;font-family:'Manrope',sans-serif;flex-shrink:0`">{{ initials(d.name) }}</div>
+            <div style="flex:1;min-width:0">
+              <p style="font-size:14px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ d.name }}</p>
+              <p style="font-size:11px;color:#6b7280;font-family:'Manrope',sans-serif">{{ d.plateNumber ? 'Truck ' + d.plateNumber : 'No truck assigned' }}</p>
+            </div>
+            <span :style="`font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;flex-shrink:0;${d.isOnline ? 'background:#dcfce7;color:#16a34a' : 'background:#f3f4f6;color:#9ca3af'}`">{{ d.isOnline ? 'Online' : 'Offline' }}</span>
+          </div>
+
+          <!-- Details -->
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <UIcon name="i-lucide-map-pin" style="width:13px;height:13px;color:#9ca3af;flex-shrink:0" />
+              <span style="font-size:12px;color:#374151;font-family:'Manrope',sans-serif">{{ formatCoord(d.lat, d.lng) }}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <UIcon name="i-lucide-gauge" style="width:13px;height:13px;color:#9ca3af;flex-shrink:0" />
+              <span style="font-size:12px;color:#374151;font-family:'Manrope',sans-serif">{{ (d.speed || 0).toFixed(1) }} km/h</span>
+            </div>
+            <div v-if="d.zoneName" style="display:flex;align-items:center;gap:8px">
+              <UIcon name="i-lucide-map" style="width:13px;height:13px;color:#9ca3af;flex-shrink:0" />
+              <span style="font-size:12px;color:#374151;font-family:'Manrope',sans-serif">{{ d.zoneName }}</span>
+            </div>
+            <div v-if="d.phoneNumber" style="display:flex;align-items:center;gap:8px">
+              <UIcon name="i-lucide-phone" style="width:13px;height:13px;color:#9ca3af;flex-shrink:0" />
+              <span style="font-size:12px;color:#374151;font-family:'Manrope',sans-serif">{{ d.phoneNumber }}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <UIcon name="i-lucide-clock" style="width:13px;height:13px;color:#9ca3af;flex-shrink:0" />
+              <span style="font-size:12px;color:#9ca3af;font-family:'Manrope',sans-serif">Updated {{ timeAgo(d.recordedAt) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
     </div>
 
   </div>

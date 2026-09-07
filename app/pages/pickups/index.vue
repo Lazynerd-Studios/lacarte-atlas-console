@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { PaginationMeta, PaginatedDataResponse } from '~/types/api'
+
 definePageMeta({ layout: 'dashboard' })
 
 interface PickupRequest {
@@ -15,6 +17,7 @@ interface PickupRequest {
     name: string
     phoneNumber: string
     address: string
+    noBins?: number
     customerType: {
       id: string
       name: string
@@ -27,20 +30,12 @@ interface PickupRequest {
   estimatedQuantity: {
     id: string
     label: string
+    binCount?: number | null
   }
 }
 
-interface Pagination {
-  page: number
-  limit: number
-  total: number
-  totalPages: number
-  hasNextPage: boolean
-  hasPreviousPage: boolean
-}
-
 const requests = ref<PickupRequest[]>([])
-const pagination = ref<Pagination>({
+const pagination = ref<PaginationMeta>({
   page: 1,
   limit: 20,
   total: 0,
@@ -55,20 +50,31 @@ const activeFilter = ref('All')
 const filters = ['All', 'Pending', 'Assigned', 'Completed']
 const activePaymentStatus = ref('All')
 
-const filtered = computed(() => {
-  let result = requests.value
-  
-  if (activeFilter.value !== 'All') {
-    result = result.filter(r => r.status.toLowerCase() === activeFilter.value.toLowerCase())
+const sortBy = ref<'createdAt' | 'preferredPickupDate' | 'updatedAt'>('createdAt')
+const sortOrder = ref<'asc' | 'desc'>('desc')
+
+function toggleSort(field: 'createdAt' | 'preferredPickupDate' | 'updatedAt') {
+  if (sortBy.value === field) {
+    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortBy.value = field
+    sortOrder.value = 'desc'
   }
-  
-  if (activePaymentStatus.value !== 'All') {
-    const val = activePaymentStatus.value.toLowerCase().replace(/\s+/g, '-')
-    result = result.filter(r => r.paymentStatus.toLowerCase().replace(/_/g, '-') === val)
-  }
-  
-  return result
-})
+  pagination.value.page = 1
+  fetchRequests()
+}
+
+function sortIcon(field: string) {
+  if (sortBy.value !== field) return 'i-lucide-arrow-up-down'
+  return sortOrder.value === 'asc' ? 'i-lucide-arrow-up' : 'i-lucide-arrow-down'
+}
+
+const filtered = computed(() => requests.value)
+
+function handlePageChange(newPage: number) {
+  pagination.value.page = newPage
+  fetchRequests()
+}
 
 watch([activeFilter, activePaymentStatus], () => { 
   pagination.value.page = 1
@@ -119,7 +125,10 @@ async function fetchRequests() {
       params.append('paymentStatus', val)
     }
     
-    const data = await api.get<{ data: PickupRequest[]; pagination: Pagination }>(
+    params.append('sortBy', sortBy.value)
+    params.append('sortOrder', sortOrder.value)
+    
+    const data = await api.get<PaginatedDataResponse<PickupRequest>>(
       `/pickup-requests/admin/list?${params.toString()}`,
       'Failed to load pickup requests'
     )
@@ -161,6 +170,9 @@ const currentPage = computed({
 
 function paymentStatusBadge(s: string) {
   if (s === 'active-plan' || s === 'paid') return { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#22c55e', label: s === 'paid' ? 'Paid' : 'Active Plan' }
+  // "failed" appears when a pickup is cancelled and its outstanding charges are
+  // invalidated so they can never be collected — render as muted "Payment invalidated"
+  if (s === 'failed') return { bg: '#f3f4f6', border: '#e5e7eb', color: '#9ca3af', label: 'Payment invalidated' }
   return { bg: 'white', border: '#ececec', color: '#1a1a1a', label: 'Unpaid' }
 }
 
@@ -177,11 +189,24 @@ function statusBadge(s: string) {
 
 const showAssignDriverModal = ref(false)
 const showCreatePickupModal = ref(false)
+const showRescheduleModal = ref(false)
 const selectedRequest = ref<PickupRequest | null>(null)
+const rescheduleTarget = ref<PickupRequest | null>(null)
 
 function openAssignModal(req: PickupRequest) {
   selectedRequest.value = req
   showAssignDriverModal.value = true
+}
+
+function openRescheduleModal(req: PickupRequest) {
+  rescheduleTarget.value = req
+  showRescheduleModal.value = true
+}
+
+async function handleRescheduled() {
+  showRescheduleModal.value = false
+  rescheduleTarget.value = null
+  await Promise.all([fetchRequests(), fetchStats()])
 }
 
 async function handleAssignDriver(data: { driver: string; scheduledDate: string; scheduledTime: string; priority: string; adminNotes: string }) {
@@ -289,6 +314,9 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
             <th style="padding:14px 16px;text-align:left">
               <div class="skeleton" style="height:14px;width:90px" />
             </th>
+            <th style="padding:14px 12px;text-align:left">
+              <div class="skeleton" style="height:14px;width:40px" />
+            </th>
             <th style="padding:14px 16px;text-align:left">
               <div class="skeleton" style="height:14px;width:100px" />
             </th>
@@ -297,6 +325,9 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
             </th>
             <th style="padding:14px 16px;text-align:left">
               <div class="skeleton" style="height:14px;width:60px" />
+            </th>
+            <th style="padding:14px 16px;text-align:left">
+              <div class="skeleton" style="height:14px;width:90px" />
             </th>
             <th style="padding:14px 16px;text-align:right">
               <div class="skeleton" style="height:14px;width:70px;margin-left:auto" />
@@ -323,6 +354,10 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
               <div class="skeleton" style="height:14px;width:100px;margin-bottom:4px" />
               <div class="skeleton" style="height:12px;width:120px" />
             </td>
+            <!-- Bins -->
+            <td style="padding:20px 12px">
+              <div class="skeleton" style="height:14px;width:40px" />
+            </td>
             <!-- Payment Type -->
             <td style="padding:20px 16px">
               <div class="skeleton" style="height:22px;width:100px;border-radius:14px" />
@@ -334,6 +369,10 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
             <!-- Status -->
             <td style="padding:20px 16px">
               <div class="skeleton" style="height:22px;width:80px;border-radius:14px" />
+            </td>
+            <!-- Created At -->
+            <td style="padding:20px 16px">
+              <div class="skeleton" style="height:14px;width:100px" />
             </td>
             <!-- Actions -->
             <td style="padding:20px 16px;text-align:right">
@@ -418,6 +457,7 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
           <option value="Paid">Paid</option>
           <option value="Unpaid">Unpaid</option>
           <option value="Active Plan">Active Plan</option>
+          <option value="Failed">Payment invalidated</option>
         </select>
         <UIcon name="i-lucide-chevron-down" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:#6b7280;pointer-events:none" />
       </div>
@@ -431,10 +471,16 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
             <th style="padding:14px 8px 14px 8px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Request ID</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Customer</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Address</th>
-            <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Pickup Date</th>
+            <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap;cursor:pointer;user-select:none" @click="toggleSort('preferredPickupDate')">
+              <span style="display:inline-flex;align-items:center;gap:4px">Pickup Date <UIcon :name="sortIcon('preferredPickupDate')" :style="`width:14px;height:14px;color:${sortBy === 'preferredPickupDate' ? '#ffb400' : '#9ca3af'}`" /></span>
+            </th>
+            <th style="padding:14px 12px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Bins</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Payment Type</th>
             <th style="padding:14px 12px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Payment Status</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Status</th>
+            <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap;cursor:pointer;user-select:none" @click="toggleSort('createdAt')">
+              <span style="display:inline-flex;align-items:center;gap:4px">Created At <UIcon :name="sortIcon('createdAt')" :style="`width:14px;height:14px;color:${sortBy === 'createdAt' ? '#ffb400' : '#9ca3af'}`" /></span>
+            </th>
             <th style="padding:14px 16px;text-align:right;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Actions</th>
           </tr>
         </thead>
@@ -464,6 +510,16 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
               <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:2px">{{ req.disposableItemType.name }} - {{ req.estimatedQuantity.label }}</p>
             </td>
 
+            <!-- Bins (snapshot from the request; falls back to the customer's bin count) -->
+            <td style="padding:20px 12px;white-space:nowrap">
+              <p v-if="req.estimatedQuantity.binCount != null" style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ req.estimatedQuantity.binCount }}</p>
+              <template v-else-if="req.customer.noBins != null">
+                <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ req.customer.noBins }}</p>
+                <p style="font-size:11px;color:#9ca3af;font-family:'Manrope',sans-serif;margin-top:2px">customer default</p>
+              </template>
+              <p v-else style="font-size:14px;color:#9ca3af;font-family:'Manrope',sans-serif">—</p>
+            </td>
+
             <!-- Payment Type -->
             <td style="padding:20px 16px">
               <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;color:${paymentTypeBadge(req.paymentType).color};background:${paymentTypeBadge(req.paymentType).bg};border:1px solid ${paymentTypeBadge(req.paymentType).border}`">
@@ -485,6 +541,11 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
               </span>
             </td>
 
+            <!-- Created At -->
+            <td style="padding:20px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">
+              {{ req.createdAt ? formatDate(req.createdAt) : '—' }}
+            </td>
+
             <!-- Actions -->
             <td style="padding:20px 16px;text-align:right">
               <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px">
@@ -502,6 +563,13 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
                   @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
                   @click="openAssignModal(req)"
                 >Reassign</button>
+                <button
+                  v-if="req.status === 'pending'"
+                  style="height:32px;padding:0 12px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer;white-space:nowrap"
+                  @mouseover="($event.currentTarget as HTMLElement).style.background='#e0e0e0'"
+                  @mouseleave="($event.currentTarget as HTMLElement).style.background='#ececec'"
+                  @click="openRescheduleModal(req)"
+                >Reschedule</button>
                 <NuxtLink
                   :to="`/pickups/${req.id}`"
                   style="width:32px;height:32px;background:none;border:none;border-radius:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;text-decoration:none"
@@ -519,15 +587,15 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
 
     <!-- Pagination -->
     <AppPagination
-      :page="currentPage"
+      :page="pagination.page"
       :total="pagination.total"
       :per-page="pagination.limit"
-      @update:page="currentPage = $event"
+      @update:page="handlePageChange"
     />
 
   </div>
 
-  <AssignDriverModal
+  <LazyAssignDriverModal
     v-if="showAssignDriverModal && selectedRequest"
     :request="{
       id: selectedRequest.id,
@@ -540,15 +608,25 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
       paymentDetail: '',
       notes: '',
     }"
+    :customer-id="selectedRequest.customerId"
     @close="showAssignDriverModal = false"
     @submit="handleAssignDriver"
   />
 
   <!-- Create Pickup Modal -->
-  <CreatePickupModal
+  <LazyCreatePickupModal
     v-if="showCreatePickupModal"
     @close="showCreatePickupModal = false"
     @created="() => { showCreatePickupModal = false; fetchStats(); fetchRequests() }"
+  />
+
+  <!-- Reschedule Modal (pending pickups only) -->
+  <LazyReschedulePickupModal
+    v-if="showRescheduleModal && rescheduleTarget"
+    :pickup-id="rescheduleTarget.id"
+    :customer-name="rescheduleTarget.customer.name"
+    @close="showRescheduleModal = false; rescheduleTarget = null"
+    @done="handleRescheduled"
   />
 </template>
 

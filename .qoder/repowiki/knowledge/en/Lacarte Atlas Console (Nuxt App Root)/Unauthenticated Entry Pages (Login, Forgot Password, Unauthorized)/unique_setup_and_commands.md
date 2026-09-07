@@ -1,0 +1,1 @@
+No build or setup steps — these are plain Nuxt SFCs picked up automatically by file-based routing under `app/pages/`. The forgot-password page references a Figma-hosted logo URL rather than a local asset.

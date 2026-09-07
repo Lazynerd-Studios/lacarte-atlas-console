@@ -13,6 +13,7 @@ const emit = defineEmits<{
     zoneId: string
     phoneNumber: string
     noBins: number
+    capacityRateId: string | null
     address: string
     city: string
     region: string
@@ -22,19 +23,28 @@ const emit = defineEmits<{
   }): void
 }>()
 
-const customerTypes = ref<{ id: string; name: string }[]>([])
+const customerTypes = ref<{ id: string; name: string; pricingMode?: 'per_bin' | 'full_truck' }[]>([])
 const zones = ref<{ id: string; name: string; color: string }[]>([])
+const capacityTiers = ref<{ id: string; capacityLiters: number; prepayRate: number }[]>([])
 const loadingOptions = ref(true)
 
 onMounted(async () => {
   const api = useApi()
-  const [typesRes, zonesRes] = await Promise.all([
-    api.get<{ id: string; name: string; customerCount?: string }[]>('/customer/admin/types/', 'Failed to load customer types'),
+  const [typesRes, zonesRes, capacityRes] = await Promise.all([
+    api.get<{ id: string; name: string; customerCount?: string; pricingMode?: 'per_bin' | 'full_truck' }[]>('/customer/admin/types/', 'Failed to load customer types'),
     api.get<{ id: string; name: string; color: string }[]>('/zone/public/list', 'Failed to load zones'),
+    api.get<{ tiers: { id: string; capacityLiters: number; prepayRate: number }[] }>('/rates/admin/capacity', 'Failed to load bin capacities'),
   ])
   if (typesRes) customerTypes.value = typesRes
   if (zonesRes) zones.value = zonesRes
+  if (capacityRes) capacityTiers.value = capacityRes.tiers || []
   loadingOptions.value = false
+})
+
+// Whether the selected customer type is priced per bin
+const isPerBinType = computed(() => {
+  const ct = customerTypes.value.find(t => t.id === form.customerTypeId)
+  return (ct?.pricingMode ?? 'per_bin') === 'per_bin'
 })
 
 const form = reactive({
@@ -42,6 +52,7 @@ const form = reactive({
   zoneId: props.customer.zoneId ?? '',
   phoneNumber: props.customer.phoneNumber ?? '',
   noBins: props.customer.noBins ?? 1,
+  capacityRateId: props.customer.capacityRateId ?? '',
   address: props.customer.address ?? '',
   city: props.customer.city ?? '',
   region: props.customer.region ?? '',
@@ -60,6 +71,7 @@ function validate() {
   if (!form.customerTypeId)      errors.customerTypeId = 'Required'
   if (!form.zoneId)              errors.zoneId = 'Required'
   if (form.noBins < 0)           errors.noBins = 'Cannot be negative'
+  if (isPerBinType.value && !form.capacityRateId) errors.capacityRateId = 'Required'
   return Object.keys(errors).length === 0
 }
 
@@ -70,7 +82,8 @@ function submit() {
     customerTypeId: form.customerTypeId,
     zoneId: form.zoneId,
     phoneNumber: form.phoneNumber.trim(),
-    noBins: Number(form.noBins),
+    noBins: isPerBinType.value ? Number(form.noBins) : 1,
+    capacityRateId: isPerBinType.value ? (form.capacityRateId || null) : null,
     address: form.address.trim(),
     city: form.city.trim(),
     region: form.region?.trim() ?? '',
@@ -146,6 +159,42 @@ const selectStyle = (hasValue: boolean) =>
           <span v-if="errors.customerTypeId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.customerTypeId }}</span>
         </div>
 
+        <!-- Bin fields (per_bin pricing mode only) -->
+        <template v-if="isPerBinType">
+          <!-- Bin Capacity -->
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Bin Capacity</label>
+            <select
+              v-model="form.capacityRateId"
+              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid ${errors.capacityRateId ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:${form.capacityRateId ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+            >
+              <option value="" disabled>Select bin capacity</option>
+              <option v-for="tier in capacityTiers" :key="tier.id" :value="tier.id">{{ tier.capacityLiters }}L — GHS {{ tier.prepayRate }}/pickup</option>
+            </select>
+            <span v-if="errors.capacityRateId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.capacityRateId }}</span>
+          </div>
+
+          <!-- Assigned BINs -->
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Assigned Bins</label>
+            <div style="display:flex;align-items:center;gap:12px">
+              <button
+                type="button"
+                style="width:36px;height:36px;border:1px solid #e5e7eb;border-radius:12px;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;color:#6b7280"
+                @click="form.noBins = Math.max(0, form.noBins - 1)"
+              >−</button>
+              <span style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;min-width:32px;text-align:center">{{ form.noBins }}</span>
+              <button
+                type="button"
+                style="width:36px;height:36px;border:1px solid #e5e7eb;border-radius:12px;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;color:#6b7280"
+                @click="form.noBins++"
+              >+</button>
+              <span style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">bin{{ form.noBins !== 1 ? 's' : '' }} assigned</span>
+            </div>
+            <span v-if="errors.noBins" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.noBins }}</span>
+          </div>
+        </template>
+
         <!-- Zone -->
         <div style="display:flex;flex-direction:column;gap:6px">
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Zone</label>
@@ -203,25 +252,6 @@ const selectStyle = (hasValue: boolean) =>
             @focus="onFocus($event, 'placeName')" @blur="onBlur($event, 'placeName')" />
         </div>
 
-        <!-- Assigned BINs -->
-        <div style="display:flex;flex-direction:column;gap:6px">
-          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Assigned Bins</label>
-          <div style="display:flex;align-items:center;gap:12px">
-            <button
-              type="button"
-              style="width:36px;height:36px;border:1px solid #e5e7eb;border-radius:12px;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;color:#6b7280"
-              @click="form.noBins = Math.max(0, form.noBins - 1)"
-            >−</button>
-            <span style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;min-width:32px;text-align:center">{{ form.noBins }}</span>
-            <button
-              type="button"
-              style="width:36px;height:36px;border:1px solid #e5e7eb;border-radius:12px;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;color:#6b7280"
-              @click="form.noBins++"
-            >+</button>
-            <span style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">bin{{ form.noBins !== 1 ? 's' : '' }} assigned</span>
-          </div>
-          <span v-if="errors.noBins" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.noBins }}</span>
-        </div>
       </div>
 
       <!-- Footer -->

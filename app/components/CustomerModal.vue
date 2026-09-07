@@ -1,24 +1,230 @@
 <script setup lang="ts">
+import { geocode, reverseGeocode } from '@tomtom-org/maps-sdk/services'
+import type { Feature, Point } from 'geojson'
+
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'submit', data: Record<string, unknown>): void
+  (e: 'success'): void
 }>()
+
+const api = useApi()
+const toast = useAppToast()
+const config = useRuntimeConfig()
+
+interface CustomerType { id: string; name: string; pricingMode?: 'per_bin' | 'full_truck' }
+interface Zone { id: string; name: string }
+interface CapacityTierOption { id: string; capacityLiters: number; prepayRate: number }
+
+type TomTomPlace = Feature<Point, {
+  address?: {
+    freeformAddress?: string
+    streetNameAndNumber?: string
+    municipality?: string
+    countrySubdivision?: string
+    postalCode?: string
+    country?: string
+    countryCode?: string
+    countryCodeISO3?: string
+    localName?: string
+  }
+}>
 
 const form = reactive({
   firstName: '',
   lastName: '',
   email: '',
   phone: '',
-  password: '',
-  confirmPassword: '',
-  zone: '',
-  userType: 'regular',
-  entityName: '',
+  customerTypeId: '',
+  zoneId: '',
   binCount: 1,
-  sendWelcome: true,
+  capacityRateId: '',
+  address: '',
+  city: '',
+  region: '',
+  postalCode: '',
+  country: '',
+  placeName: '',
+  latitude: '',
+  longitude: '',
 })
 
-const { zones, customerTypes } = useMockData()
+// Center of Ghana (approx) for biasing geocode results
+const GHANA_CENTER: [number, number] = [-1.0232, 7.9465]
+const GHANA_RADIUS_METERS = 300000
+
+const customerTypes = ref<CustomerType[]>([])
+const zones = ref<Zone[]>([])
+const capacityTiers = ref<CapacityTierOption[]>([])
+const loading = ref(false)
+
+// Whether the selected customer type is priced per bin
+const isPerBinType = computed(() => {
+  const ct = customerTypes.value.find(t => t.id === form.customerTypeId)
+  return (ct?.pricingMode ?? 'per_bin') === 'per_bin'
+})
+
+const addressSuggestions = ref<TomTomPlace[]>([])
+const showSuggestions = ref(false)
+const geocoding = ref(false)
+let geocodeTimeout: ReturnType<typeof setTimeout> | null = null
+let suppressAddressWatch = false
+
+function debouncedGeocode(query: string) {
+  if (geocodeTimeout) clearTimeout(geocodeTimeout)
+  if (!query.trim()) {
+    addressSuggestions.value = []
+    showSuggestions.value = false
+    return
+  }
+  geocodeTimeout = setTimeout(() => fetchAddressSuggestions(query), 500)
+}
+
+async function fetchAddressSuggestions(query: string) {
+  geocoding.value = true
+  try {
+    const results = await geocode({
+      query,
+      limit: 10,
+      position: GHANA_CENTER,
+      apiKey: config.public.tomtomApiKey as string,
+    }) as { features: TomTomPlace[] }
+    const features = (results.features || []).filter((place) => {
+      const cc = place.properties.address?.countryCode
+      return !cc || cc.toUpperCase() === 'GH'
+    })
+    addressSuggestions.value = features.slice(0, 5)
+    showSuggestions.value = features.length > 0
+  } catch (err) {
+    console.error('TomTom geocode error:', err)
+    addressSuggestions.value = []
+    showSuggestions.value = false
+  } finally {
+    geocoding.value = false
+  }
+}
+
+function selectAddressSuggestion(place: TomTomPlace) {
+  const addr = place.properties.address || {}
+  suppressAddressWatch = true
+  form.address = addr.streetNameAndNumber || addr.freeformAddress || form.address
+  form.city = addr.municipality || addr.localName || ''
+  form.region = addr.countrySubdivision || ''
+  form.postalCode = addr.postalCode || ''
+  form.country = addr.country || ''
+  form.placeName = addr.municipality || addr.localName || ''
+  const [lng, lat] = place.geometry.coordinates
+  form.longitude = String(lng)
+  form.latitude = String(lat)
+  showSuggestions.value = false
+  addressSuggestions.value = []
+  nextTick(() => { suppressAddressWatch = false })
+}
+
+watch(() => form.address, (query) => {
+  if (suppressAddressWatch) return
+  debouncedGeocode(query)
+})
+
+// --- Device location (field sign-ups) -------------------------------------
+// Staff sign customers up on-site, so one tap grabs the device GPS position
+// and reverse-geocodes it to fill the address fields automatically.
+const locating = ref(false)
+const geoError = ref('')
+
+function fillFormFromPlace(place: TomTomPlace) {
+  const addr = place.properties.address || {}
+  suppressAddressWatch = true
+  form.address = addr.streetNameAndNumber || addr.freeformAddress || form.address
+  form.city = addr.municipality || addr.localName || form.city
+  form.region = addr.countrySubdivision || form.region
+  form.postalCode = addr.postalCode || form.postalCode
+  form.country = addr.country || form.country
+  form.placeName = addr.municipality || addr.localName || form.placeName
+  const [lng, lat] = place.geometry.coordinates
+  form.longitude = String(lng)
+  form.latitude = String(lat)
+  nextTick(() => { suppressAddressWatch = false })
+}
+
+async function fetchCurrentLocation() {
+  if (locating.value) return
+  geoError.value = ''
+
+  if (!('geolocation' in navigator)) {
+    geoError.value = 'Location is not supported on this device.'
+    return
+  }
+
+  locating.value = true
+  try {
+    const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      })
+    })
+    const { latitude, longitude } = position.coords
+    form.latitude = String(latitude)
+    form.longitude = String(longitude)
+
+    // Resolve the coordinates into address fields; the pickup still works with
+    // just coordinates if the lookup fails
+    try {
+      const place = await reverseGeocode({
+        position: [longitude, latitude],
+        apiKey: config.public.tomtomApiKey as string,
+      }) as TomTomPlace
+      if (place) fillFormFromPlace(place)
+      toast.success('Location captured')
+    } catch (err) {
+      console.error('Reverse geocode error:', err)
+      toast.success('Coordinates captured — fill the address details manually')
+    }
+  } catch (err) {
+    const e = err as GeolocationPositionError
+    if (e?.code === e.PERMISSION_DENIED) {
+      geoError.value = 'Location permission denied. Allow location access for this site and try again.'
+    } else if (e?.code === e.TIMEOUT) {
+      geoError.value = 'Getting your location timed out. Try again in an open area.'
+    } else {
+      geoError.value = 'Could not determine your location. Check GPS/network and try again.'
+    }
+  } finally {
+    locating.value = false
+  }
+}
+
+async function fetchCustomerTypes() {
+  const data = await api.get<CustomerType[]>('/customer/admin/types/', 'Failed to load customer types')
+  if (data) {
+    customerTypes.value = data
+    const first = data[0]
+    if (first && !form.customerTypeId) {
+      form.customerTypeId = first.id
+    }
+  }
+}
+
+async function fetchZones() {
+  const data = await api.get<Zone[]>('/zone/public/list', 'Failed to load zones')
+  if (data) {
+    zones.value = data
+  }
+}
+
+async function fetchCapacityTiers() {
+  const data = await api.get<{ tiers: CapacityTierOption[] }>('/rates/admin/capacity', 'Failed to load bin capacities')
+  if (data) {
+    capacityTiers.value = (data.tiers || []).filter(t => t.capacityLiters != null)
+  }
+}
+
+onMounted(() => {
+  fetchCustomerTypes()
+  fetchZones()
+  fetchCapacityTiers()
+})
 
 const errors = reactive<Record<string, string>>({})
 
@@ -29,15 +235,48 @@ function validate() {
   if (!form.email.trim())      errors.email = 'Required'
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = 'Invalid email'
   if (!form.phone.trim())      errors.phone = 'Required'
-  if (!form.password)          errors.password = 'Required'
-  else if (form.password.length < 6) errors.password = 'Min 6 characters'
-  if (form.confirmPassword !== form.password) errors.confirmPassword = 'Passwords do not match'
+  if (!form.customerTypeId)    errors.customerTypeId = 'Required'
+  if (!form.zoneId)            errors.zoneId = 'Required'
+  if (isPerBinType.value && !form.capacityRateId) errors.capacityRateId = 'Required'
   return Object.keys(errors).length === 0
 }
 
-function submit() {
+async function submit() {
   if (!validate()) return
-  emit('submit', { ...form })
+  loading.value = true
+  const payload: Record<string, unknown> = {
+    email: form.email.trim(),
+    name: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
+    phoneNumber: form.phone.trim(),
+    customerTypeId: form.customerTypeId,
+    zoneId: form.zoneId,
+    address: form.address.trim(),
+    city: form.city.trim(),
+    region: form.region.trim(),
+    postalCode: form.postalCode.trim(),
+    country: form.country.trim(),
+    placeName: form.placeName.trim(),
+    location: {
+      latitude: Number(form.latitude) || 0,
+      longitude: Number(form.longitude) || 0,
+    },
+  }
+  // per_bin customers are priced by capacity rate × number of bins, so both
+  // fields are sent. full_truck customers are priced by the truck tier chosen at
+  // booking time, so bin fields don't apply — but the backend still requires
+  // noBins, so send a minimal default and omit capacityRateId.
+  if (isPerBinType.value) {
+    payload.capacityRateId = form.capacityRateId
+    payload.noBins = form.binCount
+  } else {
+    payload.noBins = 1
+  }
+  const result = await api.post('/customer/admin/', payload, 'Failed to create customer')
+  loading.value = false
+  if (result) {
+    toast.success('Customer created successfully')
+    emit('success')
+  }
 }
 
 const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
@@ -115,78 +354,170 @@ function onBlur(e: Event, field: string) {
         <div style="display:flex;flex-direction:column;gap:6px">
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Customer Type</label>
           <select
-            v-model="form.userType"
-            :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+            v-model="form.customerTypeId"
+            :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid ${errors.customerTypeId ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:${form.customerTypeId ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+            @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+            @blur="($event.target as HTMLElement).style.borderColor=errors.customerTypeId ? '#ef4444' : '#e5e7eb'"
           >
+            <option value="" disabled>Select a customer type</option>
             <option v-for="t in customerTypes" :key="t.id" :value="t.id">{{ t.name }}</option>
           </select>
+          <span v-if="errors.customerTypeId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.customerTypeId }}</span>
         </div>
 
-        <!-- Entity Name (non-regular types only) -->
-        <div v-if="form.userType !== 'regular'" style="display:flex;flex-direction:column;gap:6px">
-          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Entity Name</label>
-          <input v-model="form.entityName" type="text" placeholder="Company / Estate / Organisation name" :style="inputStyle('entityName')"
-            @focus="onFocus($event, 'entityName')" @blur="onBlur($event, 'entityName')" />
+        <!-- Bin fields (per_bin pricing mode only) -->
+        <template v-if="isPerBinType">
+          <!-- Bin Capacity -->
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Bin Capacity</label>
+            <select
+              v-model="form.capacityRateId"
+              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid ${errors.capacityRateId ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:${form.capacityRateId ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+              @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
+              @blur="($event.target as HTMLElement).style.borderColor=errors.capacityRateId ? '#ef4444' : '#e5e7eb'"
+            >
+              <option value="" disabled>Select bin capacity</option>
+              <option v-for="tier in capacityTiers" :key="tier.id" :value="tier.id">{{ tier.capacityLiters }}L — GHS {{ tier.prepayRate }}/pickup</option>
+            </select>
+            <span v-if="errors.capacityRateId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.capacityRateId }}</span>
+          </div>
+
+          <!-- Assigned BINs -->
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Assigned BINs</label>
+            <div style="display:flex;align-items:center;gap:12px">
+              <button
+                type="button"
+                style="width:36px;height:36px;border:1px solid #e5e7eb;border-radius:12px;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;color:#6b7280"
+                @click="form.binCount = Math.max(1, form.binCount - 1)"
+              >−</button>
+              <span style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;min-width:32px;text-align:center">{{ form.binCount }}</span>
+              <button
+                type="button"
+                style="width:36px;height:36px;border:1px solid #e5e7eb;border-radius:12px;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;color:#6b7280"
+                @click="form.binCount++"
+              >+</button>
+              <span style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">bin{{ form.binCount !== 1 ? 's' : '' }} assigned</span>
+            </div>
+          </div>
+        </template>
+
+        <!-- Current location capture (field sign-ups) -->
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button
+            type="button"
+            :disabled="locating"
+            :style="`width:100%;height:42px;display:flex;align-items:center;justify-content:center;gap:8px;background:${locating ? '#fffbeb' : 'rgba(255,180,0,0.1)'};border:1px dashed #ffb400;border-radius:16px;font-size:14px;font-weight:600;color:#b45309;font-family:'Manrope',sans-serif;cursor:${locating ? 'wait' : 'pointer'};opacity:${locating ? 0.7 : 1}`"
+            @click="fetchCurrentLocation"
+          >
+            <UIcon
+              :name="locating ? 'i-lucide-loader-2' : 'i-lucide-locate-fixed'"
+              :style="`width:16px;height:16px;${locating ? 'animation:spinPlain 1s linear infinite' : ''}`"
+            />
+            {{ locating ? 'Getting location...' : 'Use My Current Location' }}
+          </button>
+          <span v-if="geoError" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ geoError }}</span>
+          <span v-else style="font-size:12px;color:#9ca3af;font-family:'Manrope',sans-serif">Standing at the customer's place? Tap to capture GPS and auto-fill the address.</span>
         </div>
 
-        <!-- Portal access section -->
-        <div style="background:#f9fafb;border:1px solid #ececec;border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px">
-          <div style="display:flex;align-items:center;gap:8px">
-            <UIcon name="i-lucide-lock" style="width:16px;height:16px;color:#111;flex-shrink:0" />
-            <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif">Customer Portal Access</p>
+        <!-- Address -->
+        <div style="display:flex;flex-direction:column;gap:6px;position:relative">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Address</label>
+          <div style="position:relative">
+            <input
+              v-model="form.address"
+              type="text"
+              placeholder="Start typing to search (powered by TomTom)"
+              :style="inputStyle('address')"
+              @focus="onFocus($event, 'address')"
+              @blur="onBlur($event, 'address')"
+            />
+            <UIcon
+              v-if="geocoding"
+              name="i-lucide-loader-2"
+              style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#6b7280;animation:spin 1s linear infinite"
+            />
           </div>
-          <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;line-height:1.5">
-            Set an initial password for the customer to access their portal. They can change this after their first login.
-          </p>
+          <div
+            v-if="showSuggestions && addressSuggestions.length > 0"
+            style="position:absolute;top:100%;left:0;right:0;z-index:10;background:white;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.1);margin-top:4px;max-height:200px;overflow-y:auto"
+          >
+            <button
+              v-for="(place, i) in addressSuggestions"
+              :key="i"
+              type="button"
+              style="width:100%;text-align:left;padding:10px 12px;background:none;border:none;cursor:pointer;font-size:13px;color:#1a1a1a;font-family:'Manrope',sans-serif;border-bottom:1px solid #f3f4f6"
+              @click="selectAddressSuggestion(place)"
+              @mouseover="($event.currentTarget as HTMLElement).style.background='#f9fafb'"
+              @mouseleave="($event.currentTarget as HTMLElement).style.background='white'"
+            >
+              {{ place.properties.address?.freeformAddress || place.properties.address?.streetNameAndNumber || 'Address' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- City / Region -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
           <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Initial Password</label>
-            <input v-model="form.password" type="password" placeholder="Create a temporary password" :style="inputStyle('password')"
-              @focus="onFocus($event, 'password')" @blur="onBlur($event, 'password')" />
-            <span v-if="errors.password" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.password }}</span>
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">City</label>
+            <input v-model="form.city" type="text" placeholder="Accra" :style="inputStyle('city')"
+              @focus="onFocus($event, 'city')" @blur="onBlur($event, 'city')" />
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Confirm Password</label>
-            <input v-model="form.confirmPassword" type="password" placeholder="Confirm password" :style="inputStyle('confirmPassword')"
-              @focus="onFocus($event, 'confirmPassword')" @blur="onBlur($event, 'confirmPassword')" />
-            <span v-if="errors.confirmPassword" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.confirmPassword }}</span>
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Region</label>
+            <input v-model="form.region" type="text" placeholder="Greater Accra" :style="inputStyle('region')"
+              @focus="onFocus($event, 'region')" @blur="onBlur($event, 'region')" />
           </div>
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-            <input v-model="form.sendWelcome" type="checkbox" style="width:16px;height:16px;accent-color:#ffb400;cursor:pointer" />
-            <span style="font-size:12px;font-weight:500;color:#6b7280;font-family:'Manrope',sans-serif">Send welcome email with login credentials to customer</span>
-          </label>
+        </div>
+
+        <!-- Postal Code / Country -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Postal Code</label>
+            <input v-model="form.postalCode" type="text" placeholder="00233" :style="inputStyle('postalCode')"
+              @focus="onFocus($event, 'postalCode')" @blur="onBlur($event, 'postalCode')" />
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Country</label>
+            <input v-model="form.country" type="text" placeholder="Ghana" :style="inputStyle('country')"
+              @focus="onFocus($event, 'country')" @blur="onBlur($event, 'country')" />
+          </div>
+        </div>
+
+        <!-- Place Name -->
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Place Name</label>
+          <input v-model="form.placeName" type="text" placeholder="Landmark / area name" :style="inputStyle('placeName')"
+            @focus="onFocus($event, 'placeName')" @blur="onBlur($event, 'placeName')" />
+        </div>
+
+        <!-- Location -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Latitude</label>
+            <input v-model="form.latitude" type="text" placeholder="5.6037" :style="inputStyle('latitude')"
+              @focus="onFocus($event, 'latitude')" @blur="onBlur($event, 'latitude')" />
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Longitude</label>
+            <input v-model="form.longitude" type="text" placeholder="-0.1870" :style="inputStyle('longitude')"
+              @focus="onFocus($event, 'longitude')" @blur="onBlur($event, 'longitude')" />
+          </div>
         </div>
 
         <!-- Zone -->
         <div style="display:flex;flex-direction:column;gap:6px">
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Zone</label>
           <select
-            v-model="form.zone"
-            :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:${form.zone ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
+            v-model="form.zoneId"
+            :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid ${errors.zoneId ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:${form.zoneId ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
             @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
-            @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
+            @blur="($event.target as HTMLElement).style.borderColor=errors.zoneId ? '#ef4444' : '#e5e7eb'"
           >
             <option value="" disabled>Select a zone</option>
             <option v-for="z in zones" :key="z.id" :value="z.id">{{ z.name }}</option>
           </select>
-        </div>
-
-        <!-- Assigned BINs -->
-        <div style="display:flex;flex-direction:column;gap:6px">
-          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Assigned BINs</label>
-          <div style="display:flex;align-items:center;gap:12px">
-            <button
-              type="button"
-              style="width:36px;height:36px;border:1px solid #e5e7eb;border-radius:12px;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;color:#6b7280"
-              @click="form.binCount = Math.max(1, form.binCount - 1)"
-            >−</button>
-            <span style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;min-width:32px;text-align:center">{{ form.binCount }}</span>
-            <button
-              type="button"
-              style="width:36px;height:36px;border:1px solid #e5e7eb;border-radius:12px;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;color:#6b7280"
-              @click="form.binCount++"
-            >+</button>
-            <span style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">bin{{ form.binCount !== 1 ? 's' : '' }} assigned</span>
-          </div>
+          <span v-if="errors.zoneId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.zoneId }}</span>
         </div>
 
       </div>
@@ -198,9 +529,10 @@ function onBlur(e: Event, field: string) {
           @click="emit('close')"
         >Cancel</button>
         <button
-          style="height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)"
+          :disabled="loading"
+          :style="`height:40px;padding:0 20px;background:${loading ? '#f3f4f6' : '#ffb400'};border:none;border-radius:20px;font-size:14px;font-weight:500;color:${loading ? '#9ca3af' : '#0a0d12'};font-family:'Manrope',sans-serif;cursor:${loading ? 'not-allowed' : 'pointer'};box-shadow:0 1px 3px rgba(255,180,0,0.2)`"
           @click="submit"
-        >Add Customer</button>
+        >{{ loading ? 'Creating...' : 'Add Customer' }}</button>
       </div>
     </div>
   </div>

@@ -1,0 +1,3 @@
+- Public-only runtime secrets are read from `useRuntimeConfig().public.*` rather than direct env access.
+- SSR is explicitly disabled per-route via `routeRules` instead of per-page `<script setup>` flags.
+- Path imports use the `~/` alias pointing at `app/`, consistent across source and tests.

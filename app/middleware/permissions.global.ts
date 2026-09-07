@@ -3,7 +3,8 @@ import { userIsAdmin, userHasPermission, getUserPermissions } from '~/utils/auth
 export default defineNuxtRouteMiddleware((to) => {
   // Skip middleware for public routes, payment pages, and unauthorized page
   const publicRoutes = ['/login', '/forgot-password', '/unauthorized']
-  const isPublicRoute = publicRoutes.includes(to.path) || to.path.startsWith('/pay')
+  const isPaymentInvoiceRoute = to.path.startsWith('/pay/') && Boolean(to.params.id)
+  const isPublicRoute = publicRoutes.includes(to.path) || isPaymentInvoiceRoute
 
   if (isPublicRoute) {
     return
@@ -36,6 +37,7 @@ export default defineNuxtRouteMiddleware((to) => {
     '/pickups': 'pickups.view',
     '/tracking': 'tracking.view',
     '/billing': 'billing.view',
+    '/pay': 'billing.view',
     '/shop': 'shop.view',
     '/inventory': 'inventory.view',
     '/support': 'support.view',

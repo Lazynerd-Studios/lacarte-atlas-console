@@ -1,0 +1,1 @@
+Single Nuxt 4 application that wires unauthenticated entry pages, map/tracking UI, and admin features under a shared Pinia + @nuxt/ui runtime with per-route SSR control.
