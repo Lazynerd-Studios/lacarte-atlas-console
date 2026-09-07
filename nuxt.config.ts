@@ -26,7 +26,7 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'https://lacarte.lazynerdstudios.com/api',
+      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'https://lacarteprod.lazynerdstudios.com/api',
       tomtomApiKey: process.env.NUXT_PUBLIC_TOMTOM_API_KEY || '',
       sessionDurationMinutes: Number(process.env.NUXT_PUBLIC_SESSION_DURATION_MINUTES) || 30,
       sessionWarningSeconds: Number(process.env.NUXT_PUBLIC_SESSION_WARNING_SECONDS) || 120,
