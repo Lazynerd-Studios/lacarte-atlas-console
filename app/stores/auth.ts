@@ -13,6 +13,9 @@ export const useAuthStore = defineStore('auth', () => {
   // Ticks once per second ONLY while the warning banner is visible (bounded
   // to the warning window) so the countdown stays live without always-on polling
   let sessionWarningTicker: ReturnType<typeof setInterval> | null = null
+  // Timestamp of the last successful server session verification. Used to
+  // throttle the per-navigation check so we don't hit the backend on every route change.
+  let lastSessionCheckAt = 0
 
   const publicRoutes = ['/login', '/forgot-password', '/unauthorized']
   const isPublicRoute = (path: string) =>
@@ -63,6 +66,25 @@ export const useAuthStore = defineStore('auth', () => {
   function getSessionCheckIntervalMs(): number {
     const config = useRuntimeConfig()
     return (config.public.sessionCheckIntervalMinutes ?? 5) * 60 * 1000
+  }
+
+  /**
+   * Resolve the session expiry timestamp. Prefers a server-authoritative value
+   * (ISO string or epoch seconds/ms) when the backend supplies one; otherwise
+   * falls back to the configured client-side duration.
+   */
+  function computeSessionExpiry(serverExpiresAt?: string | number): number {
+    if (serverExpiresAt != null) {
+      const raw = typeof serverExpiresAt === 'number'
+        ? serverExpiresAt
+        : Date.parse(serverExpiresAt)
+      if (!isNaN(raw)) {
+        // Treat small numbers as epoch-seconds, large ones as epoch-milliseconds
+        const ms = raw < 1e12 ? raw * 1000 : raw
+        if (ms > Date.now()) return ms
+      }
+    }
+    return Date.now() + getSessionDurationMs()
   }
 
   async function setAuth(userData: AuthUser, authToken: string) {
@@ -147,8 +169,10 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = data.user
         // Refresh team member profile
         await fetchTeamMemberProfile()
-        // Update session expiry and reschedule timers against the new expiry
-        sessionExpiresAt.value = Date.now() + getSessionDurationMs()
+        // Update session expiry from the server value when available and
+        // reschedule timers against the new expiry
+        sessionExpiresAt.value = computeSessionExpiry(data.expiresAt)
+        lastSessionCheckAt = Date.now()
         scheduleSessionWarning()
         return true
       } else {
@@ -161,6 +185,20 @@ export const useAuthStore = defineStore('auth', () => {
       await logout()
       return false
     }
+  }
+
+  /**
+   * Session verification for route navigation. Skips the network round-trip when
+   * the session was verified within the configured check interval — the periodic
+   * check and useApi's 401 interception still catch real expiry.
+   */
+  async function ensureSessionForNavigation(): Promise<boolean> {
+    if (!token.value) return false
+    const interval = getSessionCheckIntervalMs()
+    if (lastSessionCheckAt && Date.now() - lastSessionCheckAt < interval) {
+      return true
+    }
+    return checkSession()
   }
 
   function startSessionWarningCheck() {
@@ -288,10 +326,13 @@ export const useAuthStore = defineStore('auth', () => {
     stopWarningTicker()
   }
 
-  async function logout() {
+  async function logout(skipServerCall?: boolean) {
     stopSessionCheck()
 
-    if (token.value) {
+    // Skip the sign-out POST when the token was already rejected by the server
+    // (e.g. a 401) — the call would be wasted. Guarded with `=== true` so an
+    // event object passed by a template handler can never trigger the skip.
+    if (token.value && skipServerCall !== true) {
       try {
         const config = useRuntimeConfig()
         await fetch(`${config.public.apiBase}/auth/sign-out`, {
@@ -340,6 +381,7 @@ export const useAuthStore = defineStore('auth', () => {
     setAuth,
     updateToken,
     checkSession,
+    ensureSessionForNavigation,
     refreshSession,
     extendSession,
     dismissSessionWarning,
@@ -351,5 +393,10 @@ export const useAuthStore = defineStore('auth', () => {
     // sessionStorage keeps the token out of long-lived localStorage (XSS surface)
     // and the guard keeps SSR safe where sessionStorage does not exist
     storage: typeof sessionStorage !== 'undefined' ? sessionStorage : undefined,
+    // Persist only durable identity/auth data. Volatile timer-derived state
+    // (sessionExpiresAt, showSessionWarning, sessionWarningTime) is intentionally
+    // excluded so a stale expiry is never rehydrated on reload — it is re-derived
+    // from the server via checkSession on app init.
+    pick: ['user', 'token', 'teamMember'],
   },
 })

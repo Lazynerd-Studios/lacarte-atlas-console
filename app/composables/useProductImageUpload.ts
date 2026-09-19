@@ -42,11 +42,9 @@ export function useProductImageUpload(maxImages = 5) {
       const formData = new FormData()
       for (const file of images) formData.append('files', file)
 
-      const config = useRuntimeConfig()
-      const authStore = useAuthStore()
-      const res = await fetch(`${config.public.apiBase}/store/admin/products/images`, {
+      const api = useApi()
+      const res = await api.authFetch('/store/admin/products/images', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${authStore.token}` },
         body: formData,
       })
       if (!res.ok) {

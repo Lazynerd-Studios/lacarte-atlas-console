@@ -90,13 +90,7 @@ async function updateStatus() {
 async function downloadInvoice() {
   downloading.value = true
   try {
-    const config = useRuntimeConfig()
-    const authStore = useAuthStore()
-    const res = await fetch(`${config.public.apiBase}/store-orders/admin/orders/${route.params.id}/invoice/pdf`, {
-      headers: {
-        'Authorization': `Bearer ${authStore.token}`,
-      },
-    })
+    const res = await api.authFetch(`/store-orders/admin/orders/${route.params.id}/invoice/pdf`)
     if (!res.ok) throw new Error('Failed to download invoice')
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)

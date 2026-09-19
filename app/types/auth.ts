@@ -48,11 +48,15 @@ export interface AuthTeamMember {
 export interface SignInResponse {
   token: string
   user: AuthUser
+  /** Optional server-authoritative session expiry (ISO string or epoch). */
+  expiresAt?: string | number
 }
 
 /** Session check response from /auth/get-session */
 export interface SessionResponse {
   user: AuthUser
+  /** Optional server-authoritative session expiry (ISO string or epoch). */
+  expiresAt?: string | number
 }
 
 /** Profile response from /user/profile */

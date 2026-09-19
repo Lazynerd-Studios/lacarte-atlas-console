@@ -3,6 +3,7 @@ definePageMeta({ layout: 'dashboard' })
 
 const api = useApi()
 const { format } = useCurrency()
+const toast = useAppToast()
 
 interface InventoryItem {
   id: string
@@ -150,13 +151,7 @@ const exporting = ref(false)
 async function exportCSV() {
   exporting.value = true
   try {
-    const config = useRuntimeConfig()
-    const authStore = useAuthStore()
-    const res = await fetch(`${config.public.apiBase}/store/admin/inventory/export`, {
-      headers: {
-        'Authorization': `Bearer ${authStore.token}`,
-      },
-    })
+    const res = await api.authFetch('/store/admin/inventory/export')
     if (!res.ok) throw new Error('Export failed')
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
@@ -169,6 +164,7 @@ async function exportCSV() {
     URL.revokeObjectURL(url)
   } catch {
     console.error('Failed to export inventory')
+    toast.error('Export failed', 'Could not export inventory. Please try again.')
   } finally {
     exporting.value = false
   }

@@ -1,11 +1,31 @@
 <script setup lang="ts">
 import type { DriverTracking, Driver } from '~/types/driver'
 import { nextTick } from 'vue'
+import type { Map as MaplibreMap, Popup, MapLayerMouseEvent, GeoJSONSource } from 'maplibre-gl'
+
+/** Constructor shape for the lazily-imported maplibre Popup class. */
+type PopupConstructor = new (options?: { offset?: number; closeButton?: boolean }) => Popup
+
+/** Properties attached to each driver point feature (see updateMarkers). */
+interface DriverMarkerProps {
+  driverId: string
+  isOnline: boolean
+  speed: number
+  heading: number
+  recordedAt: string
+}
+
+/** The subset of the TomTom map wrapper this page relies on. */
+interface DriverMapLike {
+  mapLibreMap: MaplibreMap
+  remove?: () => void
+}
 
 definePageMeta({ layout: 'dashboard' })
 
 const config = useRuntimeConfig()
 const authStore = useAuthStore()
+const api = useApi()
 
 const drivers = ref<Map<string, DriverTracking>>(new Map())
 const driverDetails = ref<Map<string, Driver>>(new Map())
@@ -15,13 +35,13 @@ const mapFailed = ref(false)
 const streamError = ref('')
 const connected = ref(false)
 
-let map: any = null
+let map: DriverMapLike | null = null
 let abortController: AbortController | null = null
 let iconsLoaded = false
 let mapReady = false
 let hasFitOnce = false
-let PopupClass: any = null
-let hoverPopup: any = null
+let PopupClass: PopupConstructor | null = null
+let hoverPopup: Popup | null = null
 let staleTimer: ReturnType<typeof setInterval> | null = null
 let detailsTimer: ReturnType<typeof setInterval> | null = null
 
@@ -43,7 +63,7 @@ function truckIconDataUrl(bodyColor: string, accentColor: string): string {
   return `data:image/svg+xml,${encodeURIComponent(svg)}`
 }
 
-function loadTruckIcons(mapLibreMap: any): Promise<void> {
+function loadTruckIcons(mapLibreMap: MaplibreMap): Promise<void> {
   return new Promise((resolve, reject) => {
     const PRIMARY = '#ffb400'
     const BLACK = '#111111'
@@ -77,7 +97,7 @@ function loadTruckIcons(mapLibreMap: any): Promise<void> {
       }
     }
 
-    const onError = (e: any) => {
+    const onError = (e: Event | string) => {
       failed = true
       console.error('[Map] Failed to load truck icon image:', e)
       reject(new Error('Failed to load truck icon image'))
@@ -138,7 +158,6 @@ function formatCoord(lat: number, lng: number): string {
 }
 
 async function fetchDriverDetails() {
-  const api = useApi()
   const data = await api.get<{ data: Driver[] }>('/drivers/admin/', 'Failed to load driver details')
   if (data?.data) {
     for (const d of data.data) {
@@ -183,31 +202,32 @@ async function initMap() {
         center: [-0.1866, 5.6037],
         zoom: 11,
       },
-    })
+    }) as unknown as DriverMapLike
 
     console.log('[Map] TomTomMap instance created')
 
-    map.mapLibreMap.on('load', async () => {
+    const mlMap = map.mapLibreMap
+    mlMap.on('load', async () => {
       console.log('[Map] Map loaded successfully')
       try {
-        const maplibreModule: any = await import('maplibre-gl')
-        PopupClass = maplibreModule.default?.Popup ?? maplibreModule.Popup
+        const maplibreModule = await import('maplibre-gl') as unknown as { default?: { Popup?: PopupConstructor }; Popup?: PopupConstructor }
+        PopupClass = maplibreModule.default?.Popup ?? maplibreModule.Popup ?? null
       } catch (err) {
         console.error('[Map] Failed to load maplibre for popups:', err)
       }
       try {
-        await loadTruckIcons(map.mapLibreMap)
+        await loadTruckIcons(mlMap)
       } catch (err) {
         // Non-fatal: updateMarkers falls back to colored circle markers
         console.error('[Map] Failed to load truck icons, using circle fallback:', err)
       }
-      setupMapInteractions(map.mapLibreMap)
+      setupMapInteractions(mlMap)
       mapReady = true
       loading.value = false
       updateMarkers()
     })
 
-    map.mapLibreMap.on('error', (e: any) => {
+    mlMap.on('error', (e) => {
       console.error('[Map] Map error:', e)
       mapFailed.value = true
       mapError.value = 'Map failed to load. Check console for details.'
@@ -220,8 +240,8 @@ async function initMap() {
 }
 
 function updateMarkers() {
-  if (!map?.mapLibreMap) return
-  const mapLibreMap = map.mapLibreMap
+  const mapLibreMap = map?.mapLibreMap
+  if (!mapLibreMap) return
 
   const driversArray = driversList.value
   const geojson = {
@@ -248,7 +268,7 @@ function updateMarkers() {
   const existingSource = mapLibreMap.getSource('drivers')
   if (existingSource) {
     // Update in place — avoids tearing down/re-adding the layer on every tick
-    ;(existingSource as any).setData(geojson)
+    ;(existingSource as GeoJSONSource).setData(geojson)
   } else {
     mapLibreMap.addSource('drivers', { type: 'geojson', data: geojson })
     if (iconsLoaded) {
@@ -291,7 +311,7 @@ function updateMarkers() {
       const minLat = Math.min(...coords.map(c => c[1]))
       const maxLat = Math.max(...coords.map(c => c[1]))
       mapLibreMap.fitBounds(
-        [[minLng, minLat], [maxLng, maxLat]],
+        [[minLng, minLat], [maxLng, maxLat]] as [[number, number], [number, number]],
         { padding: 80, maxZoom: 14 },
       )
       hasFitOnce = true
@@ -299,10 +319,21 @@ function updateMarkers() {
   }
 }
 
+// Escape untrusted values before interpolating into popup HTML (setHTML renders
+// raw markup, so backend/customer-controlled fields are an XSS vector otherwise).
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 // Build the hover-popup HTML for a driver marker from its live props + profile
-function driverPopupHtml(driverId: string, props: any): string {
+function driverPopupHtml(driverId: string, props: DriverMarkerProps): string {
   const d = driverDetails.value.get(driverId)
-  const name = d?.name || d?.user?.name || 'Driver'
+  const name = escapeHtml(d?.name || d?.user?.name || 'Driver')
   const online = !!props.isOnline
   const speed = Number(props.speed) || 0
   const plate = d?.assignedTruck?.plateNumber
@@ -311,27 +342,31 @@ function driverPopupHtml(driverId: string, props: any): string {
   const rows: string[] = []
   rows.push(`<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><div style="width:8px;height:8px;border-radius:50%;background:${online ? '#22c55e' : '#9ca3af'}"></div><span style="font-size:12px;color:#6b7280">${online ? 'Online' : 'Offline'}</span></div>`)
   rows.push(`<div style="font-size:12px;color:#6b7280">Speed: ${speed.toFixed(1)} km/h</div>`)
-  if (plate) rows.push(`<div style="font-size:12px;color:#6b7280">Truck: ${plate}</div>`)
-  if (zone) rows.push(`<div style="font-size:12px;color:#6b7280">Zone: ${zone}</div>`)
-  if (phone) rows.push(`<div style="font-size:12px;color:#6b7280">Phone: ${phone}</div>`)
+  if (plate) rows.push(`<div style="font-size:12px;color:#6b7280">Truck: ${escapeHtml(plate)}</div>`)
+  if (zone) rows.push(`<div style="font-size:12px;color:#6b7280">Zone: ${escapeHtml(zone)}</div>`)
+  if (phone) rows.push(`<div style="font-size:12px;color:#6b7280">Phone: ${escapeHtml(phone)}</div>`)
   return `<div style="font-family:'Manrope',sans-serif;padding:4px 0;min-width:180px"><div style="font-size:14px;font-weight:700;color:#111;margin-bottom:6px">${name}</div>${rows.join('')}</div>`
 }
 
 // Hover popup + cursor. Registered once — updateMarkers re-creates the layer,
 // but delegated handlers are matched by layer id at event time, so they persist.
-function setupMapInteractions(mapLibreMap: any) {
-  mapLibreMap.on('mouseenter', 'drivers-truck', (e: any) => {
+function setupMapInteractions(mapLibreMap: MaplibreMap) {
+  mapLibreMap.on('mouseenter', 'drivers-truck', (e: MapLayerMouseEvent) => {
     mapLibreMap.getCanvas().style.cursor = 'pointer'
     const f = e.features?.[0]
     if (!f || !PopupClass) return
+    const p = f.properties as DriverMarkerProps
+    const coords = (f.geometry as unknown as { coordinates: [number, number] }).coordinates
     if (!hoverPopup) hoverPopup = new PopupClass({ offset: 20, closeButton: false })
-    hoverPopup.setLngLat(f.geometry.coordinates).setHTML(driverPopupHtml(f.properties.driverId, f.properties)).addTo(mapLibreMap)
+    hoverPopup.setLngLat(coords).setHTML(driverPopupHtml(p.driverId, p)).addTo(mapLibreMap)
   })
 
-  mapLibreMap.on('mousemove', 'drivers-truck', (e: any) => {
+  mapLibreMap.on('mousemove', 'drivers-truck', (e: MapLayerMouseEvent) => {
     const f = e.features?.[0]
     if (!f || !hoverPopup) return
-    hoverPopup.setLngLat(f.geometry.coordinates).setHTML(driverPopupHtml(f.properties.driverId, f.properties))
+    const p = f.properties as DriverMarkerProps
+    const coords = (f.geometry as unknown as { coordinates: [number, number] }).coordinates
+    hoverPopup.setLngLat(coords).setHTML(driverPopupHtml(p.driverId, p))
   })
 
   mapLibreMap.on('mouseleave', 'drivers-truck', () => {
@@ -350,11 +385,9 @@ function connectSSE() {
   }
 
   abortController = new AbortController()
-  const url = `${config.public.apiBase}/tracking/sse/drivers`
 
-  fetch(url, {
+  api.authFetch('/tracking/sse/drivers', {
     headers: {
-      'Authorization': `Bearer ${authStore.token}`,
       'Accept': 'text/event-stream',
     },
     signal: abortController.signal,

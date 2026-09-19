@@ -8,12 +8,14 @@ export interface Toast {
   duration?: number
 }
 
-const toasts = ref<Toast[]>([])
-let nextId = 0
-
 export function useAppToast() {
+  // useState (not a module-level ref) so SSR renders do not share toast state
+  // across requests, and each Nuxt app instance gets its own isolated store.
+  const toasts = useState<Toast[]>('toasts', () => [])
+  const nextId = useState<number>('toast-next-id', () => 0)
+
   function show(type: ToastType, title: string, message?: string, duration = 4000) {
-    const id = ++nextId
+    const id = ++nextId.value
     toasts.value.push({ id, type, title, message, duration })
 
     if (duration > 0) {

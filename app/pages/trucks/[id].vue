@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import type { TruckDetail, MaintenanceRecord, MaintenanceRow } from '~/types/driver'
+
 definePageMeta({ layout: 'dashboard' })
 
 const route = useRoute()
-const truck = ref<any>(null)
+const truck = ref<TruckDetail | null>(null)
 const loading = ref(true)
 const notFound = ref(false)
 const toast = useAppToast()
@@ -10,12 +12,12 @@ const toast = useAppToast()
 onMounted(async () => {
   console.log('[truck-detail] Component mounted, fetching truck:', route.params.id)
   const api = useApi()
-  const data = await api.get<any>(`/trucks/admin/${route.params.id}`)
+  const data = await api.get<TruckDetail>(`/trucks/admin/${route.params.id}`)
   console.log('[truck-detail] Truck response:', data)
   console.log('[truck-detail] Registration Expiry from backend:', data?.registrationExpiry)
   if (data) {
     truck.value = data
-    console.log('[truck-detail] Loaded truck:', truck.value.truckId)
+    console.log('[truck-detail] Loaded truck:', truck.value?.truckId)
     
     // Fetch maintenance and route history after truck data is loaded
     await Promise.all([fetchMaintenanceHistory(), fetchRouteHistory()])
@@ -33,9 +35,9 @@ const showAssignDriverModal = ref(false)
 const showDeleteConfirm = ref(false)
 const showEditMaintenanceModal = ref(false)
 const editMaintenanceModalRef = ref<{ stopSubmitting: () => void } | null>(null)
-const selectedMaintenance = ref<any>(null)
+const selectedMaintenance = ref<MaintenanceRow | null>(null)
 const deleting = ref(false)
-const maintenanceHistory = ref<any[]>([])
+const maintenanceHistory = ref<MaintenanceRow[]>([])
 const loadingMaintenance = ref(false)
 
 async function fetchMaintenanceHistory() {
@@ -43,16 +45,16 @@ async function fetchMaintenanceHistory() {
   const api = useApi()
   
   console.log('[truck-detail] Fetching maintenance history for truck:', route.params.id)
-  const response = await api.get<{ data: any[] }>(`/trucks/${route.params.id}/maintenance`)
+  const response = await api.get<{ data: MaintenanceRecord[] }>(`/trucks/${route.params.id}/maintenance`)
   
   if (response && response.data) {
     console.log('[truck-detail] Maintenance history response:', response)
     
     // Transform API response to match local format
-    maintenanceHistory.value = response.data.map((item: any) => ({
+    maintenanceHistory.value = response.data.map((item: MaintenanceRecord): MaintenanceRow => ({
       id: item.id,
-      date: item.scheduledDate ? new Date(item.scheduledDate).toISOString().split('T')[0] : '',
-      type: item.maintenanceType,
+      date: item.scheduledDate ? new Date(item.scheduledDate).toISOString().split('T')[0] ?? '' : '',
+      type: item.maintenanceType ?? '',
       technician: item.serviceCentre || 'N/A',
       // Use actualCost only when status is completed, otherwise use estimatedCost
       cost: item.status === 'completed' && item.actualCost
@@ -86,7 +88,7 @@ async function handleMaintenance(data: { type: string; technician: string; date:
   }
   
   console.log('[truck-detail] API payload:', payload)
-  const result = await api.post<any>(`/trucks/admin/${route.params.id}/maintenance`, payload, 'Failed to schedule maintenance')
+  const result = await api.post<MaintenanceRecord>(`/trucks/admin/${route.params.id}/maintenance`, payload, 'Failed to schedule maintenance')
   
   if (result) {
     console.log('[truck-detail] Maintenance scheduled successfully:', result)
@@ -94,8 +96,8 @@ async function handleMaintenance(data: { type: string; technician: string; date:
     // Add to local maintenance history
     maintenanceHistory.value.unshift({
       id: result.id,
-      date: result.scheduledDate ? new Date(result.scheduledDate).toISOString().split('T')[0] : '',
-      type: result.maintenanceType,
+      date: result.scheduledDate ? new Date(result.scheduledDate).toISOString().split('T')[0] ?? '' : '',
+      type: result.maintenanceType ?? '',
       technician: result.serviceCentre || 'N/A',
       // Use actualCost only when status is completed, otherwise use estimatedCost
       cost: result.status === 'completed' && result.actualCost
@@ -122,7 +124,7 @@ async function handleAssignDriver(driverId: string) {
   if (result !== null) {
     showAssignDriverModal.value = false
     // Refresh truck data
-    const data = await api.get<any>(`/trucks/admin/${route.params.id}`)
+    const data = await api.get<TruckDetail>(`/trucks/admin/${route.params.id}`)
     if (data) {
       truck.value = data
       console.log('[truck-detail] Truck data refreshed after driver assignment')
@@ -136,7 +138,7 @@ async function handleEdit(data: { plate: string; vin: string; make: string; mode
   const result = await api.patch(`/trucks/admin/${route.params.id}`, data, 'Failed to update truck')
   console.log('[truck-detail] Update result:', result)
   
-  if (result !== null) {
+  if (result !== null && truck.value) {
     // Update local state
     truck.value.plateNumber = data.plate
     truck.value.vinNumber = data.vin
@@ -144,7 +146,7 @@ async function handleEdit(data: { plate: string; vin: string; make: string; mode
     truck.value.model = data.model
     truck.value.year = String(data.year)
     truck.value.capacity = data.capacity
-    truck.value.status = data.status
+    truck.value.status = data.status as TruckDetail['status']
     truck.value.gpsDeviceId = data.gpsDeviceId
     truck.value.registrationExpiry = data.registrationExpiry
     truck.value.notes = data.notes
@@ -170,7 +172,7 @@ async function handleDeleteTruck() {
   }
 }
 
-function openEditMaintenance(maintenance: any) {
+function openEditMaintenance(maintenance: MaintenanceRow) {
   selectedMaintenance.value = maintenance
   showEditMaintenanceModal.value = true
 }
@@ -185,12 +187,12 @@ async function handleUpdateMaintenance(maintenanceId: string, data: Record<strin
     toast.success('Maintenance updated successfully')
     
     // Update local maintenance history
-    const index = maintenanceHistory.value.findIndex((m: any) => m.id === maintenanceId)
+    const index = maintenanceHistory.value.findIndex((m: MaintenanceRow) => m.id === maintenanceId)
     if (index !== -1) {
       const status = data.status as string
       maintenanceHistory.value[index] = {
         id: maintenanceId,
-        date: data.scheduledDate ? new Date(data.scheduledDate as string).toISOString().split('T')[0] : '',
+        date: data.scheduledDate ? new Date(data.scheduledDate as string).toISOString().split('T')[0] ?? '' : '',
         type: data.maintenanceType as string,
         technician: data.serviceCentre as string || 'N/A',
         // Use actualCost only when status is completed, otherwise use estimatedCost
@@ -300,7 +302,7 @@ function formatRouteDuration(minutes: number) {
     <div v-else-if="notFound" style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">Truck not found</div>
 
     <!-- Main content -->
-    <template v-else>
+    <template v-else-if="truck">
 
       <!-- Profile card -->
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:10px 25px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
@@ -580,7 +582,7 @@ function formatRouteDuration(minutes: number) {
   <EditTruckModal
     v-if="showEditModal && truck"
     ref="editTruckModalRef"
-    :truck="{ id: truck.truckId, plate: truck.plateNumber, vin: truck.vinNumber, make: truck.make, model: truck.model, year: truck.year, capacity: truck.capacity, status: truck.status, gpsDeviceId: truck.gpsDeviceId, registrationExpiry: truck.registrationExpiry, notes: truck.notes }"
+    :truck="{ id: truck.truckId, plate: truck.plateNumber, vin: truck.vinNumber ?? '', make: truck.make ?? '', model: truck.model ?? '', year: truck.year ?? '', capacity: truck.capacity ?? '', status: truck.status, gpsDeviceId: truck.gpsDeviceId, registrationExpiry: truck.registrationExpiry, notes: truck.notes }"
     @close="showEditModal = false"
     @submit="handleEdit"
   />
@@ -601,7 +603,7 @@ function formatRouteDuration(minutes: number) {
   />
 
   <LazyEditMaintenanceModal
-    v-if="showEditMaintenanceModal && selectedMaintenance"
+    v-if="showEditMaintenanceModal && selectedMaintenance && truck"
     ref="editMaintenanceModalRef"
     :truck-id="truck.truckId"
     :maintenance="selectedMaintenance"

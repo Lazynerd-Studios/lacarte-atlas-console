@@ -87,6 +87,41 @@ export interface TruckDriver {
   name?: string
 }
 
+/** Truck detail view — adds the display-only fields returned by the detail endpoint. */
+export type TruckDetail = Omit<Truck, 'year'> & {
+  year?: number | string
+  lastService?: string
+  nextServiceDue?: string
+  totalPickups?: number | string
+  currentLocation?: string
+  lastDriverPhone?: string
+  lastDriverZone?: string
+  lastDriverDate?: string
+}
+
+/** Raw maintenance record as returned by the truck maintenance endpoints. */
+export interface MaintenanceRecord {
+  id: string
+  scheduledDate?: string
+  maintenanceType?: string
+  serviceCentre?: string
+  actualCost?: string
+  estimatedCost?: string
+  status?: string
+  notes?: string
+}
+
+/** Normalized maintenance row used for rendering the history table locally. */
+export interface MaintenanceRow {
+  id: string
+  date: string
+  type: string
+  technician: string
+  cost: string
+  status: string
+  notes: string
+}
+
 export interface Truck {
   id: string
   truckId: string

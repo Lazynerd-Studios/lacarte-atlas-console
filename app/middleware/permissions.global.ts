@@ -47,9 +47,10 @@ export default defineNuxtRouteMiddleware((to) => {
     '/comms': 'communications.send',
   }
 
-  // Check if route requires permission
+  // Check if route requires permission. Match on segment boundaries so a prefix
+  // like '/pay' never accidentally matches an unrelated '/payments' route.
   for (const [route, permission] of Object.entries(routePermissions)) {
-    if (to.path.startsWith(route)) {
+    if (to.path === route || to.path.startsWith(`${route}/`)) {
       if (!checkPermission(permission)) {
         console.log(`[permissions] Access denied to ${to.path} - missing permission: ${permission}`)
         // Redirect to unauthorized page

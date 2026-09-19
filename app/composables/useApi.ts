@@ -42,8 +42,12 @@ export function useApi() {
 
     if (res.status === 401) {
       console.log('[useApi] 401 Unauthorized - logging out and redirecting to login')
-      await authStore.logout()
-      await router.push('/login')
+      // logout(true) skips the wasted sign-out POST (token already rejected) and
+      // redirects to /login for protected routes; only push again if it didn't.
+      await authStore.logout(true)
+      if (router.currentRoute.value.path !== '/login') {
+        await router.push('/login')
+      }
       throw new Error('Session expired. Please log in again.')
     }
 
@@ -66,12 +70,52 @@ export function useApi() {
       throw new Error(detail ?? `Request failed (${res.status})`)
     }
 
-    const result = text ? JSON.parse(text) : (null as unknown as T)
+    let result: T
+    if (text) {
+      try {
+        result = JSON.parse(text) as T
+      } catch {
+        // A 2xx with a non-JSON body (e.g. an HTML proxy/error page) would
+        // otherwise surface as an opaque SyntaxError.
+        console.error('[useApi] Failed to parse JSON response', { path })
+        throw new Error('Received an invalid response from the server')
+      }
+    } else {
+      result = null as unknown as T
+    }
     console.log('[useApi] Request successful', {
       path,
       hasData: !!result,
     })
     return result
+  }
+
+  /**
+   * Authenticated raw fetch for binary/streaming responses (PDF, CSV, SSE,
+   * file uploads). Centralizes the auth header and 401 session-expiry handling
+   * that the JSON helpers already provide, so callers no longer bypass it with
+   * a bare `fetch()`. Does NOT force a Content-Type — the browser sets the
+   * correct boundary for FormData and omits it for downloads.
+   */
+  async function authFetch(path: string, options: RequestInit = {}): Promise<Response> {
+    const headers: Record<string, string> = {
+      ...(options.headers as Record<string, string>),
+    }
+    if (authStore.token) {
+      headers['Authorization'] = `Bearer ${authStore.token}`
+    }
+
+    const res = await fetch(`${config.public.apiBase}${path}`, { ...options, headers })
+
+    if (res.status === 401) {
+      await authStore.logout(true)
+      if (router.currentRoute.value.path !== '/login') {
+        await router.push('/login')
+      }
+      throw new Error('Session expired. Please log in again.')
+    }
+
+    return res
   }
 
   // Wrapped versions auto-show error toasts on failure and return null
@@ -94,5 +138,7 @@ export function useApi() {
       }),
     // Raw request for cases where the caller wants to handle errors themselves
     request,
+    // Authenticated raw fetch for binary/streaming responses (PDF, CSV, SSE, uploads)
+    authFetch,
   }
 }

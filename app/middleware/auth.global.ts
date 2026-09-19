@@ -20,10 +20,11 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
   }
   
   // Only verify session if navigating from a different route (not on initial load)
-  // The auth-init plugin handles initial session check
+  // The auth-init plugin handles initial session check. This call is throttled
+  // inside the store so we don't issue a session round-trip on every navigation.
   if (from.path !== to.path && from.name) {
     // Verify session is still valid
-    const isValid = await authStore.checkSession()
+    const isValid = await authStore.ensureSessionForNavigation()
     if (!isValid) {
       console.log('[auth] Session invalid, redirecting to login')
       return navigateTo('/login')

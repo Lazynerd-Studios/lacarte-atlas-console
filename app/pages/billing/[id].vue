@@ -74,13 +74,7 @@ onMounted(() => {
 async function downloadPdf() {
   downloading.value = true
   try {
-    const config = useRuntimeConfig()
-    const authStore = useAuthStore()
-    const res = await fetch(`${config.public.apiBase}/invoices/admin/${id}/pdf`, {
-      headers: {
-        'Authorization': `Bearer ${authStore.token}`,
-      },
-    })
+    const res = await api.authFetch(`/invoices/admin/${id}/pdf`)
     if (!res.ok) throw new Error('Failed to download PDF')
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
