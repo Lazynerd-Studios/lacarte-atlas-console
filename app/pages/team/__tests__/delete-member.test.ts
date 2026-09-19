@@ -68,7 +68,7 @@ describe('Delete Team Member Functionality', () => {
       const updatedMembers = members.filter(m => m.id !== '1')
       
       expect(updatedMembers.length).toBe(1)
-      expect(updatedMembers[0].id).toBe('2')
+      expect(updatedMembers[0]?.id).toBe('2')
     })
 
     it('should refresh member list and stats after deletion', () => {

@@ -147,11 +147,11 @@ describe('Feature: team-management, Property 10: Validation Error Display', () =
       }, false)
       
       // Error messages should contain descriptive text
-      expect(errors.firstName.length).toBeGreaterThan(5)
-      expect(errors.lastName.length).toBeGreaterThan(5)
-      expect(errors.email.length).toBeGreaterThan(5)
-      expect(errors.phone.length).toBeGreaterThan(5)
-      expect(errors.role.length).toBeGreaterThan(5)
+      expect(errors.firstName!.length).toBeGreaterThan(5)
+      expect(errors.lastName!.length).toBeGreaterThan(5)
+      expect(errors.email!.length).toBeGreaterThan(5)
+      expect(errors.phone!.length).toBeGreaterThan(5)
+      expect(errors.role!.length).toBeGreaterThan(5)
     })
   })
 
@@ -222,8 +222,8 @@ describe('Feature: team-management, Property 10: Validation Error Display', () =
       })
       
       // Error messages should contain descriptive text
-      expect(errors.name.length).toBeGreaterThan(5)
-      expect(errors.permissions.length).toBeGreaterThan(5)
+      expect(errors.name!.length).toBeGreaterThan(5)
+      expect(errors.permissions!.length).toBeGreaterThan(5)
     })
   })
 

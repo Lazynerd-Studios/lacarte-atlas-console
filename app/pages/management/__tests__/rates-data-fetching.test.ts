@@ -204,7 +204,7 @@ describe('Property 3: Customer Type Dropdown Population', () => {
   })
 
   it('should handle empty customer types list', () => {
-    const emptyCustomerTypesArb = fc.constant([])
+    const emptyCustomerTypesArb = fc.constant<CustomerType[]>([])
 
     fc.assert(
       fc.property(emptyCustomerTypesArb, (customerTypes) => {
