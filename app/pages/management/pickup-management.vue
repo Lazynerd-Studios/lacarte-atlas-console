@@ -97,7 +97,7 @@ const addDisposableModalRef = ref()
 
 async function handleAddDisposable(data: any) {
   const result = await api.post<DisposableType>(
-    '/disposable-types/admin/types',
+    '/disposable/item-types',
     data,
     'Failed to create disposable type'
   )
@@ -122,8 +122,8 @@ function openEditDisposable(item: DisposableType) {
 
 async function handleEditDisposable(data: any) {
   if (!editDisposableTarget.value) return
-  const result = await api.put<DisposableType>(
-    `/disposable-types/admin/types/${editDisposableTarget.value.id}`,
+  const result = await api.patch<DisposableType>(
+    `/disposable/item-types/${editDisposableTarget.value.id}`,
     data,
     'Failed to update disposable type'
   )
@@ -149,7 +149,7 @@ function openDeleteDisposable(item: DisposableType) {
 async function handleDeleteDisposable() {
   if (!deleteDisposableTarget.value) return
   const ok = await api.del(
-    `/disposable-types/admin/types/${deleteDisposableTarget.value.id}`,
+    `/disposable/item-types/${deleteDisposableTarget.value.id}`,
     'Failed to delete disposable type'
   )
   if (ok !== null) {
@@ -166,7 +166,7 @@ const addQuantityModalRef = ref()
 
 async function handleAddQuantity(data: any) {
   const result = await api.post<EstimatedQuantity>(
-    '/disposable-types/admin/quantities',
+    '/disposable/quantities',
     data,
     'Failed to create estimated quantity'
   )
@@ -191,8 +191,8 @@ function openEditQuantity(item: EstimatedQuantity) {
 
 async function handleEditQuantity(data: any) {
   if (!editQuantityTarget.value) return
-  const result = await api.put<EstimatedQuantity>(
-    `/disposable-types/admin/quantities/${editQuantityTarget.value.id}`,
+  const result = await api.patch<EstimatedQuantity>(
+    `/disposable/quantities/${editQuantityTarget.value.id}`,
     data,
     'Failed to update estimated quantity'
   )
@@ -218,7 +218,7 @@ function openDeleteQuantity(item: EstimatedQuantity) {
 async function handleDeleteQuantity() {
   if (!deleteQuantityTarget.value) return
   const ok = await api.del(
-    `/disposable-types/admin/quantities/${deleteQuantityTarget.value.id}`,
+    `/disposable/quantities/${deleteQuantityTarget.value.id}`,
     'Failed to delete estimated quantity'
   )
   if (ok !== null) {
