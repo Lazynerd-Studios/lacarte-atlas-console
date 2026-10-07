@@ -83,7 +83,11 @@ async function handleMaintenance(data: { type: string; technician: string; date:
     maintenanceType: data.type,
     serviceCentre: data.technician,
     scheduledDate: data.date,
-    estimatedCost: data.estimatedCost || undefined,
+    // Vue auto-casts <input type="number"> v-model to a number, but the API
+    // schema requires estimatedCost to be a string — coerce it here (same as
+    // EditMaintenanceModal). Without this the server rejects with
+    // "Expected property 'estimatedCost' to be string but found: 3100".
+    estimatedCost: data.estimatedCost ? String(data.estimatedCost) : undefined,
     notes: data.notes || undefined,
   }
   
