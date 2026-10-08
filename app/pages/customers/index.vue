@@ -121,10 +121,23 @@ onMounted(async () => {
   initialLoading.value = false
 })
 
-function handleCustomerCreated() {
+function handleCustomerCreated(customerId: string) {
   showModal.value = false
   fetchCustomers()
   toast.success('Customer created')
+  // A per_bin customer can't be subscribed or priced until bins are set, so the
+  // create modal hands back the new id and we open the Bin Mix editor directly.
+  if (customerId) navigateTo(`/customers/${customerId}?tab=bins`)
+}
+
+// Compact bin-inventory summary for the list, e.g. "1×240 L + 2×660 L"
+function binSummary(c: CustomerListItem): string {
+  const bins = c.bins ?? []
+  if (!bins.length) return '—'
+  return [...bins]
+    .sort((a, b) => (a.capacityRate.capacityLiters ?? 0) - (b.capacityRate.capacityLiters ?? 0))
+    .map(b => `${b.quantity}\u00d7${b.capacityRate.capacityLiters} L`)
+    .join(' + ')
 }
 
 function planBadge(plan: string | undefined) {
@@ -266,6 +279,7 @@ function statusBadge(status: string) {
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Phone</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Address</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Plan</th>
+            <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Bins</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Last Pickup</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Balance</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Status</th>
@@ -288,6 +302,7 @@ function statusBadge(status: string) {
                 {{ planBadge(c.customerType?.name).label }}
               </span>
             </td>
+            <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ binSummary(c) }}</td>
             <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ lastPickupDisplay(c) }}</td>
             <td style="padding:16px;font-size:14px;font-family:'Manrope',sans-serif;white-space:nowrap" :style="(c.balance ?? 0) > 0 ? 'color:#ef4444;font-weight:500' : 'color:#1a1a1a'">
               GHS {{ c.balance ?? 0 }}
@@ -325,7 +340,7 @@ function statusBadge(status: string) {
             </td>
           </tr>
           <tr v-if="customers.length === 0">
-            <td colspan="8" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No customers found</td>
+            <td colspan="9" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No customers found</td>
           </tr>
         </tbody>
       </table>

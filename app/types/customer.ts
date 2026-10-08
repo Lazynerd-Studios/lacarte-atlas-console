@@ -33,6 +33,16 @@ export interface CustomerZone {
   isActive: boolean
 }
 
+/**
+ * One entry in a per_bin customer's bin inventory (multi-bin-sizes).
+ * Returned by GET /customer/admin/{id} and list endpoints as
+ * { quantity, capacityRate: { id, capacityLiters } }.
+ */
+export interface CustomerBin {
+  quantity: number
+  capacityRate: { id: string; capacityLiters: number }
+}
+
 /** Customer returned by GET /customer/admin/{id} */
 export interface Customer {
   id: string
@@ -40,9 +50,13 @@ export interface Customer {
   customerTypeId: string
   zoneId: string
   phoneNumber: string
-  noBins: number
+  /**
+   * Bin inventory for per_bin customers (multi-bin-sizes). Replaces the old
+   * `noBins` + `capacityRateId` scalars — Σ quantity is the physical bin total.
+   * Empty array means the customer cannot be subscribed or priced for PAYG.
+   */
+  bins: CustomerBin[]
   balance?: number
-  capacityRateId?: string | null
   status: string
   createdVia?: string | null
   createdById?: string | null

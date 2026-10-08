@@ -23,7 +23,7 @@ interface PickupRequestDetail {
     region: string
     postalCode: string
     placeName: string
-    noBins: number
+    bins: { quantity: number; capacityRate: { id: string; capacityLiters: number } }[]
     status: string
     customerType: {
       id: string
@@ -158,6 +158,19 @@ async function fetchActivityLog() {
 }
 
 // Computed properties for display
+// Bin inventory helpers (multi-bin-sizes): Σ quantity is the physical bin total;
+// breakdown renders the per-tier mix, e.g. "1×240 L + 2×660 L".
+function binTotal(bins: { quantity: number }[]): number {
+  return (bins ?? []).reduce((s, b) => s + (b.quantity || 0), 0)
+}
+function binBreakdown(bins: { quantity: number; capacityRate: { capacityLiters: number } }[]): string {
+  if (!bins || !bins.length) return '—'
+  return [...bins]
+    .sort((a, b) => (a.capacityRate.capacityLiters ?? 0) - (b.capacityRate.capacityLiters ?? 0))
+    .map(b => `${b.quantity}\u00d7${b.capacityRate.capacityLiters} L`)
+    .join(' + ')
+}
+
 const pickup = computed(() => {
   if (!pickupData.value) return null
   
@@ -174,7 +187,7 @@ const pickup = computed(() => {
     region: data.customer.region || '—',
     postalCode: data.customer.postalCode || '—',
     placeName: data.customer.placeName || '—',
-    noBins: data.customer.noBins,
+    noBins: binTotal(data.customer.bins),
     customerType: data.customer.customerType.name,
     zone: data.customer.region || data.customer.city || '—',
     date: formatDate(data.preferredPickupDate),
@@ -191,10 +204,11 @@ const pickup = computed(() => {
     notes: data.additionalNotes || '—',
     disposableType: data.disposableItemType.name,
     estimatedQuantity: data.estimatedQuantity.label,
-    // Bins snapshot taken at request time; falls back to the customer's bin count when absent
+    // Bins snapshot taken at request time; falls back to the customer's current
+    // bin inventory (multi-bin-sizes) when the request carries no snapshot count
     bins: data.estimatedQuantity.binCount != null
       ? `${data.estimatedQuantity.binCount}`
-      : (data.customer.noBins != null ? `${data.customer.noBins} (customer default)` : '—'),
+      : (binTotal(data.customer.bins) > 0 ? `${binTotal(data.customer.bins)} (customer default)` : '—'),
     createdAt: formatDateTime(data.createdAt),
     assignedAt: assignment ? formatDateTime(assignment.scheduledDate) : '',
     startedAt: '',
@@ -760,6 +774,7 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
                   { label: 'Phone', value: pickup.customerPhone },
                   { label: 'Customer Type', value: pickup.customerType },
                   { label: 'No. of Bins', value: pickup.noBins },
+                  { label: 'Bin Mix', value: binBreakdown(pickupData?.customer.bins ?? []) },
                 ]" :key="item.label" style="display:flex;flex-direction:column;gap:2px">
                   <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">{{ item.label }}</p>
                   <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ item.value }}</p>
@@ -935,7 +950,7 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
     v-if="showAdjustLoadModal && pickupData"
     :pickup-id="pickupData.id"
     :pricing-mode="pickupData.pricingMode ?? 'per_bin'"
-    :current-bins="pickupData.customer.noBins"
+    :current-bins="binTotal(pickupData.customer.bins)"
     :booked-truck-load-rate-id="pickupData.truckLoadRateId ?? null"
     :booked-truck-load-label="pickupData.truckLoadLabel ?? null"
     @close="showAdjustLoadModal = false"
