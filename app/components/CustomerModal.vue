@@ -4,7 +4,7 @@ import type { Feature, Point } from 'geojson'
 
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'success'): void
+  (e: 'success', customerId: string): void
 }>()
 
 const api = useApi()
@@ -13,7 +13,6 @@ const config = useRuntimeConfig()
 
 interface CustomerType { id: string; name: string; pricingMode?: 'per_bin' | 'full_truck' }
 interface Zone { id: string; name: string }
-interface CapacityTierOption { id: string; capacityLiters: number; prepayRate: number }
 
 type TomTomPlace = Feature<Point, {
   address?: {
@@ -36,8 +35,6 @@ const form = reactive({
   phone: '',
   customerTypeId: '',
   zoneId: '',
-  binCount: 1,
-  capacityRateId: '',
   address: '',
   city: '',
   region: '',
@@ -54,14 +51,7 @@ const GHANA_RADIUS_METERS = 300000
 
 const customerTypes = ref<CustomerType[]>([])
 const zones = ref<Zone[]>([])
-const capacityTiers = ref<CapacityTierOption[]>([])
 const loading = ref(false)
-
-// Whether the selected customer type is priced per bin
-const isPerBinType = computed(() => {
-  const ct = customerTypes.value.find(t => t.id === form.customerTypeId)
-  return (ct?.pricingMode ?? 'per_bin') === 'per_bin'
-})
 
 const addressSuggestions = ref<TomTomPlace[]>([])
 const showSuggestions = ref(false)
@@ -213,17 +203,9 @@ async function fetchZones() {
   }
 }
 
-async function fetchCapacityTiers() {
-  const data = await api.get<{ tiers: CapacityTierOption[] }>('/rates/admin/capacity', 'Failed to load bin capacities')
-  if (data) {
-    capacityTiers.value = (data.tiers || []).filter(t => t.capacityLiters != null)
-  }
-}
-
 onMounted(() => {
   fetchCustomerTypes()
   fetchZones()
-  fetchCapacityTiers()
 })
 
 const errors = reactive<Record<string, string>>({})
@@ -237,7 +219,6 @@ function validate() {
   if (!form.phone.trim())      errors.phone = 'Required'
   if (!form.customerTypeId)    errors.customerTypeId = 'Required'
   if (!form.zoneId)            errors.zoneId = 'Required'
-  if (isPerBinType.value && !form.capacityRateId) errors.capacityRateId = 'Required'
   return Object.keys(errors).length === 0
 }
 
@@ -261,21 +242,14 @@ async function submit() {
       longitude: Number(form.longitude) || 0,
     },
   }
-  // per_bin customers are priced by capacity rate × number of bins, so both
-  // fields are sent. full_truck customers are priced by the truck tier chosen at
-  // booking time, so bin fields don't apply — but the backend still requires
-  // noBins, so send a minimal default and omit capacityRateId.
-  if (isPerBinType.value) {
-    payload.capacityRateId = form.capacityRateId
-    payload.noBins = form.binCount
-  } else {
-    payload.noBins = 1
-  }
-  const result = await api.post('/customer/admin/', payload, 'Failed to create customer')
+  // Bin sizes are no longer part of the create request (multi-bin-sizes): a
+  // per_bin customer's bin inventory is set afterwards via
+  // PUT /customer/admin/:id/bins, so we route the admin to the Bin Mix tab.
+  const result = await api.post<{ id: string }>('/customer/admin/', payload, 'Failed to create customer')
   loading.value = false
   if (result) {
     toast.success('Customer created successfully')
-    emit('success')
+    emit('success', result.id)
   }
 }
 
@@ -345,7 +319,7 @@ function onBlur(e: Event, field: string) {
         <!-- Phone -->
         <div style="display:flex;flex-direction:column;gap:6px">
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Phone</label>
-          <input v-model="form.phone" type="tel" placeholder="(555) 000-0000" :style="inputStyle('phone')"
+          <input v-model="form.phone" type="tel" placeholder="0541234567" :style="inputStyle('phone')"
             @focus="onFocus($event, 'phone')" @blur="onBlur($event, 'phone')" />
           <span v-if="errors.phone" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.phone }}</span>
         </div>
@@ -365,42 +339,7 @@ function onBlur(e: Event, field: string) {
           <span v-if="errors.customerTypeId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.customerTypeId }}</span>
         </div>
 
-        <!-- Bin fields (per_bin pricing mode only) -->
-        <template v-if="isPerBinType">
-          <!-- Bin Capacity -->
-          <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Bin Capacity</label>
-            <select
-              v-model="form.capacityRateId"
-              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid ${errors.capacityRateId ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:${form.capacityRateId ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
-              @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
-              @blur="($event.target as HTMLElement).style.borderColor=errors.capacityRateId ? '#ef4444' : '#e5e7eb'"
-            >
-              <option value="" disabled>Select bin capacity</option>
-              <option v-for="tier in capacityTiers" :key="tier.id" :value="tier.id">{{ tier.capacityLiters }}L — GHS {{ tier.prepayRate }}/pickup</option>
-            </select>
-            <span v-if="errors.capacityRateId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.capacityRateId }}</span>
-          </div>
-
-          <!-- Assigned BINs -->
-          <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Assigned BINs</label>
-            <div style="display:flex;align-items:center;gap:12px">
-              <button
-                type="button"
-                style="width:36px;height:36px;border:1px solid #e5e7eb;border-radius:12px;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;color:#6b7280"
-                @click="form.binCount = Math.max(1, form.binCount - 1)"
-              >−</button>
-              <span style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;min-width:32px;text-align:center">{{ form.binCount }}</span>
-              <button
-                type="button"
-                style="width:36px;height:36px;border:1px solid #e5e7eb;border-radius:12px;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;color:#6b7280"
-                @click="form.binCount++"
-              >+</button>
-              <span style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">bin{{ form.binCount !== 1 ? 's' : '' }} assigned</span>
-            </div>
-          </div>
-        </template>
+        <!-- Bin sizes are set after creation on the customer's Bin Mix tab (multi-bin-sizes) -->
 
         <!-- Current location capture (field sign-ups) -->
         <div style="display:flex;flex-direction:column;gap:6px">

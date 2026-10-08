@@ -17,7 +17,7 @@ interface PickupRequest {
     name: string
     phoneNumber: string
     address: string
-    noBins?: number
+    bins?: { quantity: number; capacityRate: { id: string; capacityLiters: number } }[]
     customerType: {
       id: string
       name: string
@@ -142,6 +142,12 @@ async function fetchRequests() {
   } finally {
     loading.value = false
   }
+}
+
+// Σ quantity across a customer's bin inventory (multi-bin-sizes); used as the
+// Bins-column fallback when the request carries no snapshot count.
+function binTotal(bins?: { quantity: number }[]): number {
+  return (bins ?? []).reduce((s, b) => s + (b.quantity || 0), 0)
 }
 
 function formatDate(dateString: string) {
@@ -510,11 +516,11 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
               <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:2px">{{ req.disposableItemType.name }} - {{ req.estimatedQuantity.label }}</p>
             </td>
 
-            <!-- Bins (snapshot from the request; falls back to the customer's bin count) -->
+            <!-- Bins (snapshot from the request; falls back to the customer's bin inventory total) -->
             <td style="padding:20px 12px;white-space:nowrap">
               <p v-if="req.estimatedQuantity.binCount != null" style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ req.estimatedQuantity.binCount }}</p>
-              <template v-else-if="req.customer.noBins != null">
-                <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ req.customer.noBins }}</p>
+              <template v-else-if="binTotal(req.customer.bins) > 0">
+                <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ binTotal(req.customer.bins) }}</p>
                 <p style="font-size:11px;color:#9ca3af;font-family:'Manrope',sans-serif;margin-top:2px">customer default</p>
               </template>
               <p v-else style="font-size:14px;color:#9ca3af;font-family:'Manrope',sans-serif">—</p>

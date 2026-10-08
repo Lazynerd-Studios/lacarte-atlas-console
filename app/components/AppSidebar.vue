@@ -40,7 +40,8 @@ const commsSubLinks = computed(() => [
 
 const managementSubLinks = computed(() => [
   { label: 'Customer Types',          to: '/management/customer-types', permission: 'management.view' },
-  { label: 'Subscription Management', to: '/management/subscriptions', permission: 'management.view' },
+  // Temporarily hidden — subscription management is on hold for now
+  // { label: 'Subscription Management', to: '/management/subscriptions', permission: 'management.view' },
   { label: 'Subscriptions List',      to: '/management/subscribers', permission: 'management.view' },
   { label: 'Rate Management',         to: '/management/rates', permission: 'management.view' },
   { label: 'Zone Management',         to: '/management/zones', permission: 'management.view' },
