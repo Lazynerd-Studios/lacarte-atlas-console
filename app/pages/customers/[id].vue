@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Customer, CustomerPickupHistoryEntry } from '~/types/customer'
+import type { Customer, CustomerBin, CustomerPickupHistoryEntry } from '~/types/customer'
 
 definePageMeta({ layout: 'dashboard' })
 
@@ -128,8 +128,6 @@ async function handleEditCustomer(payload: {
   customerTypeId: string
   zoneId: string
   phoneNumber: string
-  noBins: number
-  capacityRateId: string | null
   address: string
   city: string
   region: string
@@ -193,8 +191,28 @@ function formatDateTime(dateString?: string | null): string {
 
 const customerSince = computed(() => formatDate(customer.value?.user.createdAt ?? customer.value?.createdAt))
 
-const activeTab = ref('Overview')
-const tabs = ['Overview', 'Pickup History', 'Billing', 'GPS Location', 'Notes']
+const activeTab = ref(route.query.tab === 'bins' ? 'Bin Mix' : 'Overview')
+const tabs = ['Overview', 'Pickup History', 'Billing', 'Bin Mix', 'GPS Location', 'Notes']
+
+// Bin inventory display (multi-bin-sizes). pricingMode drives the Bin Mix tab:
+// full_truck customers price by truck tier, so the bins editor hides itself.
+const pricingMode = computed<'per_bin' | 'full_truck'>(() => customer.value?.customerType?.pricingMode ?? 'per_bin')
+const binTotal = computed(() => (customer.value?.bins ?? []).reduce((s, b) => s + (b.quantity || 0), 0))
+const binSummary = computed(() => {
+  const bins = customer.value?.bins ?? []
+  if (!bins.length) return ''
+  return [...bins]
+    .sort((a, b) => (a.capacityRate.capacityLiters ?? 0) - (b.capacityRate.capacityLiters ?? 0))
+    .map(b => `${b.quantity}\u00d7${b.capacityRate.capacityLiters} L`)
+    .join(' + ')
+})
+
+// Saving re-prices the subscription server-side; refresh the loaded customer so
+// the header total + breakdown and the editor rows reflect the persisted mix.
+async function handleBinsUpdated(bins: CustomerBin[]) {
+  if (customer.value) customer.value.bins = bins
+  await fetchCustomer()
+}
 
 const config = useRuntimeConfig()
 let gpsMap: any = null
@@ -575,7 +593,9 @@ function noteDate(dateString?: string | null): string {
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:1px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
         <div style="padding:10px 24px 10px">
           <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-bottom:8px">Assigned Bins</p>
-          <p style="font-size:20px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ customer.noBins }}</p>
+          <p style="font-size:20px;font-weight:700;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ binTotal }}</p>
+          <p v-if="binSummary" style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:2px">{{ binSummary }}</p>
+          <p v-else style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif;margin-top:2px">No bins set</p>
         </div>
       </div>
       <div style="background:white;border:1px solid #ececec;border-radius:16px;padding:1px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
@@ -796,46 +816,16 @@ function noteDate(dateString?: string | null): string {
           </div>
         </div>
 
-        <!-- Assigned Bins (disabled — no endpoint yet)
-        <div v-else-if="activeTab === 'Assigned Bins'">
-          <div class="table-scroll" style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
-            <table style="width:100%;border-collapse:collapse;min-width:480px">
-              <thead>
-                <tr style="background:#f8f9fa;border-bottom:1px solid #e5e7eb">
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Bin Type</th>
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Size</th>
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Assigned Date</th>
-                  <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="(bin, i) in bins"
-                  :key="i"
-                  style="border-bottom:1px solid #e5e7eb"
-                  @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
-                  @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
-                >
-                  <td style="padding:18px 16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ bin.type }}</td>
-                  <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ bin.size }}</td>
-                  <td style="padding:18px 16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ bin.assigned }}</td>
-                  <td style="padding:18px 16px">
-                    <span :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;border-radius:14px;padding:3px 10px;white-space:nowrap;
-                      color:${bin.status === 'active' ? '#22c55e' : '#6b7280'};
-                      background:${bin.status === 'active' ? 'rgba(34,197,94,0.1)' : '#e5e7eb'};
-                      border:1px solid ${bin.status === 'active' ? 'rgba(34,197,94,0.2)' : '#e5e7eb'}`">
-                      {{ bin.status }}
-                    </span>
-                  </td>
-                </tr>
-                <tr v-if="bins.length === 0">
-                  <td colspan="4" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No bins assigned</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <!-- Bin Mix (multi-bin-sizes inventory editor) -->
+        <div v-else-if="activeTab === 'Bin Mix'">
+          <BinMixEditor
+            v-if="customer"
+            :customer-id="customer.id"
+            :bins="customer.bins ?? []"
+            :pricing-mode="pricingMode"
+            @updated="handleBinsUpdated"
+          />
         </div>
-        -->
 
         <!-- GPS Location -->
         <div v-else-if="activeTab === 'GPS Location'" style="display:flex;flex-direction:column;gap:20px">
