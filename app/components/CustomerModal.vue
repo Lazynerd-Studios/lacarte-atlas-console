@@ -11,7 +11,7 @@ const api = useApi()
 const toast = useAppToast()
 const config = useRuntimeConfig()
 
-interface CustomerType { id: string; name: string; pricingMode?: 'per_bin' | 'full_truck' }
+interface CustomerType { id: string; name: string; pricingMode?: 'per_bin' | 'full_truck'; requiresEntityName?: boolean; entityNameLabel?: string | null }
 interface Zone { id: string; name: string }
 
 type TomTomPlace = Feature<Point, {
@@ -35,6 +35,7 @@ const form = reactive({
   phone: '',
   customerTypeId: '',
   zoneId: '',
+  entityName: '',
   address: '',
   city: '',
   region: '',
@@ -52,6 +53,13 @@ const GHANA_RADIUS_METERS = 300000
 const customerTypes = ref<CustomerType[]>([])
 const zones = ref<Zone[]>([])
 const loading = ref(false)
+
+// Entity names (§3): the business-name field is driven entirely by the selected
+// category and re-evaluates live when the selector changes.
+const selectedType = computed(() => customerTypes.value.find(t => t.id === form.customerTypeId))
+const needsEntityName = computed(() => selectedType.value?.requiresEntityName ?? false)
+const entityFieldLabel = computed(() => selectedType.value?.entityNameLabel?.trim() || 'Business name')
+const entityNameInput = ref<HTMLInputElement | null>(null)
 
 const addressSuggestions = ref<TomTomPlace[]>([])
 const showSuggestions = ref(false)
@@ -219,6 +227,8 @@ function validate() {
   if (!form.phone.trim())      errors.phone = 'Required'
   if (!form.customerTypeId)    errors.customerTypeId = 'Required'
   if (!form.zoneId)            errors.zoneId = 'Required'
+  // Required only for categories with the business-name flag on (§3)
+  if (needsEntityName.value && !form.entityName.trim()) errors.entityName = `${entityFieldLabel.value} is required`
   return Object.keys(errors).length === 0
 }
 
@@ -245,11 +255,45 @@ async function submit() {
   // Bin sizes are no longer part of the create request (multi-bin-sizes): a
   // per_bin customer's bin inventory is set afterwards via
   // PUT /customer/admin/:id/bins, so we route the admin to the Bin Mix tab.
-  const result = await api.post<{ id: string }>('/customer/admin/', payload, 'Failed to create customer')
-  loading.value = false
-  if (result) {
+  // Entity name: send ONLY for entity categories — the key must be omitted for
+  // non-entity types (sending "" is rejected with 400).
+  if (needsEntityName.value) {
+    payload.entityName = form.entityName.trim()
+  }
+  // Raw request (not api.post) so entity-name 400s can be mapped to inline
+  // field errors per §7 instead of a generic toast.
+  try {
+    const result = await api.request<{ id: string }>('/customer/admin/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
     toast.success('Customer created successfully')
-    emit('success', result.id)
+    emit('success', result?.id ?? '')
+  } catch (err: unknown) {
+    handleCreateError(err)
+  } finally {
+    loading.value = false
+  }
+}
+
+// §7: entity-name failures are 400 { message } — map to the right UI treatment
+function handleCreateError(err: unknown) {
+  const m = err instanceof Error ? err.message : String(err ?? '')
+  const lower = m.toLowerCase()
+  if (lower.includes('business name is required')) {
+    errors.entityName = m
+    nextTick(() => entityNameInput.value?.focus())
+  } else if (lower.includes('business name is not allowed')) {
+    // Unreachable when the field is hidden for non-entity types; clear and inform
+    form.entityName = ''
+    toast.error('Business name not allowed for this category', m)
+  } else if (lower.includes('150 characters')) {
+    errors.entityName = m
+  } else if (lower.includes('customer type not found')) {
+    fetchCustomerTypes()
+    toast.error('Category unavailable', 'The selected category no longer exists — the list has been refreshed.')
+  } else {
+    toast.error('Failed to create customer', m)
   }
 }
 
@@ -337,6 +381,14 @@ function onBlur(e: Event, field: string) {
             <option v-for="t in customerTypes" :key="t.id" :value="t.id">{{ t.name }}</option>
           </select>
           <span v-if="errors.customerTypeId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.customerTypeId }}</span>
+        </div>
+
+        <!-- Business name (entity names) — rendered only when the selected category requires it -->
+        <div v-if="needsEntityName" style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ entityFieldLabel }} <span style="color:#ef4444">*</span></label>
+          <input ref="entityNameInput" v-model="form.entityName" type="text" maxlength="150" :placeholder="entityFieldLabel" :style="inputStyle('entityName')"
+            @focus="onFocus($event, 'entityName')" @blur="onBlur($event, 'entityName')" />
+          <span v-if="errors.entityName" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.entityName }}</span>
         </div>
 
         <!-- Bin sizes are set after creation on the customer's Bin Mix tab (multi-bin-sizes) -->

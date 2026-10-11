@@ -17,6 +17,8 @@ interface PickupRequestDetail {
   customer: {
     id: string
     name: string
+    /** Entity names (§4): business name when present, else person name */
+    displayName?: string
     phoneNumber: string
     address: string
     city: string
@@ -179,7 +181,7 @@ const pickup = computed(() => {
   
   return {
     id: data.id,
-    customer: data.customer.name,
+    customer: data.customer.displayName || data.customer.name,
     customerPhone: data.customer.phoneNumber,
     customerEmail: '—', // Not provided by API
     address: data.customer.address,
@@ -961,7 +963,7 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
   <LazyReschedulePickupModal
     v-if="showRescheduleModal && pickupData"
     :pickup-id="pickupData.id"
-    :customer-name="pickupData.customer.name"
+    :customer-name="pickupData.customer.displayName || pickupData.customer.name"
     @close="showRescheduleModal = false"
     @done="handleRescheduled"
   />
