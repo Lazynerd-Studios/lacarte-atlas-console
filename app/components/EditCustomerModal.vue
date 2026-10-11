@@ -68,7 +68,9 @@ watch(needsEntityName, (v) => { if (v) clearConfirmed.value = false })
 
 const saveLabel = computed(() => {
   if (props.saving) return 'Saving…'
-  if (switchingToNonEntity.value && !clearConfirmed.value) return 'Remove name & save'
+  // After the first save click on an entity→non-entity switch, the button
+  // becomes the explicit confirmation action
+  if (switchingToNonEntity.value && clearConfirmed.value) return 'Remove name & save'
   return 'Save Changes'
 })
 
@@ -205,7 +207,7 @@ const selectStyle = (hasValue: boolean) =>
           <UIcon name="i-lucide-triangle-alert" style="width:16px;height:16px;color:#b45309;flex-shrink:0;margin-top:2px" />
           <div>
             <p style="font-size:13px;color:#92400e;font-family:'Manrope',sans-serif;margin:0">Switching this customer to a non-business category removes their business name.</p>
-            <p v-if="clearConfirmed" style="font-size:12px;color:#92400e;font-family:'Manrope',sans-serif;margin:4px 0 0;opacity:0.8">Click “Remove name &amp; save” again to confirm.</p>
+            <p v-if="clearConfirmed" style="font-size:12px;color:#92400e;font-family:'Manrope',sans-serif;margin:4px 0 0;opacity:0.8">Click “Remove name &amp; save” to confirm.</p>
           </div>
         </div>
 
