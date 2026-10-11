@@ -12,6 +12,7 @@ const emit = defineEmits<{
     customerTypeId: string
     zoneId: string
     phoneNumber: string
+    entityName?: string | null
     address: string
     city: string
     region: string
@@ -21,14 +22,14 @@ const emit = defineEmits<{
   }): void
 }>()
 
-const customerTypes = ref<{ id: string; name: string; pricingMode?: 'per_bin' | 'full_truck' }[]>([])
+const customerTypes = ref<{ id: string; name: string; pricingMode?: 'per_bin' | 'full_truck'; requiresEntityName?: boolean; entityNameLabel?: string | null }[]>([])
 const zones = ref<{ id: string; name: string; color: string }[]>([])
 const loadingOptions = ref(true)
 
 onMounted(async () => {
   const api = useApi()
   const [typesRes, zonesRes] = await Promise.all([
-    api.get<{ id: string; name: string; customerCount?: string; pricingMode?: 'per_bin' | 'full_truck' }[]>('/customer/admin/types/', 'Failed to load customer types'),
+    api.get<{ id: string; name: string; customerCount?: string; pricingMode?: 'per_bin' | 'full_truck'; requiresEntityName?: boolean; entityNameLabel?: string | null }[]>('/customer/admin/types/', 'Failed to load customer types'),
     api.get<{ id: string; name: string; color: string }[]>('/zone/public/list', 'Failed to load zones'),
   ])
   if (typesRes) customerTypes.value = typesRes
@@ -40,6 +41,8 @@ const form = reactive({
   customerTypeId: props.customer.customerTypeId ?? '',
   zoneId: props.customer.zoneId ?? '',
   phoneNumber: props.customer.phoneNumber ?? '',
+  // Pre-fill the stored business name so an untouched edit keeps it (§3)
+  entityName: props.customer.entityName ?? '',
   address: props.customer.address ?? '',
   city: props.customer.city ?? '',
   region: props.customer.region ?? '',
@@ -50,6 +53,25 @@ const form = reactive({
 
 const errors = reactive<Record<string, string>>({})
 
+// ── Entity names (§3) — field + rules driven entirely by the selected category ──
+const selectedType = computed(() => customerTypes.value.find(t => t.id === form.customerTypeId))
+const needsEntityName = computed(() => selectedType.value?.requiresEntityName ?? false)
+const entityFieldLabel = computed(() => selectedType.value?.entityNameLabel?.trim() || 'Business name')
+const entityNameInput = ref<HTMLInputElement | null>(null)
+// The category the customer is CURRENTLY stored under (before any selector change)
+const wasEntityType = computed(() => props.customer.customerType?.requiresEntityName ?? false)
+// entity → non-entity switch: the API clears the stored business name, so confirm first
+const switchingToNonEntity = computed(() => wasEntityType.value && !needsEntityName.value)
+const clearConfirmed = ref(false)
+// Reset the confirmation whenever the selector moves back to an entity category
+watch(needsEntityName, (v) => { if (v) clearConfirmed.value = false })
+
+const saveLabel = computed(() => {
+  if (props.saving) return 'Saving…'
+  if (switchingToNonEntity.value && !clearConfirmed.value) return 'Remove name & save'
+  return 'Save Changes'
+})
+
 function validate() {
   Object.keys(errors).forEach(k => delete errors[k])
   if (!form.phoneNumber.trim())  errors.phoneNumber = 'Required'
@@ -57,13 +79,35 @@ function validate() {
   if (!form.city.trim())         errors.city = 'Required'
   if (!form.customerTypeId)      errors.customerTypeId = 'Required'
   if (!form.zoneId)              errors.zoneId = 'Required'
+  // Switching non-entity → entity with no stored name makes entityName required
+  // in this same request; the API rejects the switch without it (§3)
+  if (needsEntityName.value && !form.entityName.trim()) {
+    errors.entityName = `${entityFieldLabel.value} is required`
+    nextTick(() => entityNameInput.value?.focus())
+  }
   return Object.keys(errors).length === 0
 }
 
 function submit() {
   if (props.saving) return
   if (!validate()) return
-  emit('submit', {
+  // Two-step confirm when the switch would clear the stored business name (§3)
+  if (switchingToNonEntity.value && !clearConfirmed.value) {
+    clearConfirmed.value = true
+    return
+  }
+  const data: {
+    customerTypeId: string
+    zoneId: string
+    phoneNumber: string
+    entityName?: string | null
+    address: string
+    city: string
+    region: string
+    postalCode: string
+    country: string
+    placeName: string
+  } = {
     customerTypeId: form.customerTypeId,
     zoneId: form.zoneId,
     phoneNumber: form.phoneNumber.trim(),
@@ -73,7 +117,13 @@ function submit() {
     postalCode: form.postalCode?.trim() ?? '',
     country: form.country?.trim() ?? '',
     placeName: form.placeName?.trim() ?? '',
-  })
+  }
+  // Send entityName ONLY for entity categories — the key must be omitted for
+  // non-entity types (the API clears the stored name on the switch itself).
+  if (needsEntityName.value) {
+    data.entityName = form.entityName.trim()
+  }
+  emit('submit', data)
 }
 
 const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
@@ -140,6 +190,23 @@ const selectStyle = (hasValue: boolean) =>
             <option v-for="t in customerTypes" :key="t.id" :value="t.id">{{ t.name }}</option>
           </select>
           <span v-if="errors.customerTypeId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.customerTypeId }}</span>
+        </div>
+
+        <!-- Business name (entity names) — only for categories that require it -->
+        <div v-if="needsEntityName" style="display:flex;flex-direction:column;gap:6px">
+          <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ entityFieldLabel }} <span style="color:#ef4444">*</span></label>
+          <input ref="entityNameInput" v-model="form.entityName" type="text" maxlength="150" :placeholder="entityFieldLabel" :style="inputStyle('entityName')"
+            @focus="onFocus($event, 'entityName')" @blur="onBlur($event, 'entityName')" />
+          <span v-if="errors.entityName" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.entityName }}</span>
+        </div>
+
+        <!-- entity → non-entity switch: the API clears the stored business name (§3) -->
+        <div v-if="switchingToNonEntity" style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start">
+          <UIcon name="i-lucide-triangle-alert" style="width:16px;height:16px;color:#b45309;flex-shrink:0;margin-top:2px" />
+          <div>
+            <p style="font-size:13px;color:#92400e;font-family:'Manrope',sans-serif;margin:0">Switching this customer to a non-business category removes their business name.</p>
+            <p v-if="clearConfirmed" style="font-size:12px;color:#92400e;font-family:'Manrope',sans-serif;margin:4px 0 0;opacity:0.8">Click “Remove name &amp; save” again to confirm.</p>
+          </div>
         </div>
 
         <!-- Bin sizes are managed on the customer's Bin Mix tab (multi-bin-sizes) -->
@@ -213,7 +280,7 @@ const selectStyle = (hasValue: boolean) =>
           :disabled="saving"
           :style="`height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:${saving ? 'not-allowed' : 'pointer'};opacity:${saving ? 0.6 : 1}`"
           @click="submit"
-        >{{ saving ? 'Saving…' : 'Save Changes' }}</button>
+        >{{ saveLabel }}</button>
       </div>
     </div>
   </div>

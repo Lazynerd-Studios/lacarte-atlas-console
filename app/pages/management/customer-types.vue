@@ -18,6 +18,10 @@ interface CustomerType {
   customerCount: number  // Client-side only
   estimatedQuantities: EstimatedQuantityOption[]
   pricingMode: PricingMode
+  /** Customers in this category must carry a business name (entity names) */
+  requiresEntityName: boolean
+  /** Custom label for the business-name field; null = server default */
+  entityNameLabel: string | null
 }
 
 interface ApiCustomerType {
@@ -26,6 +30,8 @@ interface ApiCustomerType {
   customerCount?: number
   estimatedQuantities?: EstimatedQuantityOption[]
   pricingMode?: PricingMode
+  requiresEntityName?: boolean
+  entityNameLabel?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -57,6 +63,8 @@ async function fetchCustomerTypes() {
       customerCount: ct.customerCount ?? 0,  // Use API value if available
       estimatedQuantities: ct.estimatedQuantities ?? [],
       pricingMode: ct.pricingMode ?? 'per_bin',
+      requiresEntityName: ct.requiresEntityName ?? false,
+      entityNameLabel: ct.entityNameLabel ?? null,
     }))
   }
   
@@ -95,12 +103,12 @@ function toggleQuantity(ids: string[], id: string): string[] {
 
 // Add modal
 const showAddModal = ref(false)
-const addForm = ref({ name: '', description: '', color: '#ffb400', pricingMode: 'per_bin' as PricingMode })
+const addForm = ref({ name: '', description: '', color: '#ffb400', pricingMode: 'per_bin' as PricingMode, requiresEntityName: false, entityNameLabel: '' })
 const addSelectedQuantityIds = ref<string[]>([])
 const addError = ref('')
 
 function openAdd() {
-  addForm.value = { name: '', description: '', color: '#ffb400', pricingMode: 'per_bin' }
+  addForm.value = { name: '', description: '', color: '#ffb400', pricingMode: 'per_bin', requiresEntityName: false, entityNameLabel: '' }
   addSelectedQuantityIds.value = []
   addError.value = ''
   showAddModal.value = true
@@ -134,6 +142,11 @@ async function handleAdd() {
     if (addSelectedQuantityIds.value.length > 0) {
       payload.estimatedQuantityIds = addSelectedQuantityIds.value
     }
+    payload.requiresEntityName = addForm.value.requiresEntityName
+    // Only send the label when the toggle is on; blank = omit so the server default applies
+    if (addForm.value.requiresEntityName && addForm.value.entityNameLabel.trim()) {
+      payload.entityNameLabel = addForm.value.entityNameLabel.trim()
+    }
     
     const response = await api.post<ApiCustomerType>(
       '/customer/admin/types',
@@ -163,12 +176,23 @@ async function handleAdd() {
 }
 
 const showEditModal = ref(false)
-const editForm = ref<CustomerType>({ id: '', name: '', description: '', color: '#ffb400', customerCount: 0, estimatedQuantities: [], pricingMode: 'per_bin' })
+const editForm = ref<CustomerType>({ id: '', name: '', description: '', color: '#ffb400', customerCount: 0, estimatedQuantities: [], pricingMode: 'per_bin', requiresEntityName: false, entityNameLabel: null })
 const editSelectedQuantityIds = ref<string[]>([])
 const editError = ref('')
+// Snapshot of the flag when the modal opened — used to warn only on a false→true flip
+const editOriginalRequiresEntityName = ref(false)
+
+// §2: turning business names ON for a category that already has customers does not
+// backfill them; existing customers keep no business name until edited.
+const showEntityNameWarn = computed(() =>
+  editForm.value.requiresEntityName &&
+  !editOriginalRequiresEntityName.value &&
+  editForm.value.customerCount > 0
+)
 
 function openEdit(ct: CustomerType) {
   editForm.value = { ...ct }
+  editOriginalRequiresEntityName.value = ct.requiresEntityName
   editSelectedQuantityIds.value = ct.estimatedQuantities.map(q => q.id)
   editError.value = ''
   showEditModal.value = true
@@ -190,9 +214,21 @@ async function handleEdit() {
     console.log('[CustomerTypes] Updating customer type:', editForm.value.id, 'quantities:', editSelectedQuantityIds.value)
     
     // Always send the full set on PATCH — it replaces the associations; [] detaches all (falls back to all active)
+    // `name` is REQUIRED on PATCH — a flag-only toggle must still send it or the request 422s
+    const patchPayload: Record<string, unknown> = {
+      name: editForm.value.name.trim(),
+      estimatedQuantityIds: editSelectedQuantityIds.value,
+      pricingMode: editForm.value.pricingMode,
+      requiresEntityName: editForm.value.requiresEntityName,
+    }
+    // Label semantics: omitted = untouched; null = reset to default; string = set.
+    // When the toggle is off we omit it entirely so a stored label survives.
+    if (editForm.value.requiresEntityName) {
+      patchPayload.entityNameLabel = editForm.value.entityNameLabel?.trim() || null
+    }
     const response = await api.patch<ApiCustomerType>(
       `/customer/admin/types/${editForm.value.id}`,
-      { name: editForm.value.name.trim(), estimatedQuantityIds: editSelectedQuantityIds.value, pricingMode: editForm.value.pricingMode },
+      patchPayload,
       'Failed to update customer type'
     )
     
@@ -447,6 +483,24 @@ onMounted(() => {
             </div>
             <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">{{ pricingModeHelper(addForm.pricingMode) }}</p>
           </div>
+          <!-- Business names (entity names) -->
+          <div style="border:1.5px solid #e5e7eb;border-radius:10px;padding:14px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+              <div>
+                <p style="font-size:13px;font-weight:600;color:#374151;margin:0">Customers are businesses</p>
+                <p style="font-size:12px;color:#9ca3af;margin:4px 0 0">Require a business name on every customer in this category</p>
+              </div>
+              <button type="button" @click="addForm.requiresEntityName = !addForm.requiresEntityName"
+                :style="`width:40px;height:22px;border-radius:11px;border:none;cursor:pointer;position:relative;flex-shrink:0;background:${addForm.requiresEntityName ? '#22c55e' : '#d1d5db'}`">
+                <span :style="`position:absolute;top:3px;left:${addForm.requiresEntityName ? '21px' : '3px'};width:16px;height:16px;border-radius:50%;background:#fff;transition:left 0.15s`"></span>
+              </button>
+            </div>
+            <div v-if="addForm.requiresEntityName" style="margin-top:12px">
+              <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Business-name field label</label>
+              <input v-model="addForm.entityNameLabel" maxlength="60" placeholder="Business name" style="width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box" />
+              <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">What the customer form should call this field, e.g. Estate name, Hotel name.</p>
+            </div>
+          </div>
           <div>
             <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Description</label>
             <textarea v-model="addForm.description" rows="2" placeholder="Brief description of this customer type..." style="width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;resize:vertical;box-sizing:border-box"></textarea>
@@ -510,6 +564,28 @@ onMounted(() => {
               </button>
             </div>
             <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">{{ pricingModeHelper(editForm.pricingMode) }}</p>
+          </div>
+          <!-- Business names (entity names) -->
+          <div style="border:1.5px solid #e5e7eb;border-radius:10px;padding:14px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+              <div>
+                <p style="font-size:13px;font-weight:600;color:#374151;margin:0">Customers are businesses</p>
+                <p style="font-size:12px;color:#9ca3af;margin:4px 0 0">Require a business name on every customer in this category</p>
+              </div>
+              <button type="button" @click="editForm.requiresEntityName = !editForm.requiresEntityName"
+                :style="`width:40px;height:22px;border-radius:11px;border:none;cursor:pointer;position:relative;flex-shrink:0;background:${editForm.requiresEntityName ? '#22c55e' : '#d1d5db'}`">
+                <span :style="`position:absolute;top:3px;left:${editForm.requiresEntityName ? '21px' : '3px'};width:16px;height:16px;border-radius:50%;background:#fff;transition:left 0.15s`"></span>
+              </button>
+            </div>
+            <div v-if="editForm.requiresEntityName" style="margin-top:12px">
+              <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Business-name field label</label>
+              <input v-model="editForm.entityNameLabel" maxlength="60" placeholder="Business name" style="width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box" />
+              <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">What the customer form should call this field, e.g. Estate name, Hotel name.</p>
+            </div>
+            <div v-if="showEntityNameWarn" style="margin-top:10px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;display:flex;gap:8px;align-items:flex-start">
+              <UIcon name="i-lucide-triangle-alert" style="width:16px;height:16px;color:#b45309;flex-shrink:0;margin-top:1px" />
+              <p style="font-size:12px;color:#92400e;margin:0">Existing customers are not modified — they keep no business name until edited. Use the “Missing business name” filter on the Customers page to work through the backlog.</p>
+            </div>
           </div>
           <div>
             <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Description</label>

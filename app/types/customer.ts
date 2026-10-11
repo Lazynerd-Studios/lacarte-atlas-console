@@ -21,6 +21,10 @@ export interface CustomerType {
   id: string
   name: string
   pricingMode?: 'per_bin' | 'full_truck'
+  /** When true, customers in this category must carry a business name (entity names) */
+  requiresEntityName?: boolean
+  /** Custom label for the business-name field; null falls back to "Business name" */
+  entityNameLabel?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -70,6 +74,10 @@ export interface Customer {
   location: { latitude: number; longitude: number } | null
   createdAt: string
   updatedAt: string
+  /** Business name (entity names); null unless the customer's category requires one */
+  entityName?: string | null
+  /** Unambiguous display name: business name when present, else the person's name */
+  displayName?: string
   user: CustomerUser
   customerType: CustomerType | null
   zone: CustomerZone | null
