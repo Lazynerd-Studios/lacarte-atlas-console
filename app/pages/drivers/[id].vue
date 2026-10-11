@@ -998,7 +998,7 @@ function stopBadge(status: string) {
     style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:50;display:flex;align-items:center;justify-content:center;padding:24px"
     @click.self="showAdjustmentModal = false"
   >
-    <div style="background:white;border:1px solid #e5e7eb;border-radius:16px;width:420px;box-shadow:0 10px 15px rgba(0,0,0,0.1),0 4px 6px rgba(0,0,0,0.1);position:relative;display:flex;flex-direction:column">
+    <div style="background:white;border:1px solid #e5e7eb;border-radius:16px;width:420px;max-height:90vh;box-shadow:0 10px 15px rgba(0,0,0,0.1),0 4px 6px rgba(0,0,0,0.1);position:relative;display:flex;flex-direction:column">
       <!-- Close -->
       <button
         style="position:absolute;top:16px;right:16px;width:28px;height:28px;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px;opacity:0.7"
@@ -1008,13 +1008,13 @@ function stopBadge(status: string) {
       </button>
 
       <!-- Header -->
-      <div style="padding:24px 24px 0">
+      <div style="padding:24px 24px 0;flex-shrink:0">
         <p style="font-size:20px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ adjustmentType === 'bonus' ? 'Add Manual Bonus' : 'Add Manual Deduction' }}</p>
         <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:4px">{{ adjustmentType === 'bonus' ? 'Add a one-off bonus to this driver\u2019s current pay period.' : 'Apply a one-off deduction to this driver\u2019s current pay period.' }}</p>
       </div>
 
       <!-- Body -->
-      <div style="padding:16px 24px;display:flex;flex-direction:column;gap:16px">
+      <div style="padding:16px 24px;display:flex;flex-direction:column;gap:16px;flex:1;min-height:0;overflow-y:auto">
         <div v-if="adjustmentError" style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;font-size:13px;color:#ef4444;font-family:'Manrope',sans-serif">{{ adjustmentError }}</div>
         <div style="display:flex;flex-direction:column;gap:6px">
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Amount (GHS)</label>
@@ -1053,7 +1053,7 @@ function stopBadge(status: string) {
       </div>
 
       <!-- Footer -->
-      <div style="padding:17px 24px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:8px">
+      <div style="padding:17px 24px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:8px;flex-shrink:0">
         <button
           style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
           :disabled="submittingAdjustment"

@@ -460,14 +460,14 @@ onMounted(() => {
 
     <!-- ── ADD MODAL ── -->
     <div v-if="showAddModal" @click.self="showAddModal=false" style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px">
-      <div style="background:#fff;border-radius:20px;width:100%;max-width:480px;overflow:hidden">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0">
+      <div style="background:#fff;border-radius:20px;width:100%;max-width:480px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0;flex-shrink:0">
           <h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0">Add Customer Type</h2>
           <button @click="showAddModal=false" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px">
             <UIcon name="i-lucide-x" style="width:20px;height:20px" />
           </button>
         </div>
-        <div style="padding:24px;display:flex;flex-direction:column;gap:16px">
+        <div style="padding:24px;display:flex;flex-direction:column;gap:16px;flex:1;min-height:0;overflow-y:auto">
           <div v-if="addError" style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;font-size:13px;color:#ef4444">{{ addError }}</div>
           <div>
             <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Name <span style="color:#ef4444">*</span></label>
@@ -528,7 +528,7 @@ onMounted(() => {
             <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">Leave empty to allow all active quantities for this type</p>
           </div>
         </div>
-        <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px">
+        <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px;flex-shrink:0">
           <button @click="showAddModal=false" :disabled="submitting" 
             :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.5' : '1'}`">Cancel</button>
           <button @click="handleAdd" :disabled="submitting" 
@@ -542,14 +542,14 @@ onMounted(() => {
 
     <!-- ── EDIT MODAL ── -->
     <div v-if="showEditModal" @click.self="showEditModal=false" style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px">
-      <div style="background:#fff;border-radius:20px;width:100%;max-width:480px;overflow:hidden">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0">
+      <div style="background:#fff;border-radius:20px;width:100%;max-width:480px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0;flex-shrink:0">
           <h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0">Edit Customer Type</h2>
           <button @click="showEditModal=false" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px">
             <UIcon name="i-lucide-x" style="width:20px;height:20px" />
           </button>
         </div>
-        <div style="padding:24px;display:flex;flex-direction:column;gap:16px">
+        <div style="padding:24px;display:flex;flex-direction:column;gap:16px;flex:1;min-height:0;overflow-y:auto">
           <div v-if="editError" style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;font-size:13px;color:#ef4444">{{ editError }}</div>
           <div>
             <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Name <span style="color:#ef4444">*</span></label>
@@ -614,7 +614,7 @@ onMounted(() => {
             <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">Saving replaces the entire set. Deselect all to fall back to all active quantities</p>
           </div>
         </div>
-        <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px">
+        <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px;flex-shrink:0">
           <button @click="showEditModal=false" :disabled="submitting" 
             :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.5' : '1'}`">Cancel</button>
           <button @click="handleEdit" :disabled="submitting" 
@@ -629,7 +629,7 @@ onMounted(() => {
     <!-- ── DELETE MODAL ── -->
     <div v-if="showDeleteModal" @click.self="showDeleteModal=false" style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px">
       <div style="background:#fff;border-radius:20px;width:100%;max-width:400px;overflow:hidden">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0;flex-shrink:0">
           <h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0">Delete Customer Type</h2>
           <button @click="showDeleteModal=false" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px">
             <UIcon name="i-lucide-x" style="width:20px;height:20px" />
@@ -642,7 +642,7 @@ onMounted(() => {
           <p style="font-size:15px;font-weight:600;color:#1a1a1a;margin:0 0 8px">Delete "{{ deleteTarget?.name }}"?</p>
           <p style="font-size:13px;color:#6b7280;margin:0">This action cannot be undone. All configuration for this type will be permanently removed.</p>
         </div>
-        <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px">
+        <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px;flex-shrink:0">
           <button @click="showDeleteModal=false" :disabled="deleting" 
             :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${deleting ? 'not-allowed' : 'pointer'};opacity:${deleting ? '0.5' : '1'}`">Cancel</button>
           <button @click="handleDelete" :disabled="deleting" 
