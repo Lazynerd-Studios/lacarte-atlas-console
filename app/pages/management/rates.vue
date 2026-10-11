@@ -553,14 +553,14 @@ onMounted(() => {
 
       <!-- ── CAPACITY TIER MODAL (Add/Edit) ── -->
       <div v-if="showCapacityModal" @click.self="showCapacityModal=false" style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px">
-        <div style="background:#fff;border-radius:20px;width:100%;max-width:480px;overflow:hidden">
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0">
+        <div style="background:#fff;border-radius:20px;width:100%;max-width:480px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0;flex-shrink:0">
             <h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0">{{ capacityModalMode === 'add' ? 'Add Capacity Tier' : 'Edit Capacity Tier' }}</h2>
             <button @click="showCapacityModal=false" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px">
               <UIcon name="i-lucide-x" style="width:20px;height:20px" />
             </button>
           </div>
-          <div style="padding:24px;display:flex;flex-direction:column;gap:16px">
+          <div style="padding:24px;display:flex;flex-direction:column;gap:16px;flex:1;min-height:0;overflow-y:auto">
             <div v-if="capacityError" style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;font-size:13px;color:#ef4444">{{ capacityError }}</div>
 
             <div>
@@ -598,7 +598,7 @@ onMounted(() => {
               Only one active tier per capacity — creating a new tier for an existing capacity auto-deactivates the old one.
             </p>
           </div>
-          <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px">
+          <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px;flex-shrink:0">
             <button @click="showCapacityModal=false" :disabled="submitting"
               :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.5' : '1'}`">Cancel</button>
             <button @click="handleCapacitySubmit" :disabled="submitting"
@@ -612,14 +612,14 @@ onMounted(() => {
 
       <!-- ── TRUCK LOAD TIER MODAL (Add/Edit) ── -->
       <div v-if="showTruckModal" @click.self="showTruckModal=false" style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px">
-        <div style="background:#fff;border-radius:20px;width:100%;max-width:480px;overflow:hidden">
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0">
+        <div style="background:#fff;border-radius:20px;width:100%;max-width:480px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0;flex-shrink:0">
             <h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0">{{ truckModalMode === 'add' ? 'Add Truck Load Tier' : 'Edit Truck Load Tier' }}</h2>
             <button @click="showTruckModal=false" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px">
               <UIcon name="i-lucide-x" style="width:20px;height:20px" />
             </button>
           </div>
-          <div style="padding:24px;display:flex;flex-direction:column;gap:16px">
+          <div style="padding:24px;display:flex;flex-direction:column;gap:16px;flex:1;min-height:0;overflow-y:auto">
             <div v-if="truckError" style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;font-size:13px;color:#ef4444">{{ truckError }}</div>
 
             <div>
@@ -666,7 +666,7 @@ onMounted(() => {
               <textarea v-model="truckForm.note" rows="2" placeholder="Optional note about this tier..." style="width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;resize:vertical;box-sizing:border-box;line-height:1.5" />
             </div>
           </div>
-          <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px">
+          <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px;flex-shrink:0">
             <button @click="showTruckModal=false" :disabled="submitting"
               :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.5' : '1'}`">Cancel</button>
             <button @click="handleTruckSubmit" :disabled="submitting"
@@ -681,7 +681,7 @@ onMounted(() => {
       <!-- ── DELETE MODAL ── -->
       <div v-if="showDeleteModal" @click.self="showDeleteModal=false" style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px">
         <div style="background:#fff;border-radius:20px;width:100%;max-width:400px;overflow:hidden">
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0;flex-shrink:0">
             <h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0">Delete Tier</h2>
             <button @click="showDeleteModal=false" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px">
               <UIcon name="i-lucide-x" style="width:20px;height:20px" />
@@ -694,7 +694,7 @@ onMounted(() => {
             <p style="font-size:15px;font-weight:600;color:#1a1a1a;margin:0 0 8px">Delete {{ deleteTargetLabel() }}?</p>
             <p style="font-size:13px;color:#6b7280;margin:0">This action cannot be undone. If customers or pickup requests reference this tier, deletion will be blocked.</p>
           </div>
-          <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px">
+          <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px;flex-shrink:0">
             <button @click="showDeleteModal=false" :disabled="deleting"
               :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${deleting ? 'not-allowed' : 'pointer'};opacity:${deleting ? '0.5' : '1'}`">Cancel</button>
             <button @click="handleDelete" :disabled="deleting"

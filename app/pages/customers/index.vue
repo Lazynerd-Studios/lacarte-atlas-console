@@ -78,6 +78,9 @@ function updateCustomerStatus(id: string, status: string) {
 const search = ref('')
 const statusFilter = ref('all')
 const planFilter = ref('all')
+// §5 backlog filter: entity-category customers still missing a business name
+const missingEntityName = ref(false)
+const missingCount = ref<number | null>(null)
 
 const customers = ref<CustomerListItem[]>([])
 const total = ref(0)
@@ -95,17 +98,27 @@ async function fetchCustomers() {
   if (search.value) params.set('search', search.value)
   if (statusFilter.value !== 'all') params.set('status', statusFilter.value)
   if (planFilter.value !== 'all') params.set('plan', planFilter.value)
+  if (missingEntityName.value) params.set('missingEntityName', 'true')
 
   const api = useApi()
   const data = await api.get<{ data: CustomerListItem[]; pagination: { total: number } }>(`/customer/admin/list?${params}`)
   if (data) {
     customers.value = data.data
     total.value = data.pagination.total
+    // The filtered query's total doubles as the chip badge count
+    if (missingEntityName.value) missingCount.value = data.pagination.total
   }
   loading.value = false
 }
 
-watch([search, statusFilter, planFilter], () => { page.value = 1; fetchCustomers() })
+// Lightweight count for the chip badge while the filter is inactive
+async function fetchMissingCount() {
+  const api = useApi()
+  const data = await api.get<{ pagination: { total: number } }>('/customer/admin/list?missingEntityName=true&page=1&limit=1')
+  if (data) missingCount.value = data.pagination?.total ?? 0
+}
+
+watch([search, statusFilter, planFilter, missingEntityName], () => { page.value = 1; fetchCustomers() })
 watch(page, fetchCustomers)
 
 // Last pickup: prefer lastPickupDate, fall back to locationUpdatedAt
@@ -118,6 +131,7 @@ function lastPickupDisplay(c: CustomerListItem) {
 onMounted(async () => {
   initialLoading.value = true
   await fetchCustomers()
+  fetchMissingCount()
   initialLoading.value = false
 })
 
@@ -162,7 +176,9 @@ async function downloadExcel() {
     const XLSX = await import('xlsx')
 
     const rows = customers.value.map((c) => ({
-      Name: c.user?.name ?? '—',
+      // §4: displayName is the primary identity; raw entityName kept for export
+      Name: c.displayName || c.user?.name || '—',
+      'Business Name': c.entityName ?? '',
       Phone: c.phoneNumber ?? '—',
       Address: c.address ?? '—',
       Plan: formatPlanLabel(c.customerType?.name),
@@ -221,7 +237,7 @@ function statusBadge(status: string) {
           <input
             v-model="search"
             type="text"
-            placeholder="Search customers..."
+            placeholder="Search by name, business name, email or phone"
             style="width:100%;height:38px;padding-left:40px;padding-right:16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:#111;outline:none;font-family:'Manrope',sans-serif;box-sizing:border-box"
             @focus="($event.target as HTMLElement).style.borderColor='#ffb400'"
             @blur="($event.target as HTMLElement).style.borderColor='#e5e7eb'"
@@ -268,6 +284,19 @@ function statusBadge(status: string) {
           />
         </button>
       </div>
+
+      <!-- Saved filter chip (§5): customers in entity categories with no business name yet -->
+      <div style="margin-top:14px;display:flex;gap:8px">
+        <button
+          type="button"
+          @click="missingEntityName = !missingEntityName"
+          :style="`display:flex;align-items:center;gap:6px;height:32px;padding:0 14px;border-radius:1000px;border:1px solid ${missingEntityName ? '#ffb400' : '#e5e7eb'};background:${missingEntityName ? '#fff9e6' : '#fff'};font-size:13px;font-weight:600;color:${missingEntityName ? '#b45309' : '#6b7280'};font-family:'Manrope',sans-serif;cursor:pointer`"
+        >
+          <UIcon name="i-lucide-building-2" style="width:14px;height:14px" />
+          Missing business name
+          <span v-if="missingCount != null" style="background:#ffb400;color:#1a1a1a;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700">{{ missingCount }}</span>
+        </button>
+      </div>
     </div>
 
     <!-- Table card -->
@@ -294,7 +323,11 @@ function statusBadge(status: string) {
             @mouseover="($event.currentTarget as HTMLElement).style.background='#fafafa'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
           >
-            <td style="padding:16px;font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ c.user?.name }}</td>
+            <td style="padding:16px;font-family:'Manrope',sans-serif;white-space:nowrap">
+              <p style="font-size:14px;font-weight:500;color:#1a1a1a;margin:0">{{ c.displayName || c.user?.name }}</p>
+              <!-- Entity names (§4): muted person name only when it differs -->
+              <p v-if="c.displayName && c.user?.name && c.displayName !== c.user.name" style="font-size:12px;color:#6b7280;margin:2px 0 0">{{ c.user.name }}</p>
+            </td>
             <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ c.phoneNumber }}</td>
             <td style="padding:16px;font-size:14px;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ c.address }}</td>
             <td style="padding:16px">
@@ -358,7 +391,7 @@ function statusBadge(status: string) {
   <!-- Suspend Modal -->
   <LazySuspendModal
     v-if="showSuspendModal && selectedCustomer"
-    :customer-name="selectedCustomer.user?.name ?? 'Customer'"
+    :customer-name="selectedCustomer.displayName || selectedCustomer.user?.name || 'Customer'"
     :loading="suspending"
     @close="showSuspendModal = false"
     @confirm="handleSuspend"
@@ -368,7 +401,7 @@ function statusBadge(status: string) {
   <LazyConfirmDialog
     v-if="showUnsuspendConfirm && selectedCustomer"
     title="Unsuspend Account"
-    :message="`Are you sure you want to reactivate ${selectedCustomer.user?.name ?? 'Customer'}'s account?`"
+    :message="`Are you sure you want to reactivate ${selectedCustomer.displayName || selectedCustomer.user?.name || 'Customer'}'s account?`"
     confirm-text="Unsuspend Account"
     confirm-color="#22c55e"
     :loading="unsuspending"

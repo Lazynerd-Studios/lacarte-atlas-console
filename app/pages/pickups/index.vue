@@ -15,6 +15,8 @@ interface PickupRequest {
   customer: {
     id: string
     name: string
+    /** Entity names (§4): business name when present, else person name */
+    displayName?: string
     phoneNumber: string
     address: string
     bins?: { quantity: number; capacityRate: { id: string; capacityLiters: number } }[]
@@ -503,7 +505,7 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
 
             <!-- Customer -->
             <td style="padding:20px 16px">
-              <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ req.customer.name }}</p>
+              <p style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">{{ req.customer.displayName || req.customer.name }}</p>
               <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:2px">{{ req.customer.phoneNumber }}</p>
             </td>
 
@@ -605,7 +607,7 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
     v-if="showAssignDriverModal && selectedRequest"
     :request="{
       id: selectedRequest.id,
-      customer: selectedRequest.customer.name,
+      customer: selectedRequest.customer.displayName || selectedRequest.customer.name,
       address: selectedRequest.customer.address,
       date: formatDate(selectedRequest.preferredPickupDate),
       timeSlot: '',
@@ -630,7 +632,7 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
   <LazyReschedulePickupModal
     v-if="showRescheduleModal && rescheduleTarget"
     :pickup-id="rescheduleTarget.id"
-    :customer-name="rescheduleTarget.customer.name"
+    :customer-name="rescheduleTarget.customer.displayName || rescheduleTarget.customer.name"
     @close="showRescheduleModal = false; rescheduleTarget = null"
     @done="handleRescheduled"
   />

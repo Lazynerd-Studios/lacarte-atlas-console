@@ -328,10 +328,10 @@ onMounted(() => {
     style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:50;display:flex;align-items:center;justify-content:center;padding:24px"
     @click.self="showUpdateModal = false"
   >
-    <div style="background:white;border:1px solid #e5e7eb;border-radius:16px;width:510px;box-shadow:0 10px 15px rgba(0,0,0,0.1),0 4px 6px rgba(0,0,0,0.1);position:relative">
+    <div style="background:white;border:1px solid #e5e7eb;border-radius:16px;width:510px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 10px 15px rgba(0,0,0,0.1),0 4px 6px rgba(0,0,0,0.1);position:relative">
 
       <!-- Header -->
-      <div style="padding:24px 24px 16px;border-bottom:1px solid #e5e7eb">
+      <div style="padding:24px 24px 16px;border-bottom:1px solid #e5e7eb;flex-shrink:0">
         <p style="font-size:20px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0">Update Stock</p>
       </div>
       <button
@@ -344,7 +344,7 @@ onMounted(() => {
       </button>
 
       <!-- Body -->
-      <div style="padding:24px;display:flex;flex-direction:column;gap:16px">
+      <div style="padding:24px;display:flex;flex-direction:column;gap:16px;flex:1;min-height:0;overflow-y:auto">
 
         <!-- Product info -->
         <div style="display:flex;flex-direction:column;gap:4px">
@@ -433,7 +433,7 @@ onMounted(() => {
       </div>
 
       <!-- Footer -->
-      <div style="padding:17px 24px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:8px">
+      <div style="padding:17px 24px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:8px;flex-shrink:0">
         <button
           style="height:40px;padding:0 16px;background:#ececec;border:none;border-radius:20px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer"
           @click="showUpdateModal = false"

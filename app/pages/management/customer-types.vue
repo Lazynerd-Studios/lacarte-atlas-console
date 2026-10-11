@@ -18,6 +18,10 @@ interface CustomerType {
   customerCount: number  // Client-side only
   estimatedQuantities: EstimatedQuantityOption[]
   pricingMode: PricingMode
+  /** Customers in this category must carry a business name (entity names) */
+  requiresEntityName: boolean
+  /** Custom label for the business-name field; null = server default */
+  entityNameLabel: string | null
 }
 
 interface ApiCustomerType {
@@ -26,6 +30,8 @@ interface ApiCustomerType {
   customerCount?: number
   estimatedQuantities?: EstimatedQuantityOption[]
   pricingMode?: PricingMode
+  requiresEntityName?: boolean
+  entityNameLabel?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -57,6 +63,8 @@ async function fetchCustomerTypes() {
       customerCount: ct.customerCount ?? 0,  // Use API value if available
       estimatedQuantities: ct.estimatedQuantities ?? [],
       pricingMode: ct.pricingMode ?? 'per_bin',
+      requiresEntityName: ct.requiresEntityName ?? false,
+      entityNameLabel: ct.entityNameLabel ?? null,
     }))
   }
   
@@ -95,12 +103,12 @@ function toggleQuantity(ids: string[], id: string): string[] {
 
 // Add modal
 const showAddModal = ref(false)
-const addForm = ref({ name: '', description: '', color: '#ffb400', pricingMode: 'per_bin' as PricingMode })
+const addForm = ref({ name: '', description: '', color: '#ffb400', pricingMode: 'per_bin' as PricingMode, requiresEntityName: false, entityNameLabel: '' })
 const addSelectedQuantityIds = ref<string[]>([])
 const addError = ref('')
 
 function openAdd() {
-  addForm.value = { name: '', description: '', color: '#ffb400', pricingMode: 'per_bin' }
+  addForm.value = { name: '', description: '', color: '#ffb400', pricingMode: 'per_bin', requiresEntityName: false, entityNameLabel: '' }
   addSelectedQuantityIds.value = []
   addError.value = ''
   showAddModal.value = true
@@ -134,6 +142,11 @@ async function handleAdd() {
     if (addSelectedQuantityIds.value.length > 0) {
       payload.estimatedQuantityIds = addSelectedQuantityIds.value
     }
+    payload.requiresEntityName = addForm.value.requiresEntityName
+    // Only send the label when the toggle is on; blank = omit so the server default applies
+    if (addForm.value.requiresEntityName && addForm.value.entityNameLabel.trim()) {
+      payload.entityNameLabel = addForm.value.entityNameLabel.trim()
+    }
     
     const response = await api.post<ApiCustomerType>(
       '/customer/admin/types',
@@ -163,12 +176,23 @@ async function handleAdd() {
 }
 
 const showEditModal = ref(false)
-const editForm = ref<CustomerType>({ id: '', name: '', description: '', color: '#ffb400', customerCount: 0, estimatedQuantities: [], pricingMode: 'per_bin' })
+const editForm = ref<CustomerType>({ id: '', name: '', description: '', color: '#ffb400', customerCount: 0, estimatedQuantities: [], pricingMode: 'per_bin', requiresEntityName: false, entityNameLabel: null })
 const editSelectedQuantityIds = ref<string[]>([])
 const editError = ref('')
+// Snapshot of the flag when the modal opened — used to warn only on a false→true flip
+const editOriginalRequiresEntityName = ref(false)
+
+// §2: turning business names ON for a category that already has customers does not
+// backfill them; existing customers keep no business name until edited.
+const showEntityNameWarn = computed(() =>
+  editForm.value.requiresEntityName &&
+  !editOriginalRequiresEntityName.value &&
+  editForm.value.customerCount > 0
+)
 
 function openEdit(ct: CustomerType) {
   editForm.value = { ...ct }
+  editOriginalRequiresEntityName.value = ct.requiresEntityName
   editSelectedQuantityIds.value = ct.estimatedQuantities.map(q => q.id)
   editError.value = ''
   showEditModal.value = true
@@ -190,9 +214,21 @@ async function handleEdit() {
     console.log('[CustomerTypes] Updating customer type:', editForm.value.id, 'quantities:', editSelectedQuantityIds.value)
     
     // Always send the full set on PATCH — it replaces the associations; [] detaches all (falls back to all active)
+    // `name` is REQUIRED on PATCH — a flag-only toggle must still send it or the request 422s
+    const patchPayload: Record<string, unknown> = {
+      name: editForm.value.name.trim(),
+      estimatedQuantityIds: editSelectedQuantityIds.value,
+      pricingMode: editForm.value.pricingMode,
+      requiresEntityName: editForm.value.requiresEntityName,
+    }
+    // Label semantics: omitted = untouched; null = reset to default; string = set.
+    // When the toggle is off we omit it entirely so a stored label survives.
+    if (editForm.value.requiresEntityName) {
+      patchPayload.entityNameLabel = editForm.value.entityNameLabel?.trim() || null
+    }
     const response = await api.patch<ApiCustomerType>(
       `/customer/admin/types/${editForm.value.id}`,
-      { name: editForm.value.name.trim(), estimatedQuantityIds: editSelectedQuantityIds.value, pricingMode: editForm.value.pricingMode },
+      patchPayload,
       'Failed to update customer type'
     )
     
@@ -424,14 +460,14 @@ onMounted(() => {
 
     <!-- ── ADD MODAL ── -->
     <div v-if="showAddModal" @click.self="showAddModal=false" style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px">
-      <div style="background:#fff;border-radius:20px;width:100%;max-width:480px;overflow:hidden">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0">
+      <div style="background:#fff;border-radius:20px;width:100%;max-width:480px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0;flex-shrink:0">
           <h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0">Add Customer Type</h2>
           <button @click="showAddModal=false" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px">
             <UIcon name="i-lucide-x" style="width:20px;height:20px" />
           </button>
         </div>
-        <div style="padding:24px;display:flex;flex-direction:column;gap:16px">
+        <div style="padding:24px;display:flex;flex-direction:column;gap:16px;flex:1;min-height:0;overflow-y:auto">
           <div v-if="addError" style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;font-size:13px;color:#ef4444">{{ addError }}</div>
           <div>
             <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Name <span style="color:#ef4444">*</span></label>
@@ -446,6 +482,24 @@ onMounted(() => {
               </button>
             </div>
             <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">{{ pricingModeHelper(addForm.pricingMode) }}</p>
+          </div>
+          <!-- Business names (entity names) -->
+          <div style="border:1.5px solid #e5e7eb;border-radius:10px;padding:14px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+              <div>
+                <p style="font-size:13px;font-weight:600;color:#374151;margin:0">Customers are businesses</p>
+                <p style="font-size:12px;color:#9ca3af;margin:4px 0 0">Require a business name on every customer in this category</p>
+              </div>
+              <button type="button" @click="addForm.requiresEntityName = !addForm.requiresEntityName"
+                :style="`width:40px;height:22px;border-radius:11px;border:none;cursor:pointer;position:relative;flex-shrink:0;background:${addForm.requiresEntityName ? '#22c55e' : '#d1d5db'}`">
+                <span :style="`position:absolute;top:3px;left:${addForm.requiresEntityName ? '21px' : '3px'};width:16px;height:16px;border-radius:50%;background:#fff;transition:left 0.15s`"></span>
+              </button>
+            </div>
+            <div v-if="addForm.requiresEntityName" style="margin-top:12px">
+              <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Business-name field label</label>
+              <input v-model="addForm.entityNameLabel" maxlength="60" placeholder="Business name" style="width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box" />
+              <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">What the customer form should call this field, e.g. Estate name, Hotel name.</p>
+            </div>
           </div>
           <div>
             <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Description</label>
@@ -474,7 +528,7 @@ onMounted(() => {
             <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">Leave empty to allow all active quantities for this type</p>
           </div>
         </div>
-        <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px">
+        <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px;flex-shrink:0">
           <button @click="showAddModal=false" :disabled="submitting" 
             :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.5' : '1'}`">Cancel</button>
           <button @click="handleAdd" :disabled="submitting" 
@@ -488,14 +542,14 @@ onMounted(() => {
 
     <!-- ── EDIT MODAL ── -->
     <div v-if="showEditModal" @click.self="showEditModal=false" style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px">
-      <div style="background:#fff;border-radius:20px;width:100%;max-width:480px;overflow:hidden">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0">
+      <div style="background:#fff;border-radius:20px;width:100%;max-width:480px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0;flex-shrink:0">
           <h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0">Edit Customer Type</h2>
           <button @click="showEditModal=false" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px">
             <UIcon name="i-lucide-x" style="width:20px;height:20px" />
           </button>
         </div>
-        <div style="padding:24px;display:flex;flex-direction:column;gap:16px">
+        <div style="padding:24px;display:flex;flex-direction:column;gap:16px;flex:1;min-height:0;overflow-y:auto">
           <div v-if="editError" style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;font-size:13px;color:#ef4444">{{ editError }}</div>
           <div>
             <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Name <span style="color:#ef4444">*</span></label>
@@ -510,6 +564,28 @@ onMounted(() => {
               </button>
             </div>
             <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">{{ pricingModeHelper(editForm.pricingMode) }}</p>
+          </div>
+          <!-- Business names (entity names) -->
+          <div style="border:1.5px solid #e5e7eb;border-radius:10px;padding:14px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+              <div>
+                <p style="font-size:13px;font-weight:600;color:#374151;margin:0">Customers are businesses</p>
+                <p style="font-size:12px;color:#9ca3af;margin:4px 0 0">Require a business name on every customer in this category</p>
+              </div>
+              <button type="button" @click="editForm.requiresEntityName = !editForm.requiresEntityName"
+                :style="`width:40px;height:22px;border-radius:11px;border:none;cursor:pointer;position:relative;flex-shrink:0;background:${editForm.requiresEntityName ? '#22c55e' : '#d1d5db'}`">
+                <span :style="`position:absolute;top:3px;left:${editForm.requiresEntityName ? '21px' : '3px'};width:16px;height:16px;border-radius:50%;background:#fff;transition:left 0.15s`"></span>
+              </button>
+            </div>
+            <div v-if="editForm.requiresEntityName" style="margin-top:12px">
+              <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Business-name field label</label>
+              <input v-model="editForm.entityNameLabel" maxlength="60" placeholder="Business name" style="width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:'Manrope',sans-serif;outline:none;box-sizing:border-box" />
+              <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">What the customer form should call this field, e.g. Estate name, Hotel name.</p>
+            </div>
+            <div v-if="showEntityNameWarn" style="margin-top:10px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;display:flex;gap:8px;align-items:flex-start">
+              <UIcon name="i-lucide-triangle-alert" style="width:16px;height:16px;color:#b45309;flex-shrink:0;margin-top:1px" />
+              <p style="font-size:12px;color:#92400e;margin:0">Existing customers are not modified — they keep no business name until edited. Use the “Missing business name” filter on the Customers page to work through the backlog.</p>
+            </div>
           </div>
           <div>
             <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Description</label>
@@ -538,7 +614,7 @@ onMounted(() => {
             <p style="font-size:12px;color:#9ca3af;margin:6px 0 0">Saving replaces the entire set. Deselect all to fall back to all active quantities</p>
           </div>
         </div>
-        <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px">
+        <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px;flex-shrink:0">
           <button @click="showEditModal=false" :disabled="submitting" 
             :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};opacity:${submitting ? '0.5' : '1'}`">Cancel</button>
           <button @click="handleEdit" :disabled="submitting" 
@@ -553,7 +629,7 @@ onMounted(() => {
     <!-- ── DELETE MODAL ── -->
     <div v-if="showDeleteModal" @click.self="showDeleteModal=false" style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px">
       <div style="background:#fff;border-radius:20px;width:100%;max-width:400px;overflow:hidden">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0;flex-shrink:0">
           <h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0">Delete Customer Type</h2>
           <button @click="showDeleteModal=false" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px">
             <UIcon name="i-lucide-x" style="width:20px;height:20px" />
@@ -566,7 +642,7 @@ onMounted(() => {
           <p style="font-size:15px;font-weight:600;color:#1a1a1a;margin:0 0 8px">Delete "{{ deleteTarget?.name }}"?</p>
           <p style="font-size:13px;color:#6b7280;margin:0">This action cannot be undone. All configuration for this type will be permanently removed.</p>
         </div>
-        <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px">
+        <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px;flex-shrink:0">
           <button @click="showDeleteModal=false" :disabled="deleting" 
             :style="`background:#ececec;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${deleting ? 'not-allowed' : 'pointer'};opacity:${deleting ? '0.5' : '1'}`">Cancel</button>
           <button @click="handleDelete" :disabled="deleting" 

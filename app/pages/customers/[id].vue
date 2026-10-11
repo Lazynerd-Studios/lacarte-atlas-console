@@ -59,11 +59,19 @@ const createdByDisplay = computed(() => {
 
 onMounted(fetchCustomer)
 
-const fullName = computed(() => customer.value?.user.name ?? 'Unknown Customer')
+// Entity names (§4): displayName is the unambiguous primary identity —
+// business name when present, else the person's name.
+const fullName = computed(() => customer.value?.displayName || customer.value?.user.name || 'Unknown Customer')
+// Secondary line: raw person name, only when it differs from the display name
+const personName = computed(() => {
+  const c = customer.value
+  if (!c?.displayName || !c.user?.name || c.displayName === c.user.name) return ''
+  return c.user.name
+})
 
 const initials = computed(() => {
-  const name = customer.value?.user.name?.trim()
-  if (!name) return '?'
+  const name = fullName.value?.trim()
+  if (!name || name === 'Unknown Customer') return '?'
   const parts = name.split(/\s+/)
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || name[0]?.toUpperCase() || '?'
 })
@@ -128,6 +136,7 @@ async function handleEditCustomer(payload: {
   customerTypeId: string
   zoneId: string
   phoneNumber: string
+  entityName?: string | null
   address: string
   city: string
   region: string
@@ -499,6 +508,8 @@ function noteDate(dateString?: string | null): string {
               {{ statusBadge.label }}
             </span>
           </div>
+          <!-- Entity names (§4): muted person name, only when it differs from the display name -->
+          <p v-if="personName" style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin:-4px 0 0">{{ personName }}</p>
           <div style="display:flex;flex-wrap:wrap;gap:16px">
             <div style="display:flex;align-items:center;gap:8px">
               <UIcon name="i-lucide-phone" style="width:16px;height:16px;color:#6b7280;flex-shrink:0" />

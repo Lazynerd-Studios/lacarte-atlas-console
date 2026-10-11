@@ -17,6 +17,8 @@ interface InvoiceItem {
 interface InvoiceCustomer {
   id: string
   name: string
+  /** Entity names (§4): business name when present, else person name */
+  displayName?: string
   email: string
   address: string
   phoneNumber: string
@@ -251,7 +253,9 @@ function statusBadge(s: string) {
           </div>
           <div>
             <p style="font-size:20px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin-bottom:16px">Bill To</p>
-            <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin-bottom:4px">{{ invoice.customer.name }}</p>
+            <p style="font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;margin-bottom:4px">{{ invoice.customer.displayName || invoice.customer.name }}</p>
+            <!-- Entity names (§4): muted person name only when it differs from the display name -->
+            <p v-if="invoice.customer.displayName && invoice.customer.displayName !== invoice.customer.name" style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin:-2px 0 4px">{{ invoice.customer.name }}</p>
             <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;line-height:1.6">
               {{ invoice.customer.address }}<br>
               {{ invoice.customer.email }}<br>
