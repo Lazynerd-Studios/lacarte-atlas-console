@@ -78,6 +78,14 @@ export interface Customer {
   entityName?: string | null
   /** Unambiguous display name: business name when present, else the person's name */
   displayName?: string
+  /**
+   * Per-customer pickup booking defaults (§4). Nullable preferences set via
+   * PATCH /customer/admin/:id (send null to clear). They drive the zone-schedule
+   * generator and act as the server-side fallback when a pickup is booked
+   * without an explicit estimated quantity. Not part of customer create.
+   */
+  defaultItemTypeId?: string | null
+  defaultEstimatedQuantityId?: string | null
   user: CustomerUser
   customerType: CustomerType | null
   zone: CustomerZone | null

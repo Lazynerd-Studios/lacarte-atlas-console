@@ -143,6 +143,8 @@ async function handleEditCustomer(payload: {
   postalCode: string
   country: string
   placeName: string
+  defaultItemTypeId?: string | null
+  defaultEstimatedQuantityId?: string | null
 }) {
   if (!customer.value) return
   saving.value = true
