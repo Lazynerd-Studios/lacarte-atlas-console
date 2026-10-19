@@ -108,6 +108,11 @@ const selectedPricingMode = computed<PricingMode>(() => {
   return customerTypePricingModes.value[typeId] ?? 'per_bin'
 })
 const isFullTruck = computed(() => selectedPricingMode.value === 'full_truck')
+// PAYG truck bookings must pick a tier at booking; subscribers are priced by the
+// tier fixed on their subscription (truck doc §4). Unknown paymentMode is treated
+// as PAYG so the form never under-asks — the server remains the authority.
+const isPayg = computed(() => (selectedCustomer.value?.paymentMode ?? 'pay_as_you_go') !== 'subscription')
+const needsTruckTier = computed(() => isFullTruck.value && isPayg.value)
 
 // Load customer types once to build the id -> pricingMode lookup
 async function fetchCustomerTypePricingModes() {
@@ -178,8 +183,9 @@ async function fetchAllCustomers(): Promise<CustomerOption[]> {
         if (!c.name && c.user?.name) c.name = c.user.name
         if (!c.placeName) c.placeName = (c as any).address ?? null
       }
-      // Pickups are created for subscribed customers only — drop pay-as-you-go accounts
-      all.push(...res.data.filter(c => c.paymentMode === 'subscription'))
+      // Subscribed and PAYG customers are both bookable — PAYG truck bookings
+      // simply require a load tier (truck doc §4)
+      all.push(...res.data)
     }
     hasNext = !!res.pagination?.hasNextPage
     page++
@@ -214,8 +220,10 @@ function validate() {
   Object.keys(errors).forEach(k => delete errors[k])
   if (!form.customerId)                  errors.customerId = 'Select a customer'
   if (!form.disposableItemTypeId)        errors.disposableItemTypeId = 'Required'
-  if (!form.estimatedQuantityId)         errors.estimatedQuantityId = 'Required'
-  if (isFullTruck.value && !form.truckLoadRateId) errors.truckLoadRateId = 'Select a truck load tier'
+  // estimatedQuantityId is optional — omitting falls back to the customer's
+  // stored default / the type's lowest-ordered active quantity. Truck customers
+  // skip it entirely; price comes from the tier.
+  if (needsTruckTier.value && !form.truckLoadRateId) errors.truckLoadRateId = 'Select a truck load tier'
   if (!form.preferredPickupDate)         errors.preferredPickupDate = 'Required'
   if (!form.isEmergency && form.preferredPickupDate && form.preferredPickupDate < todayForDateInput.value) {
     errors.preferredPickupDate = 'Pickup date cannot be in the past'
@@ -230,17 +238,20 @@ async function submit() {
   submitting.value = true
   submitError.value = ''
   // paymentType is intentionally omitted — the server auto-resolves it from the
-  // customer's subscription state. truckLoadRateId is only valid for full_truck
-  // customers (the server rejects it for per_bin).
+  // customer's subscription state (subscription vs PAYG). truckLoadRateId is only
+  // sent for full_truck PAYG bookings; subscribers carry the tier fixed on their
+  // subscription, and the server rejects a tier for per_bin customers.
   const payload: Record<string, unknown> = {
     customerId: form.customerId,
     disposableItemTypeId: form.disposableItemTypeId,
-    estimatedQuantityId: form.estimatedQuantityId,
     preferredPickupDate: form.preferredPickupDate,
     isEmergency: form.isEmergency,
     additionalNotes: form.additionalNotes.trim(),
   }
-  if (isFullTruck.value) {
+  if (!isFullTruck.value && form.estimatedQuantityId) {
+    payload.estimatedQuantityId = form.estimatedQuantityId
+  }
+  if (needsTruckTier.value) {
     payload.truckLoadRateId = form.truckLoadRateId
   }
   try {
@@ -285,7 +296,7 @@ function inputStyle(field: string) {
       <!-- Header -->
       <div style="padding:24px 24px 16px;flex-shrink:0;border-bottom:1px solid #e5e7eb">
         <p style="font-size:20px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">Create Pickup Request</p>
-        <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:4px">Subscribed customers only · Payment type: Auto-resolved by the system</p>
+        <p style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:4px">Payment type: Auto-resolved by the system</p>
       </div>
 
       <!-- Close -->
@@ -342,10 +353,11 @@ function inputStyle(field: string) {
               >
                 <span style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ c.name }}</span>
                 <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">{{ c.phoneNumber }}{{ c.placeName ? ' · ' + c.placeName : '' }}</span>
+                <span :style="`font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;${c.paymentMode === 'subscription' ? 'background:#dcfce7;color:#16a34a' : 'background:#fff7ed;color:#b45309'}`">{{ c.paymentMode === 'subscription' ? 'Subscription' : 'Pay as you go' }}</span>
               </button>
             </div>
             <div v-else-if="customerDropdownOpen && customerSearch && filteredCustomers.length === 0" style="position:absolute;top:calc(100% + 4px);left:0;right:0;background:white;border:1px solid #e5e7eb;border-radius:12px;padding:12px;text-align:center;z-index:10">
-              <span style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">No subscribed customers found</span>
+              <span style="font-size:13px;color:#6b7280;font-family:'Manrope',sans-serif">No customers found</span>
             </div>
           </div>
 
@@ -362,24 +374,26 @@ function inputStyle(field: string) {
             <span v-if="errors.disposableItemTypeId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.disposableItemTypeId }}</span>
           </div>
 
-          <!-- Estimated quantity -->
-          <div style="display:flex;flex-direction:column;gap:6px">
+          <!-- Estimated quantity (per_bin only). Optional — leaving it on "Use
+               customer default" lets the server fall back to the customer's stored
+               default / the type's lowest-ordered active quantity -->
+          <div v-if="!isFullTruck" style="display:flex;flex-direction:column;gap:6px">
             <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Estimated Quantity</label>
             <select
               v-model="form.estimatedQuantityId"
               :disabled="loadingQuantities"
-              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid ${errors.estimatedQuantityId ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:${form.estimatedQuantityId ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:${loadingQuantities ? 'wait' : 'pointer'};appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box;opacity:${loadingQuantities ? 0.6 : 1}`"
+              :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid #e5e7eb;border-radius:16px;font-size:14px;color:${form.estimatedQuantityId ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:${loadingQuantities ? 'wait' : 'pointer'};appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box;opacity:${loadingQuantities ? 0.6 : 1}`"
             >
-              <option value="" disabled>{{ loadingQuantities ? 'Loading quantities...' : 'Select quantity' }}</option>
+              <option value="">{{ loadingQuantities ? 'Loading quantities...' : 'Use customer default' }}</option>
               <option v-for="q in estimatedQuantities" :key="q.id" :value="q.id">{{ q.label }}{{ q.binCount != null ? ` (${q.binCount} bins)` : '' }}</option>
             </select>
-            <span v-if="errors.estimatedQuantityId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.estimatedQuantityId }}</span>
-            <span v-else-if="selectedCustomer && estimatedQuantities.length === 0 && !loadingQuantities" style="font-size:12px;color:#f59e0b;font-family:'Manrope',sans-serif">No quantities available for this customer's type</span>
+            <span v-if="selectedCustomer && estimatedQuantities.length === 0 && !loadingQuantities" style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">No quantities configured for this type — the customer's default will be used</span>
+            <span v-else style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Optional — if left unset, the customer's booking default is used</span>
           </div>
 
-          <!-- Truck load tier (full_truck customers only) -->
-          <div v-if="isFullTruck" style="display:flex;flex-direction:column;gap:6px">
-            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Truck Load Tier</label>
+          <!-- Truck load tier — required for full_truck PAYG bookings (truck doc §4) -->
+          <div v-if="needsTruckTier" style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Truck Load Tier <span style="color:#ef4444">*</span></label>
             <select
               v-model="form.truckLoadRateId"
               :style="`width:100%;height:42px;padding:0 16px;background:white;border:1px solid ${errors.truckLoadRateId ? '#ef4444' : '#e5e7eb'};border-radius:16px;font-size:14px;color:${form.truckLoadRateId ? '#1a1a1a' : '#9ca3af'};font-family:'Manrope',sans-serif;outline:none;cursor:pointer;appearance:none;background-image:${chevronBg};background-repeat:no-repeat;background-position:right 12px center;box-sizing:border-box`"
@@ -389,6 +403,12 @@ function inputStyle(field: string) {
             </select>
             <span v-if="errors.truckLoadRateId" style="font-size:12px;color:#ef4444;font-family:'Manrope',sans-serif">{{ errors.truckLoadRateId }}</span>
             <span v-else style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">This customer is priced by truck load — pick the load size for this trip.</span>
+          </div>
+
+          <!-- Subscribed truck customers carry the tier fixed on their subscription -->
+          <div v-else-if="isFullTruck" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start">
+            <UIcon name="i-lucide-truck" style="width:16px;height:16px;color:#0369a1;flex-shrink:0;margin-top:1px" />
+            <span style="font-size:12px;color:#0c4a6e;font-family:'Manrope',sans-serif">Subscribed truck customer — priced by the truck tier fixed on their subscription. No load size needed for this booking.</span>
           </div>
 
           <!-- Preferred pickup date -->
