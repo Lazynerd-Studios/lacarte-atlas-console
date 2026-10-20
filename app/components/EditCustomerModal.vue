@@ -19,6 +19,8 @@ const emit = defineEmits<{
     postalCode: string
     country: string
     placeName: string
+    defaultItemTypeId?: string | null
+    defaultEstimatedQuantityId?: string | null
   }): void
 }>()
 
@@ -26,14 +28,45 @@ const customerTypes = ref<{ id: string; name: string; pricingMode?: 'per_bin' | 
 const zones = ref<{ id: string; name: string; color: string }[]>([])
 const loadingOptions = ref(true)
 
+// Pickup booking defaults (§4): global active item types + quantities scoped to
+// the selected customer type. Both selects offer a "None" option (value '') that
+// maps to null on submit to clear the stored preference.
+interface DisposableOption { id: string; name: string }
+interface QuantityOption { id: string; label: string; binCount: number | null }
+const disposableTypes = ref<DisposableOption[]>([])
+const quantityOptions = ref<QuantityOption[]>([])
+const loadingQuantities = ref(false)
+
+async function fetchQuantities(customerTypeId: string) {
+  if (!customerTypeId) { quantityOptions.value = []; return }
+  loadingQuantities.value = true
+  const api = useApi()
+  const res = await api.get<any>(`/disposable/quantities/active?customerTypeId=${customerTypeId}`, 'Failed to load estimated quantities')
+  if (res) {
+    const items = Array.isArray(res) ? res : (res.data ?? res.quantities ?? [])
+    quantityOptions.value = items.map((q: any) => ({
+      id: q.id,
+      label: q.label,
+      binCount: q.binCount != null ? Number(q.binCount) : null,
+    }))
+  }
+  loadingQuantities.value = false
+}
+
 onMounted(async () => {
   const api = useApi()
-  const [typesRes, zonesRes] = await Promise.all([
+  const [typesRes, zonesRes, dispRes] = await Promise.all([
     api.get<{ id: string; name: string; customerCount?: string; pricingMode?: 'per_bin' | 'full_truck'; requiresEntityName?: boolean; entityNameLabel?: string | null }[]>('/customer/admin/types/', 'Failed to load customer types'),
     api.get<{ id: string; name: string; color: string }[]>('/zone/public/list', 'Failed to load zones'),
+    api.get<any>('/disposable/item-types/active', 'Failed to load disposable item types'),
+    fetchQuantities(props.customer.customerTypeId ?? ''),
   ])
   if (typesRes) customerTypes.value = typesRes
   if (zonesRes) zones.value = zonesRes
+  if (dispRes) {
+    const items = Array.isArray(dispRes) ? dispRes : (dispRes.data ?? dispRes.disposableTypes ?? [])
+    disposableTypes.value = items.map((i: any) => ({ id: i.id, name: i.name }))
+  }
   loadingOptions.value = false
 })
 
@@ -49,6 +82,8 @@ const form = reactive({
   postalCode: props.customer.postalCode ?? '',
   country: props.customer.country ?? '',
   placeName: props.customer.placeName ?? '',
+  defaultItemTypeId: props.customer.defaultItemTypeId ?? '',
+  defaultEstimatedQuantityId: props.customer.defaultEstimatedQuantityId ?? '',
 })
 
 const errors = reactive<Record<string, string>>({})
@@ -65,6 +100,13 @@ const switchingToNonEntity = computed(() => wasEntityType.value && !needsEntityN
 const clearConfirmed = ref(false)
 // Reset the confirmation whenever the selector moves back to an entity category
 watch(needsEntityName, (v) => { if (v) clearConfirmed.value = false })
+
+// When the category changes, the booking-default quantity is scoped to the old
+// type — reload the options for the new type and clear any now-invalid selection.
+watch(() => form.customerTypeId, (id) => {
+  form.defaultEstimatedQuantityId = ''
+  fetchQuantities(id)
+})
 
 const saveLabel = computed(() => {
   if (props.saving) return 'Saving…'
@@ -109,6 +151,8 @@ function submit() {
     postalCode: string
     country: string
     placeName: string
+    defaultItemTypeId?: string | null
+    defaultEstimatedQuantityId?: string | null
   } = {
     customerTypeId: form.customerTypeId,
     zoneId: form.zoneId,
@@ -119,6 +163,9 @@ function submit() {
     postalCode: form.postalCode?.trim() ?? '',
     country: form.country?.trim() ?? '',
     placeName: form.placeName?.trim() ?? '',
+    // §4: empty selection sends null to clear the stored preference
+    defaultItemTypeId: form.defaultItemTypeId || null,
+    defaultEstimatedQuantityId: form.defaultEstimatedQuantityId || null,
   }
   // Send entityName ONLY for entity categories — the key must be omitted for
   // non-entity types (the API clears the stored name on the switch itself).
@@ -212,7 +259,30 @@ const selectStyle = (hasValue: boolean) =>
         </div>
 
         <!-- Bin sizes are managed on the customer's Bin Mix tab (multi-bin-sizes) -->
-
+        
+         <!-- Pickup booking defaults (§4) -->
+         <div style="border:1.5px solid #e5e7eb;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:14px">
+           <div>
+             <p style="font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;margin:0">Pickup Booking Defaults</p>
+             <p style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif;margin:4px 0 0">What the scheduler books automatically, and the fallback when a pickup is created without an explicit quantity.</p>
+           </div>
+           <div style="display:flex;flex-direction:column;gap:6px">
+             <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Default Disposable Type</label>
+             <select v-model="form.defaultItemTypeId" :style="selectStyle(!!form.defaultItemTypeId)">
+               <option value="">None</option>
+               <option v-for="d in disposableTypes" :key="d.id" :value="d.id">{{ d.name }}</option>
+             </select>
+           </div>
+           <div style="display:flex;flex-direction:column;gap:6px">
+             <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Default Estimated Quantity</label>
+             <select v-model="form.defaultEstimatedQuantityId" :disabled="loadingQuantities" :style="selectStyle(!!form.defaultEstimatedQuantityId)">
+               <option value="">{{ loadingQuantities ? 'Loading quantities…' : 'None' }}</option>
+               <option v-for="q in quantityOptions" :key="q.id" :value="q.id">{{ q.label }}{{ q.binCount != null ? ` (${q.binCount} bins)` : '' }}</option>
+             </select>
+             <span style="font-size:12px;color:#9ca3af;font-family:'Manrope',sans-serif">Quantities available to the selected customer type. If the stored default isn't valid, the server falls back to the type's lowest-ordered active quantity.</span>
+           </div>
+         </div>
+        
         <!-- Zone -->
         <div style="display:flex;flex-direction:column;gap:6px">
           <label style="font-size:14px;font-weight:500;color:#1a1a1a;font-family:'Manrope',sans-serif">Zone</label>

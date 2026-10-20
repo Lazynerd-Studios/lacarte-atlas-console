@@ -157,11 +157,22 @@ const showTruckModal = ref(false)
 const truckModalMode = ref<'add' | 'edit'>('add')
 const truckForm = ref({ id: '', label: '', prepayRate: '', postpayRate: '', binEquivalent: '', displayOrder: '0', isActive: true, note: '' })
 const truckError = ref('')
+// Truck doc §1: binEquivalent drives driver payouts — an edit that changes it
+// must warn and be explicitly confirmed (two-step, like the entity-name switch)
+const binEqOriginal = ref<number | null>(null)
+const binEqConfirmed = ref(false)
+const binEqChanged = computed(() => {
+  if (binEqOriginal.value == null) return false
+  const v = Number(truckForm.value.binEquivalent)
+  return !isNaN(v) && v !== binEqOriginal.value
+})
 
 function openAddTruck() {
   truckModalMode.value = 'add'
   truckForm.value = { id: '', label: '', prepayRate: '', postpayRate: '', binEquivalent: '', displayOrder: '0', isActive: true, note: '' }
   truckError.value = ''
+  binEqOriginal.value = null
+  binEqConfirmed.value = false
   showTruckModal.value = true
 }
 
@@ -178,6 +189,8 @@ function openEditTruck(t: TruckLoadTier) {
     note: t.note || '',
   }
   truckError.value = ''
+  binEqOriginal.value = Number(t.binEquivalent)
+  binEqConfirmed.value = false
   showTruckModal.value = true
 }
 
@@ -195,6 +208,13 @@ function validateTruckForm(): string | null {
 async function handleTruckSubmit() {
   const error = validateTruckForm()
   if (error) { truckError.value = error; return }
+
+  // First click on a payout-affecting binEquivalent change only arms the
+  // confirmation; the banner + button label make the impact explicit
+  if (binEqChanged.value && !binEqConfirmed.value) {
+    binEqConfirmed.value = true
+    return
+  }
 
   submitting.value = true
   truckError.value = ''
@@ -256,9 +276,14 @@ async function toggleActive(tier: CapacityTier | TruckLoadTier) {
 const showDeleteModal = ref(false)
 const deleteTarget = ref<CapacityTier | TruckLoadTier | null>(null)
 const deleting = ref(false)
+const deleteError = ref('')
+// 409 blocked deletes offer a one-click deactivate instead (truck doc §6)
+const deleteBlocked = ref(false)
 
 function openDelete(tier: CapacityTier | TruckLoadTier) {
   deleteTarget.value = tier
+  deleteError.value = ''
+  deleteBlocked.value = false
   showDeleteModal.value = true
 }
 
@@ -284,13 +309,22 @@ async function handleDelete() {
     deleteTarget.value = null
     await (isCapacity ? fetchCapacityTiers() : fetchTruckTiers())
   } catch (err: any) {
-    // 409 blocked deletes show the server message as a toast
-    toast.error('Cannot delete', err?.message || 'This tier is in use. Deactivate it instead.')
-    showDeleteModal.value = false
-    deleteTarget.value = null
+    // Keep the modal open with the server message inline; a tier-in-use 409
+    // offers deactivate-instead as the safe alternative
+    const m = err?.message || 'Failed to delete tier'
+    deleteError.value = m
+    deleteBlocked.value = /409|in use|referenced|deactivate/i.test(m)
   } finally {
     deleting.value = false
   }
+}
+
+async function deactivateInstead() {
+  if (!deleteTarget.value) return
+  const tier = deleteTarget.value
+  showDeleteModal.value = false
+  deleteTarget.value = null
+  await toggleActive(tier)
 }
 
 function openAddTier() {
@@ -653,6 +687,12 @@ onMounted(() => {
               </div>
             </div>
 
+            <!-- Payout-impact warning on binEquivalent changes (truck doc §1) -->
+            <div v-if="binEqChanged" style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;display:flex;gap:8px;align-items:flex-start">
+              <UIcon name="i-lucide-triangle-alert" style="width:16px;height:16px;color:#b45309;flex-shrink:0;margin-top:1px" />
+              <p style="font-size:12px;color:#92400e;margin:0">Bin equivalent drives driver payouts — changing {{ binEqOriginal }} → {{ truckForm.binEquivalent }} affects how driver earnings are calculated for this tier.{{ binEqConfirmed ? ' Click “Confirm payout change” again to apply.' : '' }}</p>
+            </div>
+
             <div style="display:flex;align-items:center;gap:10px">
               <button @click="truckForm.isActive=!truckForm.isActive"
                 :style="`width:40px;height:22px;border-radius:11px;border:none;cursor:pointer;position:relative;background:${truckForm.isActive ? '#22c55e' : '#d1d5db'}`">
@@ -672,7 +712,7 @@ onMounted(() => {
             <button @click="handleTruckSubmit" :disabled="submitting"
               :style="`background:#ffb400;color:#1a1a1a;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;cursor:${submitting ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px;opacity:${submitting ? '0.8' : '1'}`">
               <UIcon v-if="submitting" name="i-lucide-loader-2" style="width:14px;height:14px;animation:spin 1s linear infinite" />
-              {{ submitting ? 'Saving...' : (truckModalMode === 'add' ? 'Add Tier' : 'Save Changes') }}
+              {{ submitting ? 'Saving...' : (truckModalMode === 'add' ? 'Add Tier' : (binEqChanged && binEqConfirmed ? 'Confirm payout change' : 'Save Changes')) }}
             </button>
           </div>
         </div>
@@ -693,6 +733,13 @@ onMounted(() => {
             </div>
             <p style="font-size:15px;font-weight:600;color:#1a1a1a;margin:0 0 8px">Delete {{ deleteTargetLabel() }}?</p>
             <p style="font-size:13px;color:#6b7280;margin:0">This action cannot be undone. If customers or pickup requests reference this tier, deletion will be blocked.</p>
+            <!-- Blocked delete (409): show the server reason and offer deactivating -->
+            <div v-if="deleteError" style="margin-top:14px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;font-size:13px;color:#ef4444;text-align:left">{{ deleteError }}</div>
+            <button v-if="deleteBlocked" @click="deactivateInstead" :disabled="deleting"
+              :style="`margin-top:12px;display:inline-flex;align-items:center;gap:6px;background:#fef9c3;color:#ca8a04;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer`">
+              <UIcon name="i-lucide-power-off" style="width:14px;height:14px" />
+              Deactivate instead
+            </button>
           </div>
           <div style="padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:10px;flex-shrink:0">
             <button @click="showDeleteModal=false" :disabled="deleting"
