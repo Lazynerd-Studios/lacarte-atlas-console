@@ -78,6 +78,14 @@ export interface Customer {
   entityName?: string | null
   /** Unambiguous display name: business name when present, else the person's name */
   displayName?: string
+  /**
+   * Per-customer pickup booking defaults (§4). Nullable preferences set via
+   * PATCH /customer/admin/:id (send null to clear). They drive the zone-schedule
+   * generator and act as the server-side fallback when a pickup is booked
+   * without an explicit estimated quantity. Not part of customer create.
+   */
+  defaultItemTypeId?: string | null
+  defaultEstimatedQuantityId?: string | null
   user: CustomerUser
   customerType: CustomerType | null
   zone: CustomerZone | null
@@ -124,3 +132,56 @@ export interface CustomerPickupHistoryEntry {
 
 /** Paginated response envelope for customer pickup history */
 export type CustomerPickupHistoryResponse = PaginatedDataResponse<CustomerPickupHistoryEntry>
+
+// ── Customer bulk import (frontend-web-customer-bulk-import.md) ──
+
+/** Field-level problem on an import row — shared by preview and commit responses */
+export interface ImportRowIssue {
+  field: string
+  message: string
+}
+
+/** One dry-run preview row from POST /customer/admin/import/validate */
+export interface ImportPreviewRow {
+  /** 1-based spreadsheet row (header = row 1) */
+  row: number
+  status: 'valid' | 'invalid' | 'duplicate'
+  email: string
+  fullName: string
+  businessName: string | null
+  /** Resolved against live DB; null when unknown */
+  customerType: { id: string; name: string } | null
+  /** Resolved active zone; null when unknown/inactive */
+  zone: { id: string; name: string } | null
+  /** Helps flag "will need bins" rows */
+  pricingMode: 'per_bin' | 'full_truck' | null
+  issues: ImportRowIssue[]
+}
+
+/** POST /customer/admin/import/validate response — creates nothing */
+export interface ImportPreviewResponse {
+  total: number
+  valid: number
+  invalid: number
+  duplicate: number
+  rows: ImportPreviewRow[]
+}
+
+/** Failed row echoed by the commit endpoint (same issue shape as the preview) */
+export interface ImportCommitError {
+  row: number
+  email: string
+  issues: ImportRowIssue[]
+}
+
+/** POST /customer/admin/import response — commit re-validates, never trusts the preview */
+export interface ImportCommitResponse {
+  total: number
+  created: number
+  /** Duplicate emails (existing or in-file) — skipped, not failed */
+  skipped: number
+  failed: number
+  /** Created per_bin customers still needing bins before they can be priced/subscribed */
+  needsBins: number
+  errors: ImportCommitError[]
+}

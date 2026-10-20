@@ -7,11 +7,16 @@ const toast = useAppToast()
 const api = useApi()
 
 const showModal = ref(false)
+const showImportModal = ref(false)
 const showSuspendModal = ref(false)
 const showUnsuspendConfirm = ref(false)
 const selectedCustomer = ref<CustomerListItem | null>(null)
 const suspending = ref(false)
 const unsuspending = ref(false)
+
+// Bulk import is gated on customers.create (doc §: all /import* endpoints need it);
+// authStore permissions are merged from /user/profile after login
+const { hasPermission } = usePermissions()
 
 function openSuspend(c: CustomerListItem) {
   selectedCustomer.value = c
@@ -223,9 +228,19 @@ function statusBadge(status: string) {
         <h1 style="font-size:32px;font-weight:700;color:#111;font-family:'Manrope',sans-serif;line-height:1.3">Customers</h1>
         <p style="font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif;margin-top:4px">Manage all customer accounts and subscriptions</p>
       </div>
-      <button style="height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:1000px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)" @click="showModal = true">
-        Add Customer
-      </button>
+      <div style="display:flex;align-items:center;gap:10px">
+        <button
+          v-if="hasPermission('customers.create')"
+          style="height:40px;padding:0 20px;background:white;border:1px solid #e5e7eb;border-radius:1000px;font-size:14px;font-weight:500;color:#111;font-family:'Manrope',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px"
+          @click="showImportModal = true"
+        >
+          <UIcon name="i-lucide-sheet" style="width:15px;height:15px;color:#6b7280" />
+          Bulk Import
+        </button>
+        <button style="height:40px;padding:0 20px;background:#ffb400;border:none;border-radius:1000px;font-size:14px;font-weight:500;color:#0a0d12;font-family:'Manrope',sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(255,180,0,0.2)" @click="showModal = true">
+          Add Customer
+        </button>
+      </div>
     </div>
 
     <!-- Filters card -->
@@ -387,6 +402,9 @@ function statusBadge(status: string) {
 
   <!-- Add Customer Modal -->
   <LazyCustomerModal v-if="showModal" @close="showModal = false" @success="handleCustomerCreated" />
+
+  <!-- Bulk Import Modal (xlsx, review-before-commit) -->
+  <LazyBulkImportCustomersModal v-if="showImportModal" @close="showImportModal = false" @imported="fetchCustomers" />
 
   <!-- Suspend Modal -->
   <LazySuspendModal
