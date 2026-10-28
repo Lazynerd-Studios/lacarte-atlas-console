@@ -7,7 +7,8 @@ import type { TeamMember } from '~/types/team'
 const uuidArb = fc.uuid()
 const nameArb = fc.string({ minLength: 1, maxLength: 50 }).filter(s => s.trim().length > 0)
 const emailArb = fc.emailAddress()
-const phoneArb = fc.string({ minLength: 10, maxLength: 15 }).filter(s => /^\d{10,15}$/.test(s))
+// Build digit strings directly; filtering random strings for all-digits almost never matches
+const phoneArb = fc.array(fc.integer({ min: 0, max: 9 }), { minLength: 10, maxLength: 15 }).map(d => d.join(''))
 const roleArb = fc.constantFrom('Super Admin', 'Operations Manager', 'Finance', 'Support', 'Custom Role')
 const statusArb = fc.constantFrom<'active' | 'inactive'>('active', 'inactive')
 const isoDateArb = fc.integer({ min: 1577836800000, max: 1924905600000 }).map(timestamp => new Date(timestamp).toISOString())
