@@ -480,7 +480,8 @@ async function handleDeleteDriver() {
     showDeleteConfirm.value = false
     toast.success('Driver deleted successfully')
     await navigateTo('/drivers')
-  } catch (err: any) {
+  } catch (e) {
+    const err = asError(e)
     toast.error(err.message || 'Failed to delete driver')
   } finally {
     deleting.value = false

@@ -135,7 +135,8 @@ async function handleSubmit() {
     // Success flow
     toast.success('Team member added successfully')
     router.push('/team')
-  } catch (err: any) {
+  } catch (e) {
+    const err = asError(e)
     submitting.value = false
     console.error('[Team Add] Failed to add member', { error: err })
     

@@ -160,7 +160,8 @@ async function handleAdd() {
       showAddModal.value = false
       await fetchCustomerTypes()
     }
-  } catch (err: any) {
+  } catch (e) {
+    const err = asError(e)
     console.error('[CustomerTypes] Failed to create:', err)
     const errorMessage = err?.message || 'Failed to create customer type'
     
@@ -238,7 +239,8 @@ async function handleEdit() {
       showEditModal.value = false
       await fetchCustomerTypes()
     }
-  } catch (err: any) {
+  } catch (e) {
+    const err = asError(e)
     console.error('[CustomerTypes] Failed to update:', err)
     const errorMessage = err?.message || 'Failed to update customer type'
     
