@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { CustomerListItem } from '~/types/customer'
+import type { CustomerListItem, CustomerOnboardingStage, OnboardingCounts } from '~/types/customer'
+import { ONBOARDING_STAGE_ORDER, stageTone, isOnboardingStage } from '~/utils/onboarding'
 
 definePageMeta({ layout: 'dashboard' })
 
@@ -83,9 +84,34 @@ function updateCustomerStatus(id: string, status: string) {
 const search = ref('')
 const statusFilter = ref('all')
 const planFilter = ref('all')
-// §5 backlog filter: entity-category customers still missing a business name
+// §5 backlog filter: customers in entity categories still missing a business name
 const missingEntityName = ref(false)
 const missingCount = ref<number | null>(null)
+
+// ── Onboarding triage (frontend-web-customer-onboarding-stage.md) ──
+// Deep-link support: tiles/upsell links arrive as ?stage=<stage>&subscribed=false
+const route = useRoute()
+const stageFilter = ref<CustomerOnboardingStage | ''>(
+  isOnboardingStage(route.query.stage) ? route.query.stage : '',
+)
+// true = only customers WITHOUT an active subscription (the PAYG upsell list);
+// kept separate from the existing `plan` filter which has different semantics
+const noSubscription = ref(route.query.subscribed === 'false')
+const onboardingCounts = ref<OnboardingCounts | null>(null)
+
+// The counts endpoint is not in the checked-in apidoc yet — use the raw request
+// so an undeployed route degrades silently (tiles hide) instead of toasting.
+async function fetchOnboardingCounts() {
+  try {
+    onboardingCounts.value = await api.request<OnboardingCounts>('/customer/admin/onboarding/counts')
+  } catch {
+    onboardingCounts.value = null
+  }
+}
+
+function toggleStage(stage: CustomerOnboardingStage) {
+  stageFilter.value = stageFilter.value === stage ? '' : stage
+}
 
 const customers = ref<CustomerListItem[]>([])
 const total = ref(0)
@@ -104,6 +130,8 @@ async function fetchCustomers() {
   if (statusFilter.value !== 'all') params.set('status', statusFilter.value)
   if (planFilter.value !== 'all') params.set('plan', planFilter.value)
   if (missingEntityName.value) params.set('missingEntityName', 'true')
+  if (stageFilter.value) params.set('onboardingStage', stageFilter.value)
+  if (noSubscription.value) params.set('subscribed', 'false')
 
   const api = useApi()
   const data = await api.get<{ data: CustomerListItem[]; pagination: { total: number } }>(`/customer/admin/list?${params}`)
@@ -123,7 +151,7 @@ async function fetchMissingCount() {
   if (data) missingCount.value = data.pagination?.total ?? 0
 }
 
-watch([search, statusFilter, planFilter, missingEntityName], () => { page.value = 1; fetchCustomers() })
+watch([search, statusFilter, planFilter, missingEntityName, stageFilter, noSubscription], () => { page.value = 1; fetchCustomers() })
 watch(page, fetchCustomers)
 
 // Last pickup: prefer lastPickupDate, fall back to locationUpdatedAt
@@ -137,12 +165,18 @@ onMounted(async () => {
   initialLoading.value = true
   await fetchCustomers()
   fetchMissingCount()
+  fetchOnboardingCounts()
   initialLoading.value = false
 })
 
+function handleCustomersChanged() {
+  fetchCustomers()
+  fetchOnboardingCounts()
+}
+
 function handleCustomerCreated(customerId: string) {
   showModal.value = false
-  fetchCustomers()
+  handleCustomersChanged()
   toast.success('Customer created')
   // A per_bin customer can't be subscribed or priced until bins are set, so the
   // create modal hands back the new id and we open the Bin Mix editor directly.
@@ -190,6 +224,7 @@ async function downloadExcel() {
       'Last Pickup': lastPickupDisplay(c),
       Balance: c.balance ?? 0,
       Status: c.status ?? '—',
+      Onboarding: c.onboarding ? stageTone(c.onboarding.stage).label : '—',
     }))
 
     const worksheet = XLSX.utils.json_to_sheet(rows)
@@ -242,6 +277,24 @@ function statusBadge(status: string) {
           Add Customer
         </button>
       </div>
+    </div>
+
+    <!-- Onboarding triage tiles (doc §1): click filters the list by stage, click again clears -->
+    <div v-if="onboardingCounts" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">
+      <button
+        v-for="s in ONBOARDING_STAGE_ORDER"
+        :key="s"
+        type="button"
+        :title="stageFilter === s ? 'Clear stage filter' : `Filter list: ${stageTone(s).label}`"
+        @click="toggleStage(s)"
+        :style="`background:white;border:${stageFilter === s ? '2px solid #ffb400' : '1px solid #f0f0f0'};border-radius:14px;padding:14px 16px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:6px;font-family:'Manrope',sans-serif`"
+      >
+        <span style="font-size:22px;font-weight:700;color:#1a1a1a;line-height:1.1">{{ onboardingCounts[s] }}</span>
+        <span :style="`display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:${stageTone(s).fg}`">
+          <span :style="`width:8px;height:8px;border-radius:50%;background:${stageTone(s).bg};border:1px solid ${stageTone(s).fg};flex-shrink:0`"></span>
+          {{ stageTone(s).label }}
+        </span>
+      </button>
     </div>
 
     <!-- Filters card -->
@@ -302,7 +355,7 @@ function statusBadge(status: string) {
       </div>
 
       <!-- Saved filter chip (§5): customers in entity categories with no business name yet -->
-      <div style="margin-top:14px;display:flex;gap:8px">
+      <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
         <button
           type="button"
           @click="missingEntityName = !missingEntityName"
@@ -311,6 +364,15 @@ function statusBadge(status: string) {
           <UIcon name="i-lucide-building-2" style="width:14px;height:14px" />
           Missing business name
           <span v-if="missingCount != null" style="background:#ffb400;color:#1a1a1a;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700">{{ missingCount }}</span>
+        </button>
+        <!-- PAYG upsell filter (doc §2): subscribed=false — pairs with the Ready-to-order tile -->
+        <button
+          type="button"
+          @click="noSubscription = !noSubscription"
+          :style="`display:flex;align-items:center;gap:6px;height:32px;padding:0 14px;border-radius:1000px;border:1px solid ${noSubscription ? '#0369a1' : '#e5e7eb'};background:${noSubscription ? '#f0f9ff' : '#fff'};font-size:13px;font-weight:600;color:${noSubscription ? '#0369a1' : '#6b7280'};font-family:'Manrope',sans-serif;cursor:pointer`"
+        >
+          <UIcon name="i-lucide-credit-card" style="width:14px;height:14px" />
+          No active subscription
         </button>
       </div>
     </div>
@@ -328,6 +390,7 @@ function statusBadge(status: string) {
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Last Pickup</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Balance</th>
             <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Status</th>
+            <th style="padding:14px 16px;text-align:left;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Onboarding</th>
             <th style="padding:14px 16px;text-align:right;font-size:14px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif;white-space:nowrap">Actions</th>
           </tr>
         </thead>
@@ -361,6 +424,13 @@ function statusBadge(status: string) {
                 {{ statusBadge(c.status).label }}
               </span>
             </td>
+            <!-- Stage badge from the server-derived onboarding object; hidden when the backend predates the feature -->
+            <td style="padding:16px">
+              <span v-if="c.onboarding" :style="`font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;color:${stageTone(c.onboarding.stage).fg};background:${stageTone(c.onboarding.stage).bg};border-radius:14px;padding:3px 10px;white-space:nowrap`">
+                {{ stageTone(c.onboarding.stage).label }}
+              </span>
+              <span v-else style="font-size:14px;color:#9ca3af;font-family:'Manrope',sans-serif">—</span>
+            </td>
             <td style="padding:16px">
               <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px">
                 <NuxtLink :to="`/customers/${c.id}`" style="text-decoration:none">
@@ -389,7 +459,7 @@ function statusBadge(status: string) {
             </td>
           </tr>
           <tr v-if="customers.length === 0">
-            <td colspan="9" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No customers found</td>
+            <td colspan="10" style="padding:48px 16px;text-align:center;font-size:14px;color:#6b7280;font-family:'Manrope',sans-serif">No customers found</td>
           </tr>
         </tbody>
       </table>
@@ -405,7 +475,7 @@ function statusBadge(status: string) {
   <LazyCustomerModal v-if="showModal" @close="showModal = false" @success="handleCustomerCreated" />
 
   <!-- Bulk Import Modal (xlsx, review-before-commit) -->
-  <LazyBulkImportCustomersModal v-if="showImportModal" @close="showImportModal = false" @imported="fetchCustomers" />
+  <LazyBulkImportCustomersModal v-if="showImportModal" @close="showImportModal = false" @imported="handleCustomersChanged" />
 
   <!-- Suspend Modal -->
   <LazySuspendModal

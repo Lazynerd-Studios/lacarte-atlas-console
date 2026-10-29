@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Customer, CustomerBin, CustomerPickupHistoryEntry } from '~/types/customer'
+import { ONBOARDING_STEP_KEYS, stageTone, stagePercent, stepLabel, stepApplicable, nextActionFor } from '~/utils/onboarding'
 
 definePageMeta({ layout: 'dashboard' })
 
@@ -11,6 +12,33 @@ const customer = ref<Customer | null>(null)
 const loading = ref(true)
 const notFound = ref(false)
 const suspending = ref(false)
+
+// ── Onboarding stage panel (frontend-web-customer-onboarding-stage.md) ──
+// Stage is server-derived and authoritative — never recomputed here. The panel
+// hides itself when the backend response has no `onboarding` (older deploy).
+const onboarding = computed(() => customer.value?.onboarding ?? null)
+const onboardingSteps = computed(() => {
+  if (!onboarding.value || !customer.value) return []
+  const ctx = {
+    requiresEntityName: customer.value.customerType?.requiresEntityName,
+    pricingMode: customer.value.customerType?.pricingMode,
+  }
+  return ONBOARDING_STEP_KEYS.map(key => ({
+    key,
+    label: stepLabel(key),
+    done: onboarding.value!.steps[key],
+    applicable: stepApplicable(key, ctx),
+  }))
+})
+// missingSteps[0] drives the next action; 'email' renders as guidance only
+// (no admin-side resend endpoint is verified in the checked-in apidoc)
+const onboardingAction = computed(() => nextActionFor(onboarding.value?.missingSteps))
+
+function runOnboardingAction(kind: string) {
+  if (kind === 'edit') showEditModal.value = true
+  else if (kind === 'bins') activeTab.value = 'Bin Mix'
+  else if (kind === 'pickup') navigateTo('/pickups')
+}
 
 async function fetchCustomer() {
   loading.value = true
@@ -633,6 +661,48 @@ function noteDate(dateString?: string | null): string {
 
       <!-- Tab content -->
       <div style="padding:24px">
+
+        <!-- Onboarding stage: badge + progress + six-step checklist + next action (doc §3) -->
+        <div v-if="activeTab === 'Overview' && onboarding" style="background:white;border:1px solid #f0f0f0;border-radius:16px;padding:20px 24px;display:flex;flex-direction:column;gap:14px;margin-bottom:24px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <p style="font-size:16px;font-weight:600;color:#111;font-family:'Manrope',sans-serif;margin:0">Onboarding</p>
+            <span :style="`font-size:12px;font-weight:600;color:${stageTone(onboarding.stage).fg};background:${stageTone(onboarding.stage).bg};border-radius:14px;padding:4px 12px;font-family:'Manrope',sans-serif;white-space:nowrap`">{{ stageTone(onboarding.stage).label }}</span>
+          </div>
+          <!-- percentComplete is a 0–1 fraction — stagePercent clamps and scales it -->
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+              <span style="font-size:12px;color:#6b7280;font-family:'Manrope',sans-serif">Progress</span>
+              <span style="font-size:12px;font-weight:600;color:#1a1a1a;font-family:'Manrope',sans-serif">{{ stagePercent(onboarding.percentComplete) }}%</span>
+            </div>
+            <div style="height:8px;background:#f3f4f6;border-radius:4px;overflow:hidden">
+              <div :style="`height:100%;width:${stagePercent(onboarding.percentComplete)}%;background:${onboarding.stage === 'onboarded' ? '#22c55e' : '#ffb400'};border-radius:4px;transition:width 0.3s ease`"></div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">
+            <div
+              v-for="s in onboardingSteps"
+              :key="s.key"
+              :style="`display:flex;align-items:center;gap:8px;font-size:13px;font-family:'Manrope',sans-serif;color:${!s.applicable ? '#9ca3af' : (s.done ? '#16a34a' : '#ef4444')};${!s.applicable ? 'opacity:0.7' : ''}`"
+              :title="s.applicable ? '' : `${s.label} — not applicable for this customer type`"
+            >
+              <UIcon
+                :name="!s.applicable ? 'i-lucide-minus-circle' : (s.done ? 'i-lucide-circle-check' : 'i-lucide-circle-x')"
+                :style="`width:15px;height:15px;flex-shrink:0;color:${!s.applicable ? '#d1d5db' : (s.done ? '#22c55e' : '#ef4444')}`"
+              />
+              <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.applicable ? s.label : `${s.label} (N/A)` }}</span>
+            </div>
+          </div>
+          <div v-if="onboardingAction.kind !== 'none'" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#f8f9fa;border-radius:10px;padding:10px 14px">
+            <UIcon name="i-lucide-corner-down-right" style="width:15px;height:15px;color:#6b7280;flex-shrink:0" />
+            <span style="font-size:13px;color:#374151;font-family:'Manrope',sans-serif;flex:1;min-width:0">{{ onboardingAction.kind === 'email' ? onboardingAction.hint : `Next step: ${onboardingAction.label.toLowerCase()}` }}</span>
+            <button
+              v-if="onboardingAction.kind !== 'email'"
+              type="button"
+              @click="runOnboardingAction(onboardingAction.kind)"
+              style="height:32px;padding:0 14px;background:#ffb400;color:#1a1a1a;border:none;border-radius:1000px;font-size:12px;font-weight:600;font-family:'Manrope',sans-serif;cursor:pointer;white-space:nowrap"
+            >{{ onboardingAction.label }}</button>
+          </div>
+        </div>
 
         <!-- Overview -->
         <div v-if="activeTab === 'Overview'" class="overview-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
