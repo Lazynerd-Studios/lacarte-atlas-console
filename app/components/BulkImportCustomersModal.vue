@@ -24,7 +24,7 @@ type Step = 'select' | 'preview' | 'result'
 const step = ref<Step>('select')
 const file = ref<File | null>(null)
 const fileError = ref('')
-// Server rejection banner (422/400/etc.) — always means nothing was created
+// Upload and response errors; an unreadable commit response has an unknown outcome.
 const bannerError = ref('')
 const validating = ref(false)
 const committing = ref(false)
@@ -101,48 +101,56 @@ async function runValidation() {
   validating.value = true
   bannerError.value = ''
   fileError.value = ''
-  const outcome = await uploadTo('/customer/admin/import/validate')
-  if (!outcome.ok) {
-    bannerError.value = outcome.message
-  } else {
-    const parsed = await parseImportResponse<ImportPreviewResponse>(outcome.res)
-    if (parsed.ok) {
-      preview.value = parsed.data
-      step.value = 'preview'
+  try {
+    const outcome = await uploadTo('/customer/admin/import/validate')
+    if (!outcome.ok) {
+      bannerError.value = outcome.message
     } else {
-      bannerError.value = parsed.message
+      const parsed = await parseImportResponse(outcome.res, 'preview')
+      if (parsed.ok) {
+        preview.value = parsed.data
+        step.value = 'preview'
+      } else {
+        bannerError.value = parsed.message
+      }
     }
+  } finally {
+    validating.value = false
   }
-  validating.value = false
 }
 
 async function commitImport() {
   if (!commitEnabled.value) return
   committing.value = true
   bannerError.value = ''
-  const outcome = await uploadTo('/customer/admin/import')
-  if (!outcome.ok) {
-    bannerError.value = outcome.message
-  } else {
-    const parsed = await parseImportResponse<ImportCommitResponse>(outcome.res)
-    if (parsed.ok) {
-      result.value = parsed.data
-      step.value = 'result'
-      if (parsed.data.created > 0) {
-        toast.success(`${parsed.data.created} customer${parsed.data.created === 1 ? '' : 's'} imported — temp passwords were emailed`)
-        emit('imported') // refresh the customer list behind the modal
-      } else {
-        toast.warning('Import finished', 'No customers were created — see the summary below.')
-      }
+  try {
+    const outcome = await uploadTo('/customer/admin/import')
+    if (!outcome.ok) {
+      bannerError.value = outcome.message
     } else {
-      // 4xx on commit: rejected wholesale, nothing created — force a fresh file pick
-      bannerError.value = parsed.message
-      file.value = null
-      preview.value = null
-      step.value = 'select'
+      const parsed = await parseImportResponse(outcome.res, 'commit')
+      if (parsed.ok) {
+        result.value = parsed.data
+        step.value = 'result'
+        if (parsed.data.created > 0) {
+          toast.success(`${parsed.data.created} customer${parsed.data.created === 1 ? '' : 's'} imported — temp passwords were emailed`)
+          emit('imported') // refresh the customer list behind the modal
+        } else {
+          toast.warning('Import finished', 'No customers were created — see the summary below.')
+        }
+      } else {
+        // A malformed success response cannot confirm whether the import committed.
+        bannerError.value = outcome.res.ok
+          ? `${parsed.message} The import outcome could not be confirmed. Check the customer list before trying again.`
+          : parsed.message
+        file.value = null
+        preview.value = null
+        step.value = 'select'
+      }
     }
+  } finally {
+    committing.value = false
   }
-  committing.value = false
 }
 
 function backToSelect() {
@@ -184,7 +192,7 @@ function backToSelect() {
       <!-- Body -->
       <div style="flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:16px">
 
-        <!-- Server rejection banner (422/400/...): nothing was created -->
+        <!-- Upload or response error -->
         <div
           v-if="bannerError"
           role="alert"
