@@ -89,14 +89,32 @@ const missingEntityName = ref(false)
 const missingCount = ref<number | null>(null)
 
 // ── Onboarding triage (frontend-web-customer-onboarding-stage.md) ──
-// Deep-link support: tiles/upsell links arrive as ?stage=<stage>&subscribed=false
+// The URL is the source of truth for shareable triage filters and route navigation.
 const route = useRoute()
-const stageFilter = ref<CustomerOnboardingStage | ''>(
-  isOnboardingStage(route.query.stage) ? route.query.stage : '',
-)
+const router = useRouter()
+const stageFilter = computed<CustomerOnboardingStage | ''>({
+  get: () => {
+    const stage = route.query.onboardingStage
+    return isOnboardingStage(stage) ? stage : ''
+  },
+  set: (stage) => {
+    void router.replace({
+      query: { ...route.query, onboardingStage: stage || undefined },
+      hash: route.hash,
+    })
+  },
+})
 // true = only customers WITHOUT an active subscription (the PAYG upsell list);
 // kept separate from the existing `plan` filter which has different semantics
-const noSubscription = ref(route.query.subscribed === 'false')
+const noSubscription = computed({
+  get: () => route.query.subscribed === 'false',
+  set: (enabled: boolean) => {
+    void router.replace({
+      query: { ...route.query, subscribed: enabled ? 'false' : undefined },
+      hash: route.hash,
+    })
+  },
+})
 const onboardingCounts = ref<OnboardingCounts | null>(null)
 
 // The counts endpoint is not in the checked-in apidoc yet — use the raw request

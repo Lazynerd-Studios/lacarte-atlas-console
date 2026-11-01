@@ -378,71 +378,90 @@ function setupMapInteractions(mapLibreMap: MaplibreMap) {
   })
 }
 
-function connectSSE() {
+async function connectSSE() {
   if (!authStore.token) {
     streamError.value = 'Not authenticated. Please log in again.'
     return
   }
 
-  abortController = new AbortController()
+  abortController?.abort()
+  const controller = new AbortController()
+  abortController = controller
+  connected.value = false
+  // An older request must not overwrite a replacement connection's state.
+  const isCurrent = () => abortController === controller && !controller.signal.aborted
 
-  api.authFetch('/tracking/sse/drivers', {
-    headers: {
-      'Accept': 'text/event-stream',
-    },
-    signal: abortController.signal,
-  }).then(async (response) => {
+  try {
+    const response = await api.authFetch('/tracking/sse/drivers', {
+      headers: {
+        'Accept': 'text/event-stream',
+      },
+      signal: controller.signal,
+    })
+    if (!isCurrent()) {
+      await response.body?.cancel()
+      return
+    }
     if (!response.ok) {
       streamError.value = `Failed to connect to tracking stream (${response.status})`
-      connected.value = false
+      return
+    }
+
+    const reader = response.body?.getReader()
+    if (!reader) {
+      streamError.value = 'Failed to read tracking stream'
       return
     }
 
     connected.value = true
     streamError.value = ''
     loading.value = false
-
-    const reader = response.body?.getReader()
-    if (!reader) {
-      streamError.value = 'Failed to read tracking stream'
-      connected.value = false
-      return
-    }
-
     const decoder = new TextDecoder()
     let buffer = ''
 
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
+    try {
+      while (isCurrent()) {
+        const { done, value } = await reader.read()
+        if (!isCurrent()) break
+        if (done) {
+          streamError.value = 'Tracking stream ended. Reconnect to resume live updates.'
+          break
+        }
 
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
 
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(line.slice(6))
-            if (data && data.driverId) {
-              drivers.value.set(data.driverId, data)
-              if (mapReady) {
-                updateMarkers()
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              if (data && data.driverId) {
+                drivers.value.set(data.driverId, data)
+                if (mapReady) {
+                  updateMarkers()
+                }
               }
+            } catch (err) {
+              console.error('Failed to parse SSE data:', err)
             }
-          } catch (err) {
-            console.error('Failed to parse SSE data:', err)
           }
         }
       }
+    } finally {
+      reader.releaseLock()
     }
-  }).catch((err) => {
-    if (err.name !== 'AbortError') {
+  } catch (err) {
+    if (isCurrent()) {
       console.error('SSE connection error:', err)
       streamError.value = 'Lost connection to tracking stream'
-      connected.value = false
     }
-  })
+  } finally {
+    if (abortController === controller) {
+      connected.value = false
+      abortController = null
+    }
+  }
 }
 
 function disconnectSSE() {
