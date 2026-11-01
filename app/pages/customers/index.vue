@@ -200,7 +200,8 @@ async function downloadExcel() {
     XLSX.writeFile(workbook, `customers-${date}.xlsx`)
 
     toast.success('Customers exported successfully')
-  } catch (err: any) {
+  } catch (e) {
+    const err = asError(e)
     toast.error('Failed to export customers', err.message)
   } finally {
     downloading.value = false

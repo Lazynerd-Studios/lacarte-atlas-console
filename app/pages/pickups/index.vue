@@ -266,7 +266,8 @@ async function handleAssignDriver(data: { driver: string; scheduledDate: string;
     showAssignDriverModal.value = false
     selectedRequest.value = null
     await Promise.all([fetchRequests(), fetchStats()])
-  } catch (err: any) {
+  } catch (e) {
+    const err = asError(e)
     console.error('Error assigning/reassigning driver:', err)
   }
 }

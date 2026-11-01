@@ -54,7 +54,8 @@ export function useProductImageUpload(maxImages = 5) {
       }
       const data = await res.json() as { urls: string[] }
       imagePreviews.value.push(...data.urls)
-    } catch (err: any) {
+    } catch (e) {
+      const err = asError(e)
       console.error('[useProductImageUpload] Image upload failed:', err)
       const toast = useAppToast()
       toast.error('Upload failed', err?.message || 'Could not upload images.')

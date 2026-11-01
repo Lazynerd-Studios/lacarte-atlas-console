@@ -97,7 +97,8 @@ async function loadMember() {
       
       console.log('[Team Edit] Form populated', { form, selectedPermissions: selectedPermissions.value })
     }
-  } catch (err: any) {
+  } catch (e) {
+    const err = asError(e)
     console.error('[Team Edit] Failed to load member', { error: err })
     // Handle invalid member ID error
     toast.error('Member not found', 'The requested team member could not be found')
@@ -231,7 +232,8 @@ async function handleSubmit() {
     // Success flow
     toast.success('Team member updated successfully')
     router.push('/team')
-  } catch (err: any) {
+  } catch (e) {
+    const err = asError(e)
     submitting.value = false
     
     // Handle 400 validation errors or 404 not found

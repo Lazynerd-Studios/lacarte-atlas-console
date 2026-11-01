@@ -135,7 +135,8 @@ async function fetchPickupDetails() {
     if (data) {
       pickupData.value = data
     }
-  } catch (err: any) {
+  } catch (e) {
+    const err = asError(e)
     error.value = err?.message || 'An unexpected error occurred'
     console.error('Error fetching pickup details:', err)
   } finally {
@@ -154,7 +155,8 @@ async function fetchActivityLog() {
     if (data) {
       activityLogData.value = data
     }
-  } catch (err: any) {
+  } catch (e) {
+    const err = asError(e)
     console.error('Error fetching activity log:', err)
   }
 }
@@ -413,7 +415,8 @@ async function startTrip() {
     
     await fetchPickupDetails()
     await fetchActivityLog()
-  } catch (err: any) {
+  } catch (e) {
+    const err = asError(e)
     console.error('Error starting trip:', err)
   }
 }
@@ -431,7 +434,8 @@ async function markEnRoute() {
     
     await fetchPickupDetails()
     await fetchActivityLog()
-  } catch (err: any) {
+  } catch (e) {
+    const err = asError(e)
     console.error('Error marking as en route:', err)
   }
 }
@@ -449,7 +453,8 @@ async function markPickedUp() {
     
     await fetchPickupDetails()
     await fetchActivityLog()
-  } catch (err: any) {
+  } catch (e) {
+    const err = asError(e)
     console.error('Error marking as picked up:', err)
   }
 }
@@ -467,7 +472,8 @@ async function completePickup() {
     
     await fetchPickupDetails()
     await fetchActivityLog()
-  } catch (err: any) {
+  } catch (e) {
+    const err = asError(e)
     console.error('Error completing pickup:', err)
   }
 }
@@ -486,7 +492,8 @@ async function cancelPickup() {
     showCancelConfirm.value = false
     await fetchPickupDetails()
     await fetchActivityLog()
-  } catch (err: any) {
+  } catch (e) {
+    const err = asError(e)
     console.error('Error cancelling pickup:', err)
   }
 }
@@ -538,7 +545,8 @@ async function handleReassign(data: { driver: string; scheduledDate: string; sch
     showReassignModal.value = false
     await fetchPickupDetails()
     await fetchActivityLog()
-  } catch (err: any) {
+  } catch (e) {
+    const err = asError(e)
     console.error('Error assigning/reassigning driver:', err)
     // Reset submitting state so user can retry
     if (assignDriverModalRef.value) {

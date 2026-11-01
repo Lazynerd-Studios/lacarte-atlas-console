@@ -23,17 +23,29 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isAuthenticated = computed(() => !!token.value)
 
+  /**
+   * Single place for the store's own authenticated calls. The store cannot use
+   * `useApi()` (it depends on this store, and it would be instantiated while
+   * the store is still being set up), so the base URL and auth headers are
+   * centralized here instead of being repeated per call.
+   */
+  function authedFetch(path: string, init: RequestInit = {}): Promise<Response> {
+    const config = useRuntimeConfig()
+    return fetch(`${config.public.apiBase}${path}`, {
+      ...init,
+      headers: {
+        'Authorization': `Bearer ${token.value}`,
+        'Content-Type': 'application/json',
+        ...(init.headers as Record<string, string> | undefined),
+      },
+    })
+  }
+
   async function fetchTeamMemberProfile() {
     if (!token.value || !user.value) return
 
     try {
-      const config = useRuntimeConfig()
-      const res = await fetch(`${config.public.apiBase}/user/profile`, {
-        headers: {
-          'Authorization': `Bearer ${token.value}`,
-          'Content-Type': 'application/json',
-        },
-      })
+      const res = await authedFetch('/user/profile')
 
       if (res.ok) {
         const response = (await res.json()) as ProfileResponse
@@ -156,13 +168,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (!token.value) return false
 
     try {
-      const config = useRuntimeConfig()
-      const res = await fetch(`${config.public.apiBase}/auth/get-session`, {
-        headers: {
-          'Authorization': `Bearer ${token.value}`,
-          'Content-Type': 'application/json',
-        },
-      })
+      const res = await authedFetch('/auth/get-session')
 
       if (res.ok) {
         const data = (await res.json()) as SessionResponse
@@ -175,15 +181,22 @@ export const useAuthStore = defineStore('auth', () => {
         lastSessionCheckAt = Date.now()
         scheduleSessionWarning()
         return true
-      } else {
+      }
+
+      // Only an explicit auth rejection ends the session. Server errors (5xx),
+      // rate limiting, etc. are transient: keep the user signed in and let the
+      // next check retry (lastSessionCheckAt is intentionally not advanced).
+      if (res.status === 401 || res.status === 403) {
         console.log('[auth] Session expired or invalid')
-        await logout()
+        await logout(true)
         return false
       }
+      console.warn(`[auth] Session check inconclusive (HTTP ${res.status}); keeping session`)
+      return true
     } catch (error) {
-      console.error('[auth] Session check failed:', error)
-      await logout()
-      return false
+      // Network failure / offline: do not sign the user out on a transient error.
+      console.warn('[auth] Session check failed (network error); keeping session:', error)
+      return true
     }
   }
 
@@ -334,13 +347,8 @@ export const useAuthStore = defineStore('auth', () => {
     // event object passed by a template handler can never trigger the skip.
     if (token.value && skipServerCall !== true) {
       try {
-        const config = useRuntimeConfig()
-        await fetch(`${config.public.apiBase}/auth/sign-out`, {
+        await authedFetch('/auth/sign-out', {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token.value}`,
-            'Content-Type': 'application/json',
-          },
           body: JSON.stringify({}),
         })
       } catch (error) {

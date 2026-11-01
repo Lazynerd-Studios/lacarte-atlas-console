@@ -349,7 +349,8 @@ async function handleAdd() {
     toast.success('Plan created successfully')
     showAddModal.value = false
     await Promise.all([fetchPlans(), fetchStats()])
-  } catch (err: any) {
+  } catch (e) {
+    const err = asError(e)
     console.error('[handleAdd] Error creating plan:', err)
     
     // Handle 400 validation errors in modal (e.g., duplicate plan name)
@@ -455,7 +456,8 @@ async function handleEdit() {
     toast.success('Plan updated successfully')
     showEditModal.value = false
     await Promise.all([fetchPlans(), fetchStats()])
-  } catch (err: any) {
+  } catch (e) {
+    const err = asError(e)
     console.error('[handleEdit] Error updating plan:', err)
     
     // Handle 400 validation errors in modal (e.g., duplicate plan name)

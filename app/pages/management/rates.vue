@@ -145,7 +145,8 @@ async function handleCapacitySubmit() {
     }
     showCapacityModal.value = false
     await fetchCapacityTiers()
-  } catch (err: any) {
+  } catch (e) {
+    const err = asError(e)
     capacityError.value = err?.message || 'Failed to save capacity tier'
   } finally {
     submitting.value = false
@@ -251,7 +252,8 @@ async function handleTruckSubmit() {
     }
     showTruckModal.value = false
     await fetchTruckTiers()
-  } catch (err: any) {
+  } catch (e) {
+    const err = asError(e)
     truckError.value = err?.message || 'Failed to save truck load tier'
   } finally {
     submitting.value = false
@@ -308,7 +310,8 @@ async function handleDelete() {
     showDeleteModal.value = false
     deleteTarget.value = null
     await (isCapacity ? fetchCapacityTiers() : fetchTruckTiers())
-  } catch (err: any) {
+  } catch (e) {
+    const err = asError(e)
     // Keep the modal open with the server message inline; a tier-in-use 409
     // offers deactivate-instead as the safe alternative
     const m = err?.message || 'Failed to delete tier'
