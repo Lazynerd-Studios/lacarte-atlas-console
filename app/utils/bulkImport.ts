@@ -1,6 +1,7 @@
 // Pure helpers for customer bulk import (frontend-web-customer-bulk-import.md).
 // Kept out of the SFC so they can be unit-tested, per the repo's
 // rateValidation/teamValidation convention.
+import type { ImportPreviewResponse, ImportCommitResponse } from '~/types/customer'
 
 /** Doc §5: files over 1 MB are rejected by the server (422) — pre-flight the same limit. */
 export const IMPORT_MAX_BYTES = 1024 * 1024
@@ -58,21 +59,82 @@ export function importRowTone(status: 'valid' | 'invalid' | 'duplicate'): Import
   return { bg: '#f3f4f6', fg: '#6b7280', label: 'Duplicate' }
 }
 
-/**
- * Read an import upload response: parse the body once, pass through JSON on
- * success, and convert any 4xx into doc-mapped UI text. Structurally typed so
- * tests can pass a fake Response.
- */
-export async function parseImportResponse<T>(res: {
+type ImportResponses = {
+  preview: ImportPreviewResponse
+  commit: ImportCommitResponse
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function isCount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+}
+
+function isNamedReference(value: unknown): boolean {
+  return value === null || (isRecord(value) && typeof value.id === 'string' && typeof value.name === 'string')
+}
+
+function isImportIssues(value: unknown): boolean {
+  return Array.isArray(value) && value.every(issue =>
+    isRecord(issue) && typeof issue.field === 'string' && typeof issue.message === 'string',
+  )
+}
+
+function isPreviewResponse(value: unknown): value is ImportPreviewResponse {
+  return isRecord(value)
+    && ['total', 'valid', 'invalid', 'duplicate'].every(key => isCount(value[key]))
+    && Array.isArray(value.rows)
+    && value.rows.every(row =>
+      isRecord(row)
+      && isCount(row.row) && row.row > 0
+      && ['valid', 'invalid', 'duplicate'].includes(row.status as string)
+      && typeof row.email === 'string'
+      && typeof row.fullName === 'string'
+      && (row.businessName === null || typeof row.businessName === 'string')
+      && isNamedReference(row.customerType)
+      && isNamedReference(row.zone)
+      && (row.pricingMode === null || row.pricingMode === 'per_bin' || row.pricingMode === 'full_truck')
+      && isImportIssues(row.issues),
+    )
+}
+
+function isCommitResponse(value: unknown): value is ImportCommitResponse {
+  return isRecord(value)
+    && ['total', 'created', 'skipped', 'failed', 'needsBins'].every(key => isCount(value[key]))
+    && Array.isArray(value.errors)
+    && value.errors.every(error =>
+      isRecord(error)
+      && isCount(error.row) && error.row > 0
+      && typeof error.email === 'string'
+      && isImportIssues(error.issues),
+    )
+}
+
+/** Read the body once and validate the selected import phase before exposing it to the UI. */
+export async function parseImportResponse<T extends keyof ImportResponses>(res: {
   ok: boolean
   status: number
   text: () => Promise<string>
-}): Promise<{ ok: true; data: T } | { ok: false; message: string }> {
-  const text = await res.text()
-  let body: any = null
+}, phase: T): Promise<{ ok: true; data: ImportResponses[T] } | { ok: false; message: string }> {
+  let text: string
+  try {
+    text = await res.text()
+  } catch {
+    return { ok: false, message: 'Could not read the server response.' }
+  }
+
+  let body: unknown = null
   if (text) {
     try { body = JSON.parse(text) } catch { /* non-JSON body — handled below */ }
   }
-  if (res.ok) return { ok: true, data: (body ?? {}) as T }
-  return { ok: false, message: mapImportFailure(res.status, body?.message) }
+  if (!res.ok) {
+    const message = isRecord(body) && typeof body.message === 'string' ? body.message : undefined
+    return { ok: false, message: mapImportFailure(res.status, message) }
+  }
+  if (phase === 'preview' ? isPreviewResponse(body) : isCommitResponse(body)) {
+    return { ok: true, data: body as ImportResponses[T] }
+  }
+  return { ok: false, message: 'Received an invalid import response from the server.' }
 }

@@ -103,25 +103,108 @@ describe('parseImportResponse', () => {
     return { ok, status, text: async () => body }
   }
 
-  it('passes through parsed JSON on success', async () => {
-    const res = await parseImportResponse<{ total: number }>(fakeRes(200, true, '{"total":3}'))
-    expect(res).toEqual({ ok: true, data: { total: 3 } })
+  const preview = {
+    total: 1, valid: 1, invalid: 0, duplicate: 0,
+    rows: [{
+      row: 2, status: 'valid', email: 'customer@example.test', fullName: 'Test Customer',
+      businessName: null, customerType: { id: 'type-1', name: 'Residential' },
+      zone: { id: 'zone-1', name: 'Central' }, pricingMode: 'per_bin', issues: [],
+    }],
+  }
+  const commit = { total: 1, created: 1, skipped: 0, failed: 0, needsBins: 1, errors: [] }
+
+  it('accepts a complete preview response', async () => {
+    const res = await parseImportResponse(fakeRes(200, true, JSON.stringify(preview)), 'preview')
+    expect(res).toEqual({ ok: true, data: preview })
+  })
+
+  it('accepts invalid and duplicate preview rows with nullable unresolved fields', async () => {
+    const data = {
+      total: 2, valid: 0, invalid: 1, duplicate: 1,
+      rows: ['invalid', 'duplicate'].map((status, index) => ({
+        ...preview.rows[0], row: index + 2, status, customerType: null, zone: null,
+        pricingMode: null, issues: [{ field: 'email', message: 'Check this address' }],
+      })),
+    }
+    expect(await parseImportResponse(fakeRes(200, true, JSON.stringify(data)), 'preview'))
+      .toEqual({ ok: true, data })
+  })
+
+  it('accepts a complete commit response', async () => {
+    expect(await parseImportResponse(fakeRes(201, true, JSON.stringify(commit)), 'commit'))
+      .toEqual({ ok: true, data: commit })
+  })
+
+  it('accepts a commit with failed rows and field-level issues', async () => {
+    const data = {
+      ...commit, created: 0, failed: 1, needsBins: 0,
+      errors: [{ row: 2, email: 'customer@example.test', issues: [{ field: 'zone', message: 'Inactive zone' }] }],
+    }
+    expect(await parseImportResponse(fakeRes(200, true, JSON.stringify(data)), 'commit'))
+      .toEqual({ ok: true, data })
   })
 
   it('uses the server message on 4xx when provided', async () => {
-    const res = await parseImportResponse<{ total: number }>(fakeRes(400, false, '{"message":"Only 100 rows allowed"}'))
+    const res = await parseImportResponse(fakeRes(400, false, '{"message":"Only 100 rows allowed"}'), 'preview')
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.message).toBe('Only 100 rows allowed')
   })
 
   it('falls back to mapped copy for a non-JSON error body', async () => {
-    const res = await parseImportResponse(fakeRes(422, false, '<html>gateway</html>'))
+    const res = await parseImportResponse(fakeRes(422, false, '<html>gateway</html>'), 'preview')
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.message).toBe('Upload a valid .xlsx under 1 MB.')
   })
 
-  it('treats an empty 2xx body as success with an empty object', async () => {
-    const res = await parseImportResponse(fakeRes(200, true, ''))
-    expect(res).toEqual({ ok: true, data: {} })
+  it.each(['', '   ', '<html>gateway</html>', '{', 'null', '[]', 'true', '12', '"text"', '{}'])(
+    'rejects an empty, malformed, or non-object success body: %s', async (body) => {
+      for (const phase of ['preview', 'commit'] as const) {
+        const res = await parseImportResponse(fakeRes(200, true, body), phase)
+        expect(res.ok).toBe(false)
+        if (!res.ok) expect(res.message).toMatch(/invalid.*response/i)
+      }
+    },
+  )
+
+  it.each([
+    { total: '1' }, { valid: -1 }, { invalid: 0.5 }, { duplicate: null }, { rows: {} },
+    { rows: [null] }, { rows: [{ row: 2 }] },
+    { rows: [{ ...preview.rows[0], issues: null }] },
+    { rows: [{ ...preview.rows[0], issues: [{ field: 'email' }] }] },
+    { rows: [{ ...preview.rows[0], status: 'unexpected' }] },
+    { rows: [{ ...preview.rows[0], row: 0 }] },
+    { rows: [{ ...preview.rows[0], email: 1 }] },
+    { rows: [{ ...preview.rows[0], fullName: null }] },
+    { rows: [{ ...preview.rows[0], businessName: {} }] },
+    { rows: [{ ...preview.rows[0], customerType: { id: 'type-1' } }] },
+    { rows: [{ ...preview.rows[0], zone: [] }] },
+    { rows: [{ ...preview.rows[0], pricingMode: 'unknown' }] },
+  ])('rejects incorrectly typed preview fields: %j', async (patch) => {
+    const res = await parseImportResponse(fakeRes(200, true, JSON.stringify({ ...preview, ...patch })), 'preview')
+    expect(res.ok).toBe(false)
+  })
+
+  it.each([
+    { total: null }, { created: '1' }, { skipped: -1 }, { failed: 0.5 }, { needsBins: undefined },
+    { errors: null }, { errors: [null] }, { errors: [{ row: 2 }] },
+    { errors: [{ row: 0, email: 'a@example.test', issues: [] }] },
+    { errors: [{ row: 2, email: 5, issues: [] }] },
+    { errors: [{ row: 2, email: 'a@example.test', issues: [{ field: 'email', message: null }] }] },
+  ])('rejects incorrectly typed commit fields: %j', async (patch) => {
+    const res = await parseImportResponse(fakeRes(200, true, JSON.stringify({ ...commit, ...patch })), 'commit')
+    expect(res.ok).toBe(false)
+  })
+
+  it('does not accept the response shape for the other import phase', async () => {
+    expect((await parseImportResponse(fakeRes(200, true, JSON.stringify(commit)), 'preview')).ok).toBe(false)
+    expect((await parseImportResponse(fakeRes(200, true, JSON.stringify(preview)), 'commit')).ok).toBe(false)
+  })
+
+  it('returns a recoverable error when reading the response body fails', async () => {
+    const res = await parseImportResponse({
+      ok: true, status: 200, text: async () => { throw new Error('Connection interrupted') },
+    }, 'preview')
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.message).toMatch(/read.*response/i)
   })
 })

@@ -79,6 +79,12 @@ export interface Customer {
   /** Unambiguous display name: business name when present, else the person's name */
   displayName?: string
   /**
+   * Derived, read-only onboarding stage (admin detail + list responses only).
+   * Computed per request — absent when the backend predates the feature; the
+   * UI hides itself rather than guessing. Never recompute `stage` client-side.
+   */
+  onboarding?: CustomerOnboarding
+  /**
    * Per-customer pickup booking defaults (§4). Nullable preferences set via
    * PATCH /customer/admin/:id (send null to clear). They drive the zone-schedule
    * generator and act as the server-side fallback when a pickup is booked
@@ -132,6 +138,41 @@ export interface CustomerPickupHistoryEntry {
 
 /** Paginated response envelope for customer pickup history */
 export type CustomerPickupHistoryResponse = PaginatedDataResponse<CustomerPickupHistoryEntry>
+
+// ── Customer onboarding stage (frontend-web-customer-onboarding-stage.md) ──
+
+/** Ordered ladder — every customer sits in exactly one stage */
+export type CustomerOnboardingStage =
+  | 'registered'
+  | 'profile_incomplete'
+  | 'not_priced'
+  | 'ready_to_order'
+  | 'active'
+  | 'onboarded'
+
+/** Six boolean steps; non-applicable steps come back auto-true from the server */
+export interface CustomerOnboardingSteps {
+  emailVerified: boolean
+  businessName: boolean
+  address: boolean
+  priced: boolean
+  paymentActive: boolean
+  firstPickupCompleted: boolean
+}
+
+export interface CustomerOnboarding {
+  stage: CustomerOnboardingStage
+  /** Fraction 0–1 over APPLICABLE steps only — multiply by 100 to display */
+  percentComplete: number
+  steps: CustomerOnboardingSteps
+  /** Outstanding applicable steps, in ladder order; [0] drives the next action */
+  missingSteps: (keyof CustomerOnboardingSteps)[]
+}
+
+/** GET /customer/admin/onboarding/counts — all six stages always present, sum to total */
+export interface OnboardingCounts extends Record<CustomerOnboardingStage, number> {
+  total: number
+}
 
 // ── Customer bulk import (frontend-web-customer-bulk-import.md) ──
 
